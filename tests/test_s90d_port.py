@@ -196,7 +196,7 @@ class S90dPortTests(unittest.TestCase):
         # idle check only runs from the clock timer, which is stopped while Quiet Home is in the background
         self.assertIn("IdleTick();return true;", src)
         on_pause = body(src, "protected override void OnPause()")
-        self.assertIn("CloseInputs(false);HideLive();clockTimer?.Stop();", on_pause)
+        self.assertIn("CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();", on_pause)
         # first key press only wakes, never activates a tile
         on_key = body(src, "void OnKey(")
         self.assertLess(on_key.index("if(dimmed){Wake(true);"), on_key.index("HandleKey(k)"))
@@ -255,20 +255,25 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("UpdateLive()", body(src, "void BuildPage(").replace("ScheduleLive()", ""))
         # only for the current input, only with a picture, only while Quiet Home is visible and awake
         update = body(src, "void UpdateLive()")
-        # off until tuned on screen (video plane lagged the focus animation on the S90D)
-        self.assertIn("static readonly bool LivePreviewEnabled=false;", src)
-        self.assertLess(update.index("if(!LivePreviewEnabled){HideLive();return;}"), update.index("TVWindowControlAPI"))
+        # tunables come from a file read only when the preview is rebuilt, never on the key path
+        self.assertLess(update.index("liveConf=ReadLiveConf();"), update.index("TVWindowControlAPI"))
+        self.assertNotIn("ReadLiveConf", body(src, "void OnKey("))
+        # the live card does not grow or lift on focus (the video plane does not follow those animations)
+        self.assertIn("bool still=IsLiveStill(s);scale=f&&!still?1.045f:1;lift=f&&!still?-6:0;", src)
+        # video directly above the artwork, below the words
+        self.assertIn("var art=hero.Card.GetChildAt(0);", update)
         # the status dot must not flicker with the signal flag
         self.assertIn("signalTimer=new Tizen.NUI.Timer(800)", src)
         self.assertIn('page==0&&visible&&!dimmed&&CurrentHasSignal', update)
         self.assertIn('s.Action=="hdmi:"+lastSource', update)
         self.assertIn("catch(Exception ex){liveState=\"failed:\"", update)
         # released whenever Home is left: pause, OLED dim, page rebuild
-        self.assertIn("HideLive();", body(src, "protected override void OnPause()"))
+        self.assertIn("ReleaseLiveWindow();", body(src, "protected override void OnPause()"))
         self.assertIn("HideLive();", src.split("void Dim()")[1].split("void MoveDimClock()")[0])
         self.assertIn("HideLive();", body(src, "void BuildPage("))
-        # the TV window hint is turned back off with the preview
-        self.assertIn('SetAuxiliaryHintValue(tvsHint,"0")', body(src, "void HideLive()"))
+        # the TV window hint is only turned off when Home is left - toggling it per preview re-synced the input
+        self.assertNotIn('SetAuxiliaryHintValue(tvsHint,"0")', body(src, "void HideLive()"))
+        self.assertIn('SetAuxiliaryHintValue(tvsHint,"0")', body(src, "void ReleaseLiveWindow()"))
 
     def test_key_path_has_no_io_or_ipc(self):
         src = launcher()

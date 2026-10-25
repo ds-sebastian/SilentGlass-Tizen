@@ -10,9 +10,26 @@ using Tizen.NUI.BaseComponents;
 public sealed partial class QuietHome
 {
  const string SignalKey="memory/tv-viewer/mainscreen_signal_state";
- // Off until it can be tuned with someone watching: on the S90D the video plane lagged the card's focus scale/lift
- // (black cut-out while focused) and attaching it made the signal flag flap. Code kept; switch on to experiment.
- static readonly bool LivePreviewEnabled=false;
+ // Tunables, re-read whenever the preview is (re)built: /tmp/quiet-home-live.conf with key=0|1 lines.
+ //  enabled - show the preview at all;  still - the live card does not grow/lift on focus (the video plane does not
+ //  follow scale/position animations);  sync - Graphic-Video sync mode;  scrim - darken the bottom for the words.
+ const string LiveConfPath="/tmp/quiet-home-live.conf";
+ sealed class LiveConf{public bool Enabled=true,Still=true,Sync=false,Scrim=true;public string Source="default";}
+ LiveConf liveConf=new LiveConf();
+ static LiveConf ReadLiveConf()
+ {
+  var c=new LiveConf();
+  try{
+   if(!System.IO.File.Exists(LiveConfPath))return c;
+   c.Source="file";
+   foreach(var line in System.IO.File.ReadAllLines(LiveConfPath)){
+    var kv=line.Split('=');if(kv.Length!=2)continue;bool v=kv[1].Trim()=="1";
+    switch(kv[0].Trim()){case "enabled":c.Enabled=v;break;case "still":c.Still=v;break;case "sync":c.Sync=v;break;case "scrim":c.Scrim=v;break;}
+   }
+  }catch(Exception ex){c.Source="error:"+ex.GetType().Name;}
+  return c;
+ }
+ Slot liveSlot;bool liveWindow;Tizen.NUI.Timer liveGeometryTimer;
  VideoCanvasViewHolder liveView;
  Tizen.TV.Broadcast.TVWindowControl.TVWindowControlAPI tvWindow;
  uint tvsHint;bool tvsHintSet;
@@ -37,38 +54,72 @@ public sealed partial class QuietHome
  void ScheduleLive(){OnUi(UpdateLive);}
  void UpdateLive()
  {
+  liveConf=ReadLiveConf();
   Slot hero=null;
-  if(!LivePreviewEnabled){HideLive();return;}
-  if(page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
-  if(hero==null){HideLive();return;}
-  if(liveView!=null&&liveView.View.GetParent()==hero.Card)return;
+  if(liveConf.Enabled&&page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
+  if(hero==null){HideLive();MarkState("live");return;}
+  if(liveView!=null&&liveSlot==hero)return;
   HideLive();
   try{
-   if(!tvsHintSet){tvsHint=Window.Default.AddAuxiliaryHint("wm.tvs.win.use.tvs","1");tvsHintSet=true;}
-   else Window.Default.SetAuxiliaryHintValue(tvsHint,"1");
-   Window.Default.SetTransparency(true); // the video plane shows through the canvas' cut-out; background art stays opaque
+   // the window is told once that it shows TV video and stays so until Home is left (toggling it per preview made
+   // the TV re-sync the input, which flapped the signal flag, which rebuilt the preview...)
+   if(!liveWindow){
+    if(!tvsHintSet){tvsHint=Window.Default.AddAuxiliaryHint("wm.tvs.win.use.tvs","1");tvsHintSet=true;}
+    else Window.Default.SetAuxiliaryHintValue(tvsHint,"1");
+    Window.Default.SetTransparency(true);liveWindow=true;
+   }
    tvWindow??=new Tizen.TV.Broadcast.TVWindowControl.TVWindowControlAPI();
+   var art=hero.Card.GetChildAt(0); // the card artwork; the video goes directly above it, words and dot above that
    var canvas=new Tizen.TV.FLUX.VideoCanvasView{Size2D=new Size2D(hero.W,hero.H),Position2D=new Position2D(0,0)};
    canvas.CornerRadius=new Vector4(40,40,40,40);
-   hero.Card.Add(canvas);canvas.LowerToBottom();hero.Card.GetChildAt(0).LowerToBottom(); // art below, video above it, text on top
-   canvas.SetPlayer(tvWindow);
-   // keep the word and device name readable over any picture
-   var scrim=new View{Name="live-scrim",Position2D=new Position2D(0,hero.H-250),Size2D=new Size2D(hero.W,250),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(0,0,40,40)};
-   hero.Card.Add(scrim);scrim.RaiseAbove(canvas);
-   liveView=new VideoCanvasViewHolder{View=canvas};liveState="on:"+hero.Name;
+   hero.Card.Add(canvas);canvas.LowerToBottom();art.LowerToBottom();
+   View scrim=null;
+   if(liveConf.Scrim){
+    // soft fade (clear -> 60% black) under the device name, not a hard band across the picture
+    scrim=new View{Name="live-scrim",Position2D=new Position2D(0,hero.H-260),Size2D=new Size2D(hero.W,260),CornerRadius=new Vector4(0,0,40,40)};
+    var stops=new PropertyArray();stops.PushBack(new PropertyValue(new Vector4(0,0,0,0)));stops.PushBack(new PropertyValue(new Vector4(0,0,0,.6f)));
+    var offsets=new PropertyArray();offsets.PushBack(new PropertyValue(0f));offsets.PushBack(new PropertyValue(1f));
+    var fade=new PropertyMap();
+    fade.Add(Visual.Property.Type,new PropertyValue((int)Visual.Type.Gradient));
+    fade.Add(GradientVisualProperty.StartPosition,new PropertyValue(new Vector2(0,-.5f)));
+    fade.Add(GradientVisualProperty.EndPosition,new PropertyValue(new Vector2(0,.5f)));
+    fade.Add(GradientVisualProperty.StopOffset,new PropertyValue(offsets));
+    fade.Add(GradientVisualProperty.StopColor,new PropertyValue(stops));
+    fade.Add(Visual.Property.CornerRadius,new PropertyValue(new Vector4(0,0,40,40)));
+    scrim.Background=fade;
+    hero.Card.Add(scrim);scrim.LowerToBottom();art.LowerToBottom();canvas.RaiseAbove(art);scrim.RaiseAbove(canvas);
+   }
+   canvas.SetPlayer(tvWindow,liveConf.Sync?Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.GraphicVideoSync:Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.None);
+   liveView=new VideoCanvasViewHolder{View=canvas};liveSlot=hero;
+   int idx=slots.IndexOf(hero);StyleSlot(hero,idx==selected&&area==1,false); // settle any focus transform first
+   // once layout has settled, push the final rectangle to the video plane explicitly
+   liveGeometryTimer?.Stop();liveGeometryTimer=new Tizen.NUI.Timer(250);
+   liveGeometryTimer.Tick+=(s,e)=>{try{(liveView?.View as Tizen.TV.FLUX.VideoCanvasView)?.ForceUpdateVideoGeometry();}catch{}return false;};liveGeometryTimer.Start();
+   liveState="on:"+hero.Name+(liveConf.Still?":still":"")+(liveConf.Sync?":sync":"")+":conf="+liveConf.Source;
   }catch(Exception ex){liveState="failed:"+ex.GetType().Name+":"+ex.Message;HideLive();}
   MarkState("live");
  }
+ bool IsLiveStill(Slot s)=>s==liveSlot&&liveView!=null&&liveConf.Still;
  void HideLive()
  {
+  liveGeometryTimer?.Stop();
   if(liveView==null)return;
+  var was=liveSlot;liveSlot=null;
   try{
    var card=liveView.View.GetParent() as View;
    if(card!=null){for(uint i=0;i<card.ChildCount;i++){var c=card.GetChildAt(i);if(c.Name=="live-scrim"){card.Remove(c);c.Dispose();break;}}card.Remove(liveView.View);}
    liveView.View.Dispose();
   }catch{}
   liveView=null;
-  try{if(tvsHintSet)Window.Default.SetAuxiliaryHintValue(tvsHint,"0");Window.Default.SetTransparency(false);}catch{}
+  if(was!=null&&slots.Contains(was))StyleSlot(was,slots.IndexOf(was)==selected&&area==1,false);
   if(!liveState.StartsWith("failed"))liveState="off";
+ }
+ // leaving Home: hand the screen back to the TV the normal way
+ void ReleaseLiveWindow()
+ {
+  HideLive();
+  if(!liveWindow)return;
+  try{if(tvsHintSet)Window.Default.SetAuxiliaryHintValue(tvsHint,"0");Window.Default.SetTransparency(false);}catch{}
+  liveWindow=false;
  }
 }

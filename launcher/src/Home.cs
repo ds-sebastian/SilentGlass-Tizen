@@ -74,7 +74,7 @@ public sealed partial class QuietHome : NUIApplication
  }
  protected override void OnResume(){base.OnResume();visible=true;Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
- protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);HideLive();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
+ protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
  {
   clockTimer?.Start();RefreshSource();
@@ -330,7 +330,7 @@ public sealed partial class QuietHome : NUIApplication
  void StyleSlot(Slot s,bool f,bool animate)
  {
   float scale=1,lift=0,opacity=1;
-  if(s.Kind==1){scale=f?1.045f:1;lift=f?-6:0;opacity=f||area==0?1:.7f;s.Card.BorderlineWidth=f?4:0;s.Card.BorderlineColor=heroLine;}
+  if(s.Kind==1){bool still=IsLiveStill(s);scale=f&&!still?1.045f:1;lift=f&&!still?-6:0;opacity=f||area==0||s==liveSlot?1:.7f;s.Card.BorderlineWidth=f?4:0;s.Card.BorderlineColor=heroLine;}
   else if(s.Kind==2){
    scale=f?1.06f:1;
    s.Card.BackgroundColor=f?white:tileFill;

@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v15)
+## Quiet Home on the S90D (v16b)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -21,10 +21,15 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
-- **Live preview: built, switched off** (`LivePreviewEnabled`). FLUX `VideoCanvasView` + `TVWindowControlAPI`
-  (Channel List's mini-TV recipe, hint `wm.tvs.win.use.tvs=1`) attached, but the video plane lagged the card's focus
-  scale/lift (black cut-out while focused) and the signal flag flapped (40 events). Needs on-screen tuning:
-  no focus transform on the video card, fixed geometry, GV-sync mode.
+- **Live preview**: the current input plays inside its hero card when it has a signal. FLUX `VideoCanvasView` +
+  `TVWindowControlAPI` (Channel List's mini-TV recipe). Lessons from getting it right on the S90D:
+  - the video plane does not follow scale/position animations, so the live card does not grow/lift on focus;
+  - set `wm.tvs.win.use.tvs=1` + window transparency once and keep it until Home is paused - toggling it per
+    preview made the TV re-sync the input, flapping the signal flag in a rebuild loop;
+  - the canvas must sit directly above the card artwork (below the words), with a soft gradient for legibility.
+  Verify without looking: `enlightenment_info -hwc_wins` lists the `VD` plane's `dst_pos` (e.g. `1100x0560+0100+0170`
+  for the Watch card); `enlightenment_info -dump topvwins DIR` dumps the UI layer (the hole is alpha 0; video is not
+  captured). Tunables in `/tmp/quiet-home-live.conf` (`enabled`, `still`, `sync`, `scrim` = 0/1).
 - **Inputs sheet**: HDMI 1-4 + Live TV by the TV's edit name > detected name > port; *On now* / *Not connected*.
   `powerState` is deliberately not shown: on this TV the on-screen SHIELD reports Off (devices behind the soundbar,
   empty CEC device list).
