@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v17b)
+## Quiet Home on the S90D (v18d)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -21,6 +21,13 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **Apple look (v18)**: glass surfaces (top-lit tint + fine rim) on tiles, tab capsule and Info panels; real GPU
+  backdrop blur (`RenderEffect.CreateBackgroundBlurEffect`) on the Inputs sheet and toast, which float over moving
+  content; Apple continuous corners (`CornerSquareness`). Tunable at runtime in `/tmp/quiet-home-live.conf`
+  (`glass=0/1/2`, `shadow=0/1`, `squircle=0/1`, `bench=N`). Measured (bench/apple-overhaul-20261025.json):
+  GPU busy while redrawing every frame - flat 16-18%, glass+squircle 20%, +focus shadows 23%, +always-on soft
+  shadows 27-28%, blur on every surface 25% (static backdrop is cached). 30 fps in every mode (this TV runs the app
+  at 30 fps). RSS/PSS/GPU memory and key handling unchanged within noise, so shadows ship off.
 - **Hero cards follow the input on screen**: Watch stays left and Play right, but the current input's card is the
   wide one at exactly 16:9 (996x560), so its preview is uncropped; the other is 684 wide. Each artwork exists at
   both widths (`feature-{watch,play}-{wide,narrow}.svg`). The 100px hero word needs a 150px-tall label (116 drew "...").

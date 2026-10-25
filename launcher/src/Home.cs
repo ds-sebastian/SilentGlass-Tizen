@@ -64,7 +64,7 @@ public sealed partial class QuietHome : NUIApplication
   if(!library.Exists(a=>a.Id=="com.samsung.tv.csfs")){int at=library.FindIndex(a=>a.Utility);var sh=new LibraryApp{Name="Samsung Home",Id="com.samsung.tv.csfs",Asset="tile-samsung-home.svg",Description="Samsung's home screen",Fit="cover",Background="#1C2638",Width=640,Height=360};if(at<0)library.Add(sh);else library.Insert(at,sh);}
   Window.Default.BackgroundColor=new Color(0,0,0,1);
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
-  BuildChrome();
+  style=ReadStyleConf();BuildChrome();
   PreloadArtwork();
   RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();
   selected=SourceIndex();BuildPage(false);
@@ -72,7 +72,7 @@ public sealed partial class QuietHome : NUIApplication
   clockTimer.Tick+=(s,e)=>{clock.Text=Clock();IdleTick();return true;};clockTimer.Start();
   visible=true;MarkState("created");
  }
- protected override void OnResume(){base.OnResume();visible=true;Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
+ protected override void OnResume(){base.OnResume();visible=true;BenchRender();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
  protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
@@ -89,7 +89,7 @@ public sealed partial class QuietHome : NUIApplication
 
  // ---- scene helpers: page views go into the content layer and are disposed with the page ----
  View Add(View v){content.Add(v);return v;}
- View Panel(int x,int y,int w,int h,Color color,int radius=18){return Add(new View{Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),BackgroundColor=color,CornerRadius=new Vector4(radius,radius,radius,radius)});}
+ View Panel(int x,int y,int w,int h,Color color,int radius=18){var v=Add(new View{Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),BackgroundColor=color,CornerRadius=new Vector4(radius,radius,radius,radius)});Corners(v,radius,w,h);return v;}
  // a focusable card: positioned by its centre so it can scale in place
  View Card(int x,int y,int w,int h,Color color,int radius){var c=Panel(x+w/2,y+h/2,w,h,color,radius);c.PivotPoint=new Position(.5f,.5f,.5f);c.PositionUsesPivotPoint=true;return c;}
  TextLabel Text(string text,int x,int y,int w,int h,float size,Color color,string face="Medium")
@@ -108,7 +108,8 @@ public sealed partial class QuietHome : NUIApplication
   // tvOS-style centred tab bar; the selected tab stays lit, and turns white while it has focus
   string[] nav={"Home","Apps","Controls","Info"};int[] tw={132,122,178,110};int total=12;foreach(var w in tw)total+=w;
   int px=960-total/2;
-  win.Add(new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68),BackgroundColor=tileFill,CornerRadius=new Vector4(34,34,34,34)});
+  var capsule=new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68),BackgroundColor=tileFill,CornerRadius=new Vector4(34,34,34,34)};
+  Glass(capsule,34,total,68,false,tileFill);win.Add(capsule);
   tabs=new TextLabel[4];tabBg=new View[4];int tabX=px+6;
   for(int i=0;i<tabs.Length;i++){
    tabBg[i]=new View{Position2D=new Position2D(tabX,42),Size2D=new Size2D(tw[i],56),BackgroundColor=clear,CornerRadius=new Vector4(28,28,28,28)};win.Add(tabBg[i]);
@@ -142,7 +143,7 @@ public sealed partial class QuietHome : NUIApplication
   StopAnimation(ref pageAnimation);
   if(fade){content.Opacity=0;pageAnimation=new Animation(140){DefaultAlphaFunction=Ease()};pageAnimation.AnimateTo(content,"Opacity",1f);pageAnimation.Play();}
   else content.Opacity=1;
-  buildMilliseconds=stopwatch.ElapsedMilliseconds;MarkState("page_ready");
+  buildMilliseconds=stopwatch.ElapsedMilliseconds;buildMsByPage[page]=Math.Max(buildMsByPage.TryGetValue(page,out long was)?was:0,buildMilliseconds);MarkState("page_ready");
   if(page==0)ScheduleLive();
  }
  const int HeroWide=996,HeroNarrow=684,HeroGap=40; // 996x560 = 16:9; 996+40+684 = the 1720 content width
@@ -272,7 +273,7 @@ public sealed partial class QuietHome : NUIApplication
  void SettingsTile(string name,string action,string description,string icon,int column,int row)
  {
   int w=409,h=236,x=100+column*(w+28),y=150+row*262;
-  var card=Card(x,y,w,h,tileFill,30);
+  var card=Card(x,y,w,h,tileFill,30);Glass(card,30,w,h,false,tileFill);
   var disc=new View{Position2D=new Position2D(26,26),Size2D=new Size2D(84,84),BackgroundColor=new Color(1,1,1,.14f),CornerRadius=new Vector4(42,42,42,42)};
   var glyph=new ImageView{ResourceUrl=Root+"glyph-"+icon+".svg",Position2D=new Position2D(16,16),Size2D=new Size2D(52,52)};disc.Add(glyph);card.Add(disc);
   var title=Label(name,28,124,w-56,38,26,new Color(1,1,1,.78f),"Semibold");title.Ellipsis=true;card.Add(title);
@@ -295,7 +296,7 @@ public sealed partial class QuietHome : NUIApplication
  void Control(string name,string action,string glyph,int n)
  {
   const int Count=5,Gap=25;int w=(1720-(Count-1)*Gap)/Count,h=150,x=100+n*(w+Gap),y=780;
-  var card=Card(x,y,w,h,tileFill,30);
+  var card=Card(x,y,w,h,tileFill,30);Glass(card,30,w,h,false,tileFill);
   var disc=new View{Position2D=new Position2D(22,35),Size2D=new Size2D(80,80),BackgroundColor=discFill,CornerRadius=new Vector4(40,40,40,40)};
   var g=new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(15,15),Size2D=new Size2D(50,50)};disc.Add(g);card.Add(disc);
   var title=Label(name,120,32,w-136,42,28,white,"Semibold");title.Ellipsis=true;card.Add(title);
@@ -342,14 +343,15 @@ public sealed partial class QuietHome : NUIApplication
   if(s.Kind==1){bool still=IsLiveStill(s);scale=f&&!still?1.045f:1;lift=f&&!still?-6:0;opacity=f||area==0||s==liveSlot?1:.7f;s.Card.BorderlineWidth=f?4:0;s.Card.BorderlineColor=heroLine;}
   else if(s.Kind==2){
    scale=f?1.06f:1;
-   s.Card.BackgroundColor=f?white:tileFill;
+   if(f){s.Card.BackgroundColor=white;s.Card.BorderlineWidth=0;}else GlassFill(s.Card,30);
    s.Disc.BackgroundColor=f?discFocus:discFill;
    s.Glyph.Color=f?dark:white;
    s.Title.TextColor=f?dark:page==2?titleDim:white;
    s.Label.TextColor=f?(page==2?dark:valueFocus):page==2?white:muted;
   }
   else if(page==1){scale=f?1.08f:1;lift=f?-6:0;if(s.Label!=null)s.Label.TextColor=f?white:muted;}
-  else{scale=f?1.015f:1;s.Card.BorderlineWidth=f?3:0;s.Card.BorderlineColor=panelLine;}
+  else{scale=f?1.015f:1;s.Card.BorderlineWidth=f?3:style.Glass>0?1.5f:0;s.Card.BorderlineColor=f?panelLine:Rim;}
+  if(s.Kind==1||s.Kind==2)ApplyShadow(s,f);
   if(s.FocusRing!=null)s.FocusRing.Opacity=f?1:0;
   var pos=new Position(s.X+s.W/2f,s.Y+s.H/2f+lift,0);var sc=new Vector3(scale,scale,1);
   if(animate){var a=FocusAnimation();a.AnimateTo(s.Card,"Scale",sc);a.AnimateTo(s.Card,"Position",pos);a.AnimateTo(s.Card,"Opacity",opacity);}

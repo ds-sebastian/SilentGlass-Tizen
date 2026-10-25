@@ -95,6 +95,7 @@ public sealed partial class QuietHome
   StopAnimation(ref toastAnimation);
   if(toast!=null){overlay.Remove(toast);toast.Dispose();toast=null;}
   var t=new View{Position2D=new Position2D(960-300,962),Size2D=new Size2D(600,68),BackgroundColor=new Color(.15f,.15f,.18f,.96f),CornerRadius=new Vector4(34,34,34,34),BorderlineWidth=1.5f,BorderlineColor=new Color(1,1,1,.12f),Opacity=0};
+  Glass(t,34,600,68,true,new Color(.15f,.15f,.18f,.96f),dark:true);
   t.Add(new ImageView{ResourceUrl=Root+"glyph-inputs.svg",Position2D=new Position2D(24,12),Size2D=new Size2D(44,44)});
   var l=Label(text,80,0,600-120,68,28,white,"Semibold");l.Ellipsis=true;t.Add(l);
   overlay.Add(t);toast=t;
@@ -116,6 +117,7 @@ public sealed partial class QuietHome
   CloseInputs(false);
   inputsLayer=new View{Size2D=new Size2D(1920,1080),BackgroundColor=new Color(0,0,0,.6f),Opacity=0};
   sheet=new View{Position2D=new Position2D(SheetX,0),BackgroundColor=new Color(.13f,.13f,.15f,.97f),CornerRadius=new Vector4(34,34,34,34),BorderlineWidth=1.5f,BorderlineColor=new Color(1,1,1,.12f)};
+  Glass(sheet,34,SheetW,400,true,new Color(.13f,.13f,.15f,.97f),dark:true);
   inputsLayer.Add(sheet);overlay.Add(inputsLayer);
   inputSel=-1;FillSheet();
   // slide up 40 px while fading in

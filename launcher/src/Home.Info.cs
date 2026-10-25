@@ -20,7 +20,7 @@ public sealed partial class QuietHome
  }
  View InfoPanel(int x,int y,int w,int h,string title,Color dot,int row)
  {
-  var card=Card(x,y,w,h,new Color(1,1,1,.08f),30);
+  var card=Card(x,y,w,h,new Color(1,1,1,.08f),30);Glass(card,30,w,h,false,new Color(1,1,1,.08f));
   card.Add(new View{Position2D=new Position2D(30,39),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)});
   card.Add(Label(title,56,24,w-86,44,29,white,"Semibold"));
   slots.Add(new Slot{Card=card,Name=title,Action="info",Row=row,X=x,Y=y,W=w,H=h});

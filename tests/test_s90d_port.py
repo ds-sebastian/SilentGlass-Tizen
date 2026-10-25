@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs")
+PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs")
 
 
 def launcher():
@@ -263,6 +263,24 @@ class S90dPortTests(unittest.TestCase):
 
     def test_info_card_select_does_not_flash(self):
         self.assertIn('if(a=="info"){BuildPage(false);return;}', body(launcher(), "void Activate()"))
+
+    def test_apple_style_defaults_and_costs(self):
+        style = (SRC / "Home.Style.cs").read_text()
+        # glass + squircle on, shadows off by default (measured: shadows were the only real GPU cost)
+        self.assertIn("public int Glass=1,Bench=0; public bool Shadow=false,Squircle=true;", style)
+        # real backdrop blur only where the backdrop moves, unless glass=2
+        self.assertIn("if(movingBackdrop||style.Glass==2)", style)
+        src = launcher()
+        self.assertIn('Glass(sheet,34,SheetW,400,true,', src)
+        self.assertIn("Glass(t,34,600,68,true,", src)
+        # squircles never turn circles or capsules into squares
+        self.assertIn("radius*2<Math.Min(w,h)", style)
+        # nothing style-related is read or built on the key path
+        key = body(src, "void OnKey(")
+        for word in ("ReadStyleConf", "GlassMap", "CreateBackgroundBlurEffect", "KeepRendering"):
+            self.assertNotIn(word, key)
+        # glass maps are cached, focus moves reuse them
+        self.assertIn("glassMaps.TryGetValue", style)
 
     def test_live_preview_is_deferred_and_released(self):
         src = launcher()

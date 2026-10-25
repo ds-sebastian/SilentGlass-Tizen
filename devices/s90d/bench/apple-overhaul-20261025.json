@@ -1,0 +1,253 @@
+{
+ "note": "GPU busy % = whole-GPU Mali DVFS busy share per 8 s window while Quiet Home redraws every frame (bench=60); fps = compositor fps of the Quiet Home window [min, avg, samples]. Key/build/memory from a scripted remote-key run.",
+ "windows": [
+  {
+   "name": "base",
+   "gpu_busy": [
+    18.2,
+    16.4,
+    16.0,
+    17.3
+   ],
+   "fps": [
+    [
+     29.2,
+     29.9,
+     9
+    ],
+    [
+     29.2,
+     29.9,
+     9
+    ],
+    [
+     29.8,
+     30.0,
+     9
+    ],
+    [
+     29.8,
+     30.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "apple",
+   "gpu_busy": [
+    31.1,
+    27.4,
+    27.6,
+    27.5
+   ],
+   "fps": [
+    [
+     30.0,
+     30.0,
+     9
+    ],
+    [
+     29.2,
+     29.9,
+     9
+    ],
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     29.6,
+     30.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "blurall",
+   "gpu_busy": [
+    25.1,
+    25.1,
+    25.0,
+    25.4
+   ],
+   "fps": [
+    [
+     30.0,
+     30.0,
+     9
+    ],
+    [
+     29.3,
+     30.0,
+     9
+    ],
+    [
+     29.8,
+     30.0,
+     9
+    ],
+    [
+     29.5,
+     30.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "shadowonly",
+   "gpu_busy": [
+    27.9,
+    27.3,
+    27.4,
+    26.5
+   ],
+   "fps": [
+    [
+     30.0,
+     30.0,
+     9
+    ],
+    [
+     28.9,
+     29.9,
+     9
+    ],
+    [
+     29.8,
+     30.0,
+     9
+    ],
+    [
+     29.7,
+     30.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "lightshadow",
+   "gpu_busy": [
+    22.9,
+    22.8,
+    22.8,
+    22.9
+   ],
+   "fps": [
+    [
+     30.0,
+     30.0,
+     9
+    ],
+    [
+     29.5,
+     29.9,
+     9
+    ],
+    [
+     29.3,
+     30.0,
+     9
+    ],
+    [
+     29.3,
+     29.9,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "final-noshadow",
+   "gpu_busy": [
+    20.1,
+    19.9,
+    19.8,
+    19.9
+   ],
+   "fps": [
+    [
+     29.5,
+     29.9,
+     9
+    ],
+    [
+     29.2,
+     30.0,
+     9
+    ],
+    [
+     29.3,
+     30.0,
+     9
+    ],
+    [
+     29.6,
+     30.1,
+     9
+    ]
+   ]
+  }
+ ],
+ "key_runs": [
+  {
+   "name": "base",
+   "page": "0",
+   "style": "tvos-dark-v18",
+   "key_count": "60",
+   "key_ms_avg": "11.92",
+   "key_ms_max": "187.09",
+   "style_conf": "glass0(file)",
+   "blur_created": "0",
+   "build_ms_by_page": "0:98,1:18,2:121,3:185",
+   "live": "on:Play:still:conf=file",
+   "rss_kb": "84712",
+   "pss_kb": "38560",
+   "gpu_kb": "33756"
+  },
+  {
+   "name": "apple",
+   "page": "0",
+   "style": "tvos-dark-v18",
+   "key_count": "30",
+   "key_ms_avg": "17.59",
+   "key_ms_max": "170.44",
+   "style_conf": "glass1+shadow+squircle(file)",
+   "blur_created": "1",
+   "build_ms_by_page": "0:74,1:15,2:104,3:168",
+   "live": "on:Play:still:conf=file",
+   "rss_kb": "80460",
+   "pss_kb": "34364",
+   "gpu_kb": "31812"
+  },
+  {
+   "name": "final",
+   "page": "0",
+   "style": "tvos-dark-v18",
+   "key_count": "40",
+   "key_ms_avg": "12.85",
+   "key_ms_max": "180.63",
+   "style_conf": "glass1+squircle(file)",
+   "blur_created": "3",
+   "build_ms_by_page": "0:72,1:16,2:98,3:179",
+   "live": "on:Play:still:conf=file",
+   "rss_kb": "80060",
+   "pss_kb": "34284",
+   "gpu_kb": "31804"
+  },
+  {
+   "name": "final-defaults",
+   "page": "0",
+   "style": "tvos-dark-v18",
+   "key_count": "0",
+   "key_ms_avg": "0",
+   "key_ms_max": "0.00",
+   "style_conf": "glass1+squircle(default)",
+   "blur_created": "0",
+   "build_ms_by_page": "0:73",
+   "live": "on:Play:still:conf=default",
+   "rss_kb": "72840",
+   "pss_kb": "31460",
+   "gpu_kb": "25096"
+  }
+ ]
+}
