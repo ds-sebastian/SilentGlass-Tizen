@@ -95,13 +95,29 @@ class S90dPortTests(unittest.TestCase):
 
     def test_new_artwork_is_local_valid_svg(self):
         # Fixed locally authored SVGs only; no uploads, remote XML, or DTDs are accepted.
-        for name in ("feature-watch.svg", "feature-play.svg", "tile-samsung-home.svg", "free-background.svg"):
+        cards = [f"feature-{c}-{w}.svg" for c in ("watch", "play") for w in ("wide", "narrow")]
+        for name in cards + ["tile-samsung-home.svg", "free-background.svg"]:
             tree = ET.parse(ASSETS / name)
             self.assertTrue(tree.getroot().tag.endswith("svg"))
             self.assertNotIn("https://", (ASSETS / name).read_text())
-        watch = (ASSETS / "feature-watch.svg").read_text()
-        self.assertNotIn("<text", watch)
-        self.assertNotIn("<image", watch)  # drawn art, no embedded app logos
+        for name in cards:
+            art = (ASSETS / name).read_text()
+            self.assertNotIn("<text", art)
+            self.assertNotIn("<image", art)  # drawn art, no embedded app logos
+            # drawn at the size the card is shown at
+            self.assertIn(f'width="{996 if "wide" in name else 684}" height="560"', art)
+
+    def test_current_input_gets_the_wide_16x9_card(self):
+        src = launcher()
+        self.assertIn("const int HeroWide=996,HeroNarrow=684,HeroGap=40;", src)
+        # the big word fits its line (was drawn as "..." on the TV)
+        self.assertIn('var big=Label(word,50,h-223,w-100,150,100,white,"Display");big.Ellipsis=false;', src)
+        self.assertEqual(996 * 9 // 16, 560)  # 996x560 is 16:9 to the pixel, so Cover() returns the card itself
+        self.assertEqual(996 + 40 + 684, 1720)
+        self.assertIn("bool PlayIsWide()=>lastSource==playPort;", src)
+        # follows input changes, without a fade
+        self.assertIn("if(RelayoutHeroes())return;", body(src, "void OnInputsChanged("))
+        self.assertIn("BuildPage(false)", body(src, "bool RelayoutHeroes()"))
 
     def test_settings_tiles_have_valid_local_artwork(self):
         import re

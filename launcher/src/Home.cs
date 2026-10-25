@@ -145,13 +145,21 @@ public sealed partial class QuietHome : NUIApplication
   buildMilliseconds=stopwatch.ElapsedMilliseconds;MarkState("page_ready");
   if(page==0)ScheduleLive();
  }
+ const int HeroWide=996,HeroNarrow=684,HeroGap=40; // 996x560 = 16:9; 996+40+684 = the 1720 content width
+ bool playWide;
+ bool PlayIsWide()=>lastSource==playPort;
+ // the wide card follows the input on screen; rebuilt (no fade) when that changes while Home is the page
+ bool RelayoutHeroes(){if(page!=0||PlayIsWide()==playWide)return false;BuildPage(false);MarkState("hero_layout");return true;}
  void BuildHome()
  {
   RefreshSettings();
-  // SHIELD is the main device: the wide Watch card. The Switch card sits beside it. No TV apps here.
+  // Watch (SHIELD) left, Play (Switch) right - the order never changes. The card of the input on screen is the
+  // wide one: exactly 16:9, so its live preview fills it uncropped. SHIELD is wide when neither is on screen.
   // ports follow the TV's input names (Shield / Switch), so re-cabling needs no code change
-  Hero("Watch","hdmi:"+watchPort,"SHIELD","feature-watch.svg",100,170,1100,560,new Color(.76f,.94f,.56f,1));
-  Hero("Play","hdmi:"+playPort,"Nintendo Switch","feature-play.svg",1240,170,580,560,new Color(1f,.74f,.78f,1));
+  playWide=PlayIsWide();
+  int ww=playWide?HeroNarrow:HeroWide,pw=playWide?HeroWide:HeroNarrow;
+  Hero("Watch","hdmi:"+watchPort,"SHIELD","feature-watch-"+(playWide?"narrow":"wide")+".svg",100,170,ww,560,new Color(.76f,.94f,.56f,1));
+  Hero("Play","hdmi:"+playPort,"Nintendo Switch","feature-play-"+(playWide?"wide":"narrow")+".svg",100+ww+HeroGap,170,pw,560,new Color(1f,.74f,.78f,1));
   Control("Inputs","inputs","inputs",0);
   Control("Ambient","ambient","ambient",1);
   Control("Sleep Timer","sleeptimer","sleep",2);
@@ -275,7 +283,8 @@ public sealed partial class QuietHome : NUIApplication
  {
   var card=Card(x,y,w,h,clear,40);
   card.Add(new ImageView{ResourceUrl=Root+asset,Size2D=new Size2D(w,h)});
-  card.Add(Label(word,50,h-206,w-100,116,100,white,"Display"));
+  // 150 tall around the same centre line: at 116 the 100px word did not fit its line height and the TV drew "..."
+  var big=Label(word,50,h-223,w-100,150,100,white,"Display");big.Ellipsis=false;card.Add(big);
   card.Add(Label(sub,56,h-96,w-112,46,30,subColor,"Semibold"));
   // status dot, no words: set by UpdateHeroBadges whenever the input or signal changes
   var badge=new View{Position2D=new Position2D(36,36),Size2D=new Size2D(44,44),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(22,22,22,22),Opacity=0};

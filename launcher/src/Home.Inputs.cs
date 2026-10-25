@@ -38,7 +38,8 @@ public sealed partial class QuietHome
  void OnSourceTypeChanged()
  {
   int before=lastSource;RefreshSource();if(before==lastSource)return;
-  ReadSignal();UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("source_changed");
+  ReadSignal();if(RelayoutHeroes())return;
+  UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("source_changed");
  }
  int watchPort=15,playPort=13;
  // Watch = the input the TV calls "Shield", Play = "Switch"; falls back to HDMI 3 / HDMI 1
@@ -48,6 +49,7 @@ public sealed partial class QuietHome
  {
   var before=inputs;RefreshInputs();RefreshSource();
   if(ResolveHeroPorts()&&page==0){BuildPage(false);MarkState("hero_ports_changed");return;}
+  if(RelayoutHeroes())return;
   if(announce&&visible)
    foreach(var now in inputs){
     var was=before.Find(i=>i.Type==now.Type);

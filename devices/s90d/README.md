@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v16c)
+## Quiet Home on the S90D (v17b)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -21,6 +21,9 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **Hero cards follow the input on screen**: Watch stays left and Play right, but the current input's card is the
+  wide one at exactly 16:9 (996x560), so its preview is uncropped; the other is 684 wide. Each artwork exists at
+  both widths (`feature-{watch,play}-{wide,narrow}.svg`). The 100px hero word needs a 150px-tall label (116 drew "...").
 - **Live preview**: the current input plays inside its hero card when it has a signal. FLUX `VideoCanvasView` +
   `TVWindowControlAPI` (Channel List's mini-TV recipe). Lessons from getting it right on the S90D:
   - the video plane does not follow scale/position animations, so the live card does not grow/lift on focus;
