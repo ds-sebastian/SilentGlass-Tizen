@@ -260,6 +260,10 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("ReadLiveConf", body(src, "void OnKey("))
         # the live card does not grow or lift on focus (the video plane does not follow those animations)
         self.assertIn("bool still=IsLiveStill(s);scale=f&&!still?1.045f:1;lift=f&&!still?-6:0;", src)
+        # crop to fill (16:9 plane covering the card) instead of squashing into the card's shape
+        self.assertIn("canvas.DisableAutoUpdateVideoGeometry=liveConf.Cover;", update)
+        self.assertLess(update.index("DisableAutoUpdateVideoGeometry"), update.index("canvas.SetPlayer("))
+        self.assertIn("if(s.W*9>=s.H*16){int h=s.W*9/16;", src)
         # video directly above the artwork, below the words
         self.assertIn("var art=hero.Card.GetChildAt(0);", update)
         # the status dot must not flicker with the signal flag

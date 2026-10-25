@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v16b)
+## Quiet Home on the S90D (v16c)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -26,7 +26,12 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   - the video plane does not follow scale/position animations, so the live card does not grow/lift on focus;
   - set `wm.tvs.win.use.tvs=1` + window transparency once and keep it until Home is paused - toggling it per
     preview made the TV re-sync the input, flapping the signal flag in a rebuild loop;
-  - the canvas must sit directly above the card artwork (below the words), with a soft gradient for legibility.
+  - the canvas must sit directly above the card artwork (below the words), with a soft gradient for legibility;
+  - crop, don't squash: the canvas (hole) is the card, but `DisableAutoUpdateVideoGeometry` +
+    `ForceUpdateVideoGeometry(x,y,w,h)` give the plane a covering 16:9 rect; overflow hides behind the opaque UI and
+    the HW clips the off-screen part with a matching source crop (seen: src 3423x2160 -> dst 887x560);
+  - the TV can leave the main video muted while tv-viewer is backgrounded (black but correctly placed plane after
+    Quiet Home restarted mid-preview): `IAVControl.MuteVideo(0)` on attach, as Channel List does.
   Verify without looking: `enlightenment_info -hwc_wins` lists the `VD` plane's `dst_pos` (e.g. `1100x0560+0100+0170`
   for the Watch card); `enlightenment_info -dump topvwins DIR` dumps the UI layer (the hole is alpha 0; video is not
   captured). Tunables in `/tmp/quiet-home-live.conf` (`enabled`, `still`, `sync`, `scrim` = 0/1).

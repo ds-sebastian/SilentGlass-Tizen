@@ -14,7 +14,7 @@ public sealed partial class QuietHome
  //  enabled - show the preview at all;  still - the live card does not grow/lift on focus (the video plane does not
  //  follow scale/position animations);  sync - Graphic-Video sync mode;  scrim - darken the bottom for the words.
  const string LiveConfPath="/tmp/quiet-home-live.conf";
- sealed class LiveConf{public bool Enabled=true,Still=true,Sync=false,Scrim=true;public string Source="default";}
+ sealed class LiveConf{public bool Enabled=true,Still=true,Sync=false,Scrim=true,Cover=true;public string Source="default";}
  LiveConf liveConf=new LiveConf();
  static LiveConf ReadLiveConf()
  {
@@ -24,7 +24,7 @@ public sealed partial class QuietHome
    c.Source="file";
    foreach(var line in System.IO.File.ReadAllLines(LiveConfPath)){
     var kv=line.Split('=');if(kv.Length!=2)continue;bool v=kv[1].Trim()=="1";
-    switch(kv[0].Trim()){case "enabled":c.Enabled=v;break;case "still":c.Still=v;break;case "sync":c.Sync=v;break;case "scrim":c.Scrim=v;break;}
+    switch(kv[0].Trim()){case "enabled":c.Enabled=v;break;case "still":c.Still=v;break;case "sync":c.Sync=v;break;case "scrim":c.Scrim=v;break;case "cover":c.Cover=v;break;}
    }
   }catch(Exception ex){c.Source="error:"+ex.GetType().Name;}
   return c;
@@ -89,16 +89,40 @@ public sealed partial class QuietHome
     scrim.Background=fade;
     hero.Card.Add(scrim);scrim.LowerToBottom();art.LowerToBottom();canvas.RaiseAbove(art);scrim.RaiseAbove(canvas);
    }
+   // fill, don't squash: the canvas (the see-through hole) is exactly the card, but the video plane gets a 16:9
+   // rectangle covering it; the overflow sits behind the opaque launcher and is never seen
+   canvas.DisableAutoUpdateVideoGeometry=liveConf.Cover;
    canvas.SetPlayer(tvWindow,liveConf.Sync?Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.GraphicVideoSync:Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.None);
    liveView=new VideoCanvasViewHolder{View=canvas};liveSlot=hero;
    int idx=slots.IndexOf(hero);StyleSlot(hero,idx==selected&&area==1,false); // settle any focus transform first
    // once layout has settled, push the final rectangle to the video plane explicitly
    liveGeometryTimer?.Stop();liveGeometryTimer=new Tizen.NUI.Timer(250);
-   liveGeometryTimer.Tick+=(s,e)=>{try{(liveView?.View as Tizen.TV.FLUX.VideoCanvasView)?.ForceUpdateVideoGeometry();}catch{}return false;};liveGeometryTimer.Start();
+   var rect=liveConf.Cover?Cover(hero):(hero.X,hero.Y,hero.W,hero.H);
+   PushLiveGeometry(rect);UnmuteLive();
+   liveGeometryTimer.Tick+=(s,e)=>{PushLiveGeometry(rect);UnmuteLive();return false;};liveGeometryTimer.Start();
    liveState="on:"+hero.Name+(liveConf.Still?":still":"")+(liveConf.Sync?":sync":"")+":conf="+liveConf.Source;
   }catch(Exception ex){liveState="failed:"+ex.GetType().Name+":"+ex.Message;HideLive();}
   MarkState("live");
  }
+ static (int,int,int,int) Cover(Slot s)
+ {
+  // smallest 16:9 rectangle that covers the card, centred on it
+  if(s.W*9>=s.H*16){int h=s.W*9/16;return (s.X,s.Y-(h-s.H)/2,s.W,h);}
+  int w=s.H*16/9;return (s.X-(w-s.W)/2,s.Y,w,s.H);
+ }
+ void PushLiveGeometry((int x,int y,int w,int h) r)
+ {
+  try{(liveView?.View as Tizen.TV.FLUX.VideoCanvasView)?.ForceUpdateVideoGeometry(r.x,r.y,r.w,r.h);liveGeometry=$"{r.w}x{r.h}+{r.x}+{r.y}";}
+  catch(Exception ex){liveGeometry="error:"+ex.GetType().Name;}
+ }
+ // The TV can leave the main video muted while its viewer is in the background (seen after Quiet Home restarted
+ // mid-preview: plane in place, picture black). Samsung's Channel List unmutes on the same condition.
+ void UnmuteLive()
+ {
+  try{using var av=Tizen.TV.Broadcast.TVService.TVServiceAPI.Instance().CreateAVControl((Tizen.TV.Broadcast.TVService.Types.Profile)1,0);liveUnmute=av.MuteVideo(0);}
+  catch(Exception ex){liveUnmute=-1;liveGeometry+=" unmute:"+ex.GetType().Name;}
+ }
+ string liveGeometry="";int liveUnmute=-99;
  bool IsLiveStill(Slot s)=>s==liveSlot&&liveView!=null&&liveConf.Still;
  void HideLive()
  {
