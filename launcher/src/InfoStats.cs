@@ -231,15 +231,16 @@ public static class InfoStats
     public static (bool present, int rloc16, bool leader, bool homeRoute, int addresses) Thread() => ParseThread(Read("/proc/net/if_inet6"), "wpan0");
     public static bool Ipv6Forwarding() => Read("/proc/sys/net/ipv6/conf/all/forwarding")?.Trim() == "1";
     // ---- TV inputs: Samsung's own source list (libsource-api get_source_list JSON) ----
-    public sealed class InputSource { public int Type; public string Name, Port; public bool Connected; public int Power; }
+    public sealed class InputSource { public int Type; public string Name, Port; public bool Connected, Known; public int Power; }  // Known: the TV answered
     static string Unescape(string v) { try { return Uri.UnescapeDataString(v ?? ""); } catch { return v ?? ""; } }
     // HDMI 1-4 are source types 13-16 and always listed (not-connected ports included); Live TV (0) only if the TV reports it.
     public static List<InputSource> ParseSources(string json)
     {
         var seen = new Dictionary<int, (string edit, string detected, bool conn, int power)>();
+        bool known = false;
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(json ?? "[]");
+            using var doc = System.Text.Json.JsonDocument.Parse(json ?? "");
             foreach (var e in doc.RootElement.EnumerateArray())
             {
                 int t = e.TryGetProperty("sourceType", out var st) && st.TryGetInt32(out var tv) ? tv : -1;
@@ -249,6 +250,7 @@ public static class InfoStats
                 int pw = e.TryGetProperty("powerState", out var ps) && ps.TryGetInt32(out var pv) ? pv : 0;
                 seen[t] = (Str("editName"), Str("detectedName"), conn, pw);
             }
+            known = doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0;
         }
         catch { }
         var list = new List<InputSource>();
@@ -258,17 +260,18 @@ public static class InfoStats
             if (seen.TryGetValue(t, out var v))
             {
                 string name = v.edit.Length > 0 ? v.edit : v.detected.Length > 0 ? v.detected : port;
-                list.Add(new InputSource { Type = t, Name = name, Port = port, Connected = v.conn, Power = v.power });
+                list.Add(new InputSource { Type = t, Name = name, Port = port, Connected = v.conn, Power = v.power, Known = known });
             }
-            else list.Add(new InputSource { Type = t, Name = port, Port = port, Connected = false, Power = 0 });
+            else list.Add(new InputSource { Type = t, Name = port, Port = port, Connected = false, Power = 0, Known = known });
         }
-        if (seen.ContainsKey(0)) list.Add(new InputSource { Type = 0, Name = "Live TV", Port = "Antenna", Connected = true, Power = 0 });
+        if (seen.ContainsKey(0)) list.Add(new InputSource { Type = 0, Name = "Live TV", Port = "Antenna", Connected = true, Power = 0, Known = known });
         return list;
     }
-    [System.Runtime.InteropServices.DllImport("/usr/lib/libsource-api.so")] static extern IntPtr get_source_list();
+    // declared as string (like Samsung's own binding): the marshaller frees the malloc'd JSON buffer
+    [System.Runtime.InteropServices.DllImport("/usr/lib/libsource-api.so")] static extern string get_source_list();
     public static List<InputSource> Sources()
     {
-        try { var p = get_source_list(); return ParseSources(p == IntPtr.Zero ? null : System.Runtime.InteropServices.Marshal.PtrToStringUTF8(p)); }
+        try { return ParseSources(get_source_list()); }
         catch { return ParseSources(null); }
     }
 

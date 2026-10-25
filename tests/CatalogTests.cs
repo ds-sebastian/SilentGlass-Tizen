@@ -91,7 +91,9 @@ static class CatalogTests
         True(ins[1].Type == 14 && ins[1].Name == "HDMI 2" && !ins[1].Connected, "input not connected");
         True(ins[2].Name == "Q-Series Soundbar" && ins[2].Power == 1, "input detected name decoded");
         True(ins[4].Type == 0 && ins[4].Name == "Live TV", "live tv last; DLNA skipped");
-        True(InfoStats.ParseSources("not json").Count == 4 && InfoStats.ParseSources(null).TrueForAll(i => !i.Connected), "inputs garbage");
+        True(ins.TrueForAll(i => i.Known), "inputs known when the TV answered");
+        True(InfoStats.ParseSources("not json").Count == 4 && InfoStats.ParseSources(null).TrueForAll(i => !i.Connected && !i.Known), "inputs garbage");
+        True(InfoStats.ParseSources("[]").TrueForAll(i => !i.Known), "empty list is not an answer");
         True(InfoStats.Bytes(999) == "999 B" && InfoStats.Bytes(58459740) == "58.5 MB" && InfoStats.Bytes(1.5e9) == "1.5 GB", "bytes");
         True(InfoStats.Duration(11586) == "3 h 13 min" && InfoStats.Duration(30) == "1 min" && InfoStats.Duration(90000) == "1 d 1 h", "duration");
         True(InfoStats.CountMarkers(InfoStats.VendorMarkers) == 10, "all markers");
