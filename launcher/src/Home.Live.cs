@@ -10,6 +10,9 @@ using Tizen.NUI.BaseComponents;
 public sealed partial class QuietHome
 {
  const string SignalKey="memory/tv-viewer/mainscreen_signal_state";
+ // Off until it can be tuned with someone watching: on the S90D the video plane lagged the card's focus scale/lift
+ // (black cut-out while focused) and attaching it made the signal flag flap. Code kept; switch on to experiment.
+ static readonly bool LivePreviewEnabled=false;
  VideoCanvasViewHolder liveView;
  Tizen.TV.Broadcast.TVWindowControl.TVWindowControlAPI tvWindow;
  uint tvsHint;bool tvsHintSet;
@@ -21,9 +24,12 @@ public sealed partial class QuietHome
  void WatchSignal()
  {
   ReadSignal();
-  try{signalCallback=(n,d)=>OnUi(()=>{signalEvents++;int before=signal;ReadSignal();if(before!=signal){UpdateHeroBadges();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("signal_changed");}});
+  // debounced: the flag can flap while the TV re-syncs a source; act only once it has held for 800 ms
+  try{signalCallback=(n,d)=>OnUi(()=>{signalEvents++;if(signalTimer==null){signalTimer=new Tizen.NUI.Timer(800);signalTimer.Tick+=(s,e)=>{ApplySignal();return false;};}signalTimer.Stop();signalTimer.Start();});
    vconf_notify_key_changed(SignalKey,signalCallback,IntPtr.Zero);}catch{}
  }
+ Tizen.NUI.Timer signalTimer;
+ void ApplySignal(){int before=signal;ReadSignal();if(before==signal)return;UpdateHeroBadges();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("signal_changed");}
  void ReadSignal(){try{signal=vconf_get_int(SignalKey,out int v)==0?v:-1;}catch{signal=-1;}}
  bool CurrentHasSignal=>signal==1;
 
@@ -32,6 +38,7 @@ public sealed partial class QuietHome
  void UpdateLive()
  {
   Slot hero=null;
+  if(!LivePreviewEnabled){HideLive();return;}
   if(page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
   if(hero==null){HideLive();return;}
   if(liveView!=null&&liveView.View.GetParent()==hero.Card)return;

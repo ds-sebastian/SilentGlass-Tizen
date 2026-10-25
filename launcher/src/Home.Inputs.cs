@@ -8,7 +8,8 @@ using Tizen.NUI.BaseComponents;
 
 // Live inputs: Samsung's source list (names, connected) and the current source, both pushed by the TV.
 // Drives the hero badges, the Inputs tile, the Inputs sheet and a short "connected" toast.
-// powerState is never shown: on this TV the on-screen SHIELD reports Off (devices sit behind the soundbar).
+// powerState is never used: on this TV the on-screen SHIELD reports Off (devices sit behind the soundbar);
+// the only trusted power signal is the picture on the current input (memory/tv-viewer/mainscreen_signal_state).
 public sealed partial class QuietHome
 {
  List<InfoStats.InputSource> inputs=new List<InfoStats.InputSource>();
@@ -55,8 +56,20 @@ public sealed partial class QuietHome
   UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();MarkState("inputs_changed");
  }
 
- // ---- hero badges: only what the TV can actually tell. Current input: On (picture) / Off (no signal).
- // Other inputs: Unplugged when no device is connected, otherwise nothing (the TV cannot see their power here).
+ // ---- status dots, no words: only what the TV can actually tell.
+ // Current input: green = picture, grey = no signal. Unplugged: empty ring. Other inputs: no dot (power unknown here).
+ enum Dot { None, On, Off, Unplugged }
+ Dot DotFor(int type)
+ {
+  var src=inputs.Find(i=>i.Type==type);
+  if(type==lastSource)return signal==1?Dot.On:signal==0?Dot.Off:Dot.None;
+  return src!=null&&src.Known&&!src.Connected?Dot.Unplugged:Dot.None;
+ }
+ void PaintDot(View dot,Dot d,bool onLight)
+ {
+  dot.BackgroundColor=d==Dot.On?onNowGreen:d==Dot.Off?(onLight?new Color(.55f,.56f,.6f,1):muted):clear;
+  dot.BorderlineWidth=d==Dot.Unplugged?3:0;dot.BorderlineColor=onLight?new Color(.45f,.46f,.5f,1):muted;
+ }
  Animation badgeAnimation;
  void UpdateHeroBadges(bool animate=true)
  {
@@ -65,17 +78,9 @@ public sealed partial class QuietHome
   if(animate)badgeAnimation=new Animation(220){DefaultAlphaFunction=Ease()};
   foreach(var s in slots){
    if(s.Kind!=1||!s.Action.StartsWith("hdmi:"))continue;
-   int type=int.Parse(s.Action.Substring(5));var src=inputs.Find(i=>i.Type==type);
-   bool current=type==lastSource,on=current&&signal==1,off=current&&signal==0,unplugged=!current&&src!=null&&src.Known&&!src.Connected;
-   string text=on?"On":off?"Off":unplugged?"Unplugged":"";
-   if(text!=""){
-    s.BadgeText.Text=text;
-    int w=on||off?110:210;s.Badge.Size2D=new Size2D(w,50);s.BadgeText.Size2D=new Size2D(w-52,50);
-    s.Badge.BackgroundColor=on?new Color(1,1,1,.94f):new Color(0,0,0,.55f);
-    s.BadgeDot.BackgroundColor=on?onNowGreen:muted;
-    s.BadgeText.TextColor=on?dark:new Color(1,1,1,.85f);
-   }
-   float target=text!=""?1:0;
+   var d=DotFor(int.Parse(s.Action.Substring(5)));
+   if(d!=Dot.None)PaintDot(s.BadgeDot,d,false);
+   float target=d!=Dot.None?1:0;
    if(animate)badgeAnimation.AnimateTo(s.Badge,"Opacity",target);else s.Badge.Opacity=target;
   }
   badgeAnimation?.Play();
@@ -98,7 +103,7 @@ public sealed partial class QuietHome
  }
 
  // ---- Inputs sheet: every HDMI port by the TV's name for it; Up/Down, Select switches, Back closes ----
- sealed class SheetRow { public View Row,Pill; public TextLabel Name,Port,PillText; public ImageView Glyph; public bool Current; }
+ sealed class SheetRow { public View Row,Dot; public TextLabel Name,Port; public ImageView Glyph,Check; public bool Current; public Dot State; }
  View inputsLayer,sheet;Animation sheetAnimation;
  readonly List<SheetRow> sheetRows=new List<SheetRow>();
  List<InfoStats.InputSource> sheetInputs=new List<InfoStats.InputSource>();
@@ -132,13 +137,12 @@ public sealed partial class QuietHome
    r.Row=new View{Position2D=new Position2D(16,96+i*RowH),Size2D=new Size2D(SheetW-32,RowH-8),CornerRadius=new Vector4(22,22,22,22),Opacity=off?.45f:1};
    r.Glyph=new ImageView{ResourceUrl=Root+"glyph-inputs.svg",Position2D=new Position2D(20,22),Size2D=new Size2D(44,44)};r.Row.Add(r.Glyph);
    bool sub=s.Name!=s.Port;
-   r.Name=Label(s.Name,84,sub?10:0,330,sub?44:RowH-8,30,white,"Semibold");r.Name.Ellipsis=true;r.Row.Add(r.Name);
+   r.Name=Label(s.Name,84,sub?10:0,SheetW-32-84-130,sub?44:RowH-8,30,white,"Semibold");r.Name.Ellipsis=true;r.Row.Add(r.Name);
    if(sub){r.Port=Label(s.Port,84,50,300,32,22,muted);r.Row.Add(r.Port);}
-   string status=cur?(signal==1?"On":signal==0?"Off":""):off?"Not connected":"";
-   if(status!=""){
-    r.Pill=new View{Position2D=new Position2D(SheetW-32-196,(RowH-8-44)/2),Size2D=new Size2D(180,44),CornerRadius=new Vector4(22,22,22,22)};
-    r.PillText=Label(status,0,0,180,44,21,muted,"Semibold");r.PillText.HorizontalAlignment=HorizontalAlignment.Center;r.Pill.Add(r.PillText);r.Row.Add(r.Pill);
-   }
+   // right side: status dot (is it on?) and, separately, a checkmark on the selected input
+   r.State=DotFor(s.Type);
+   if(r.State!=Dot.None){r.Dot=new View{Position2D=new Position2D(SheetW-32-118,(RowH-8-22)/2),Size2D=new Size2D(22,22),CornerRadius=new Vector4(11,11,11,11)};r.Row.Add(r.Dot);}
+   if(cur){r.Check=new ImageView{ResourceUrl=Root+"glyph-check.svg",Position2D=new Position2D(SheetW-32-74,(RowH-8-44)/2),Size2D=new Size2D(44,44)};r.Row.Add(r.Check);}
    sheet.Add(r.Row);sheetRows.Add(r);
   }
   inputSel=Math.Max(0,sheetInputs.FindIndex(i=>i.Type==keepType));
@@ -151,12 +155,8 @@ public sealed partial class QuietHome
    r.Row.BackgroundColor=f?white:clear;
    r.Name.TextColor=f?dark:white;r.Glyph.Color=f?dark:white;
    if(r.Port!=null)r.Port.TextColor=f?valueFocus:muted;
-   if(r.Pill!=null){
-    // stays readable on the white focused row
-    bool green=r.Current&&signal==1;
-    r.Pill.BackgroundColor=green?new Color(.2f,.78f,.36f,f?1:.22f):f?new Color(0,0,0,.08f):new Color(1,1,1,.08f);
-    r.PillText.TextColor=green?(f?white:new Color(.5f,.95f,.6f,1)):f?valueFocus:muted;
-   }
+   if(r.Dot!=null)PaintDot(r.Dot,r.State,f);
+   if(r.Check!=null)r.Check.Color=f?dark:white;
   }
  }
  bool HandleInputsKey(string k)

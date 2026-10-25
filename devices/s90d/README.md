@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v14)
+## Quiet Home on the S90D (v15)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -17,12 +17,14 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   Heroes bind to the inputs the TV names `Shield` / `Switch` (fallback HDMI 3 / HDMI 1), so re-cabling needs no change.
 - **Live inputs**: `libsource-api` `register_sourcelist_changed_callback` + vconf `memory/system/source_type`
   notifications drive the *On now* / *Unplugged* badges, the Inputs sheet and a short "connected" toast. No polling.
-- **Honest status**: the current input's card says *On* / *Off* from `memory/tv-viewer/mainscreen_signal_state`
-  (picture present or not). Other inputs show nothing - CEC only reports power per TV port, and port 3 answers as the
-  soundbar (SHIELD is a second-depth CEC device behind it); the Switch dock is not on CEC.
-- **Live preview (experimental)**: FLUX `VideoCanvasView` + `TVWindowControlAPI` (Samsung Channel List's mini-TV
-  recipe, window hint `wm.tvs.win.use.tvs=1`) shows the current input inside its card when it has a signal; created
-  after the first frame, released on pause/dim/page change; state file reports `live=`.
+- **Status dots, no words**: green = the current input has a picture, grey = no signal
+  (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
+  (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
+  list marks the selected input with a separate checkmark.
+- **Live preview: built, switched off** (`LivePreviewEnabled`). FLUX `VideoCanvasView` + `TVWindowControlAPI`
+  (Channel List's mini-TV recipe, hint `wm.tvs.win.use.tvs=1`) attached, but the video plane lagged the card's focus
+  scale/lift (black cut-out while focused) and the signal flag flapped (40 events). Needs on-screen tuning:
+  no focus transform on the video card, fixed geometry, GV-sync mode.
 - **Inputs sheet**: HDMI 1-4 + Live TV by the TV's edit name > detected name > port; *On now* / *Not connected*.
   `powerState` is deliberately not shown: on this TV the on-screen SHIELD reports Off (devices behind the soundbar,
   empty CEC device list).

@@ -19,7 +19,7 @@ public sealed partial class QuietHome : NUIApplication
  const string Root="/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
  const int TB=9; // toolbar focus area; 1..3 are content rows
  // Kind: 0 plain (Info panels), 1 hero, 2 control tile
- sealed class Slot { public View Card,FocusRing,Disc,Badge,BadgeDot; public TextLabel Label,Title,BadgeText; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
+ sealed class Slot { public View Card,FocusRing,Disc,Badge,BadgeDot; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
  readonly Dictionary<string,CachedArtwork> artworkCache=new Dictionary<string,CachedArtwork>();
@@ -277,11 +277,10 @@ public sealed partial class QuietHome : NUIApplication
   card.Add(new ImageView{ResourceUrl=Root+asset,Size2D=new Size2D(w,h)});
   card.Add(Label(word,50,h-206,w-100,116,100,white,"Display"));
   card.Add(Label(sub,56,h-96,w-112,46,30,subColor,"Semibold"));
-  // status pill (On / Off / Unplugged), filled in by UpdateHeroBadges whenever the input or signal changes
-  var badge=new View{Position2D=new Position2D(40,36),Size2D=new Size2D(160,50),CornerRadius=new Vector4(25,25,25,25),Opacity=0};
-  var dot=new View{Position2D=new Position2D(20,18),Size2D=new Size2D(14,14),CornerRadius=new Vector4(7,7,7,7)};badge.Add(dot);
-  var text=Label("",44,0,108,50,24,dark,"Semibold");badge.Add(text);card.Add(badge);
-  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot,BadgeText=text};slots.Add(slot);return slot;
+  // status dot, no words: set by UpdateHeroBadges whenever the input or signal changes
+  var badge=new View{Position2D=new Position2D(36,36),Size2D=new Size2D(44,44),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(22,22,22,22),Opacity=0};
+  var dot=new View{Position2D=new Position2D(11,11),Size2D=new Size2D(22,22),CornerRadius=new Vector4(11,11,11,11)};badge.Add(dot);card.Add(badge);
+  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot};slots.Add(slot);return slot;
  }
  // Control Centre style tile: glyph disc, name, current value. Five across.
  void Control(string name,string action,string glyph,int n)

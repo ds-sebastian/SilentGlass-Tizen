@@ -63,7 +63,13 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("HeroApps", src)
         # owner: "On now" only meant "selected" - badges now come from the TV's signal state
         self.assertNotIn("On now", src)
-        self.assertIn("on=current&&signal==1,off=current&&signal==0", src)
+        # status is a dot, never words; "selected" is a separate checkmark in the Inputs list
+        self.assertIn('if(type==lastSource)return signal==1?Dot.On:signal==0?Dot.Off:Dot.None;', src)
+        inputs = (SRC / "Home.Inputs.cs").read_text()
+        for word in ('"On"', '"Off"', '"Not connected"', '"Unplugged"'):
+            self.assertNotIn(word, inputs)
+        self.assertIn('if(cur){r.Check=new ImageView{ResourceUrl=Root+"glyph-check.svg"', inputs)
+        ET.parse(ASSETS / "glyph-check.svg")
         for noisy in ("Input name saved", "Direct input", "Everyday controls", "Back to input", "Most opened", "Select · ", "Let's watch"):
             self.assertNotIn(noisy, src)
 
@@ -217,7 +223,6 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn(".Power==", src)
         # connection states are only claimed when the TV actually answered
         self.assertIn("src.Known&&!src.Connected", src)
-        self.assertIn("s.Known&&!s.Connected", src)
         for g in ("glyph-inputs.svg", "glyph-ambient.svg", "glow-watch.svg", "glow-play.svg"):
             ET.parse(ASSETS / g)
 
@@ -250,6 +255,11 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("UpdateLive()", body(src, "void BuildPage(").replace("ScheduleLive()", ""))
         # only for the current input, only with a picture, only while Quiet Home is visible and awake
         update = body(src, "void UpdateLive()")
+        # off until tuned on screen (video plane lagged the focus animation on the S90D)
+        self.assertIn("static readonly bool LivePreviewEnabled=false;", src)
+        self.assertLess(update.index("if(!LivePreviewEnabled){HideLive();return;}"), update.index("TVWindowControlAPI"))
+        # the status dot must not flicker with the signal flag
+        self.assertIn("signalTimer=new Tizen.NUI.Timer(800)", src)
         self.assertIn('page==0&&visible&&!dimmed&&CurrentHasSignal', update)
         self.assertIn('s.Action=="hdmi:"+lastSource', update)
         self.assertIn("catch(Exception ex){liveState=\"failed:\"", update)
