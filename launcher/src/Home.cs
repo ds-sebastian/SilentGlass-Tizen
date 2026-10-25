@@ -66,15 +66,15 @@ public sealed partial class QuietHome : NUIApplication
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   BuildChrome();
   PreloadArtwork();
-  RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();
+  RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();
   selected=SourceIndex();BuildPage(false);
   clockTimer=new Tizen.NUI.Timer(30000);
   clockTimer.Tick+=(s,e)=>{clock.Text=Clock();IdleTick();return true;};clockTimer.Start();
   visible=true;MarkState("created");
  }
- protected override void OnResume(){base.OnResume();visible=true;Wake(false);clockTimer?.Start();clock.Text=Clock();OnInputsChanged(false);if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
+ protected override void OnResume(){base.OnResume();visible=true;Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
- protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
+ protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);HideLive();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
  {
   clockTimer?.Start();RefreshSource();
@@ -130,7 +130,7 @@ public sealed partial class QuietHome : NUIApplication
   var stopwatch=Stopwatch.StartNew();
   StopAnimation(ref focusAnimation);
   ParkArtwork();pageArtworkCold=0;
-  infoTimer?.Stop();CloseInputs(false);
+  infoTimer?.Stop();CloseInputs(false);HideLive();
   while(content.ChildCount>0){var v=content.GetChildAt(0);content.Remove(v);v.Dispose();}
   slots.Clear();styledAll=false;styledSelected=-1;notice.Text="";
   if(page==0)BuildHome();
@@ -143,6 +143,7 @@ public sealed partial class QuietHome : NUIApplication
   if(fade){content.Opacity=0;pageAnimation=new Animation(140){DefaultAlphaFunction=Ease()};pageAnimation.AnimateTo(content,"Opacity",1f);pageAnimation.Play();}
   else content.Opacity=1;
   buildMilliseconds=stopwatch.ElapsedMilliseconds;MarkState("page_ready");
+  if(page==0)ScheduleLive();
  }
  void BuildHome()
  {
@@ -276,7 +277,7 @@ public sealed partial class QuietHome : NUIApplication
   card.Add(new ImageView{ResourceUrl=Root+asset,Size2D=new Size2D(w,h)});
   card.Add(Label(word,50,h-206,w-100,116,100,white,"Display"));
   card.Add(Label(sub,56,h-96,w-112,46,30,subColor,"Semibold"));
-  // status pill (On now / Unplugged), filled in by UpdateHeroBadges whenever the input state changes
+  // status pill (On / Off / Unplugged), filled in by UpdateHeroBadges whenever the input or signal changes
   var badge=new View{Position2D=new Position2D(40,36),Size2D=new Size2D(160,50),CornerRadius=new Vector4(25,25,25,25),Opacity=0};
   var dot=new View{Position2D=new Position2D(20,18),Size2D=new Size2D(14,14),CornerRadius=new Vector4(7,7,7,7)};badge.Add(dot);
   var text=Label("",44,0,108,50,24,dark,"Semibold");badge.Add(text);card.Add(badge);

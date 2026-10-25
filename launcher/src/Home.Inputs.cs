@@ -37,7 +37,7 @@ public sealed partial class QuietHome
  void OnSourceTypeChanged()
  {
   int before=lastSource;RefreshSource();if(before==lastSource)return;
-  UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();MarkState("source_changed");
+  ReadSignal();UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("source_changed");
  }
  int watchPort=15,playPort=13;
  // Watch = the input the TV calls "Shield", Play = "Switch"; falls back to HDMI 3 / HDMI 1
@@ -55,7 +55,8 @@ public sealed partial class QuietHome
   UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();MarkState("inputs_changed");
  }
 
- // ---- hero badges: "On now" for the current input, "Unplugged" when the TV sees no device on that port ----
+ // ---- hero badges: only what the TV can actually tell. Current input: On (picture) / Off (no signal).
+ // Other inputs: Unplugged when no device is connected, otherwise nothing (the TV cannot see their power here).
  Animation badgeAnimation;
  void UpdateHeroBadges(bool animate=true)
  {
@@ -65,15 +66,16 @@ public sealed partial class QuietHome
   foreach(var s in slots){
    if(s.Kind!=1||!s.Action.StartsWith("hdmi:"))continue;
    int type=int.Parse(s.Action.Substring(5));var src=inputs.Find(i=>i.Type==type);
-   bool on=type==lastSource,unplugged=!on&&src!=null&&src.Known&&!src.Connected;
-   if(on||unplugged){
-    s.BadgeText.Text=on?"On now":"Unplugged";
-    s.Badge.Size2D=new Size2D(on?160:210,50);s.BadgeText.Size2D=new Size2D(on?108:160,50);
+   bool current=type==lastSource,on=current&&signal==1,off=current&&signal==0,unplugged=!current&&src!=null&&src.Known&&!src.Connected;
+   string text=on?"On":off?"Off":unplugged?"Unplugged":"";
+   if(text!=""){
+    s.BadgeText.Text=text;
+    int w=on||off?110:210;s.Badge.Size2D=new Size2D(w,50);s.BadgeText.Size2D=new Size2D(w-52,50);
     s.Badge.BackgroundColor=on?new Color(1,1,1,.94f):new Color(0,0,0,.55f);
     s.BadgeDot.BackgroundColor=on?onNowGreen:muted;
     s.BadgeText.TextColor=on?dark:new Color(1,1,1,.85f);
    }
-   float target=on||unplugged?1:0;
+   float target=text!=""?1:0;
    if(animate)badgeAnimation.AnimateTo(s.Badge,"Opacity",target);else s.Badge.Opacity=target;
   }
   badgeAnimation?.Play();
@@ -132,7 +134,7 @@ public sealed partial class QuietHome
    bool sub=s.Name!=s.Port;
    r.Name=Label(s.Name,84,sub?10:0,330,sub?44:RowH-8,30,white,"Semibold");r.Name.Ellipsis=true;r.Row.Add(r.Name);
    if(sub){r.Port=Label(s.Port,84,50,300,32,22,muted);r.Row.Add(r.Port);}
-   string status=cur?"On now":off?"Not connected":"";
+   string status=cur?(signal==1?"On":signal==0?"Off":""):off?"Not connected":"";
    if(status!=""){
     r.Pill=new View{Position2D=new Position2D(SheetW-32-196,(RowH-8-44)/2),Size2D=new Size2D(180,44),CornerRadius=new Vector4(22,22,22,22)};
     r.PillText=Label(status,0,0,180,44,21,muted,"Semibold");r.PillText.HorizontalAlignment=HorizontalAlignment.Center;r.Pill.Add(r.PillText);r.Row.Add(r.Pill);
@@ -151,8 +153,9 @@ public sealed partial class QuietHome
    if(r.Port!=null)r.Port.TextColor=f?valueFocus:muted;
    if(r.Pill!=null){
     // stays readable on the white focused row
-    r.Pill.BackgroundColor=r.Current?new Color(.2f,.78f,.36f,f?1:.22f):f?new Color(0,0,0,.08f):new Color(1,1,1,.08f);
-    r.PillText.TextColor=r.Current?(f?white:new Color(.5f,.95f,.6f,1)):f?valueFocus:muted;
+    bool green=r.Current&&signal==1;
+    r.Pill.BackgroundColor=green?new Color(.2f,.78f,.36f,f?1:.22f):f?new Color(0,0,0,.08f):new Color(1,1,1,.08f);
+    r.PillText.TextColor=green?(f?white:new Color(.5f,.95f,.6f,1)):f?valueFocus:muted;
    }
   }
  }

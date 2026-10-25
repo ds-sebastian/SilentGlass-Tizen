@@ -3,11 +3,18 @@
   <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><AssemblyName>BixbyPromotion</AssemblyName>
   <UseAppHost>false</UseAppHost><EnableDefaultCompileItems>false</EnableDefaultCompileItems><DebugType>none</DebugType><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable>
  </PropertyGroup>
- <ItemGroup><Compile Include="Home.cs" /><Compile Include="Home.Controls.cs" /><Compile Include="Home.Inputs.cs" /><Compile Include="Home.Info.cs" /><Compile Include="Home.Idle.cs" /><Compile Include="Home.State.cs" /><Compile Include="AppLibrary.cs" /><Compile Include="InfoStats.cs" /></ItemGroup>
+ <ItemGroup><Compile Include="Home.cs" /><Compile Include="Home.Controls.cs" /><Compile Include="Home.Inputs.cs" /><Compile Include="Home.Info.cs" /><Compile Include="Home.Idle.cs" /><Compile Include="Home.State.cs" /><Compile Include="Home.Live.cs" /><Compile Include="AppLibrary.cs" /><Compile Include="InfoStats.cs" /></ItemGroup>
  <ItemGroup>
   <Reference Include="Tizen.NUI"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.NUI.dll</HintPath><Private>false</Private></Reference>
   <Reference Include="Tizen.Applications.Common"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.Applications.Common.dll</HintPath><Private>false</Private></Reference>
   <Reference Include="Tizen.System"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.System.dll</HintPath><Private>false</Private></Reference>
   <Reference Include="Tizen"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.dll</HintPath><Private>false</Private></Reference>
+ </ItemGroup>
+ <ItemGroup>
+  <Reference Include="Tizen.TV.FLUX"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.FLUX.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Tizen.TV.Broadcast.TVWindowControl"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.Broadcast.TVWindowControl.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Tizen.TV.UI.SharedAPI"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.UI.SharedAPI.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Tizen.TV.NUI.VideoWindowControl"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.NUI.VideoWindowControl.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Tizen.TV.Broadcast.TVService"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.Broadcast.TVService.dll</HintPath><Private>false</Private></Reference>
  </ItemGroup>
 </Project>

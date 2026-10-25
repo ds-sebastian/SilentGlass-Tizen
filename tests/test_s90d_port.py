@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs")
+PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs")
 
 
 def launcher():
@@ -61,7 +61,9 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn('Control("Ambient","ambient","ambient",1);', home)
         # owner: the app chips inside the Watch card looked messy - the card is art only
         self.assertNotIn("HeroApps", src)
-        self.assertIn("bool on=type==lastSource", src)  # "On now" follows the real input
+        # owner: "On now" only meant "selected" - badges now come from the TV's signal state
+        self.assertNotIn("On now", src)
+        self.assertIn("on=current&&signal==1,off=current&&signal==0", src)
         for noisy in ("Input name saved", "Direct input", "Everyday controls", "Back to input", "Most opened", "Select · ", "Let's watch"):
             self.assertNotIn(noisy, src)
 
@@ -188,7 +190,7 @@ class S90dPortTests(unittest.TestCase):
         # idle check only runs from the clock timer, which is stopped while Quiet Home is in the background
         self.assertIn("IdleTick();return true;", src)
         on_pause = body(src, "protected override void OnPause()")
-        self.assertIn("CloseInputs(false);clockTimer?.Stop();", on_pause)
+        self.assertIn("CloseInputs(false);HideLive();clockTimer?.Stop();", on_pause)
         # first key press only wakes, never activates a tile
         on_key = body(src, "void OnKey(")
         self.assertLess(on_key.index("if(dimmed){Wake(true);"), on_key.index("HandleKey(k)"))
@@ -240,6 +242,23 @@ class S90dPortTests(unittest.TestCase):
 
     def test_info_card_select_does_not_flash(self):
         self.assertIn('if(a=="info"){BuildPage(false);return;}', body(launcher(), "void Activate()"))
+
+    def test_live_preview_is_deferred_and_released(self):
+        src = launcher()
+        # never built during the page build itself: posted to after the frame
+        self.assertIn("void ScheduleLive(){OnUi(UpdateLive);}", src)
+        self.assertNotIn("UpdateLive()", body(src, "void BuildPage(").replace("ScheduleLive()", ""))
+        # only for the current input, only with a picture, only while Quiet Home is visible and awake
+        update = body(src, "void UpdateLive()")
+        self.assertIn('page==0&&visible&&!dimmed&&CurrentHasSignal', update)
+        self.assertIn('s.Action=="hdmi:"+lastSource', update)
+        self.assertIn("catch(Exception ex){liveState=\"failed:\"", update)
+        # released whenever Home is left: pause, OLED dim, page rebuild
+        self.assertIn("HideLive();", body(src, "protected override void OnPause()"))
+        self.assertIn("HideLive();", src.split("void Dim()")[1].split("void MoveDimClock()")[0])
+        self.assertIn("HideLive();", body(src, "void BuildPage("))
+        # the TV window hint is turned back off with the preview
+        self.assertIn('SetAuxiliaryHintValue(tvsHint,"0")', body(src, "void HideLive()"))
 
     def test_key_path_has_no_io_or_ipc(self):
         src = launcher()

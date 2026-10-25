@@ -17,7 +17,7 @@ public sealed partial class QuietHome
  }
  void Dim()
  {
-  dimmed=true;infoTimer?.Stop();
+  dimmed=true;infoTimer?.Stop();HideLive();
   dimLayer=new View{Size2D=new Size2D(1920,1080),BackgroundColor=new Color(0,0,0,1),Opacity=0};
   dimClock=new TextLabel{Size2D=new Size2D(360,90),PixelSize=64,FontFamily="Quiet Inter Display",TextColor=new Color(.32f,.33f,.36f,1),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
   dimLayer.Add(dimClock);MoveDimClock();
@@ -39,6 +39,7 @@ public sealed partial class QuietHome
   if(dimAnimation!=null){dimAnimation.Stop();dimAnimation.Dispose();dimAnimation=null;}
   if(dimLayer!=null){overlay.Remove(dimLayer);dimLayer.Dispose();dimLayer=null;dimClock=null;}
   if(page==3&&infoTimer!=null)infoTimer.Start();
+  ScheduleLive();
   MarkState(fromKey?"woke_key":"woke");
  }
 }
