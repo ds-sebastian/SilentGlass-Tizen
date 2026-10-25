@@ -66,7 +66,7 @@ public sealed partial class QuietHome : NUIApplication
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   BuildChrome();
   PreloadArtwork();
-  RefreshSource();RefreshInputs();WatchInputs();
+  RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();
   selected=SourceIndex();BuildPage(false);
   clockTimer=new Tizen.NUI.Timer(30000);
   clockTimer.Tick+=(s,e)=>{clock.Text=Clock();IdleTick();return true;};clockTimer.Start();
@@ -85,7 +85,7 @@ public sealed partial class QuietHome : NUIApplication
  }
  void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage(false);MarkState(activity);}
  static string Clock()=>DateTime.Now.ToString("h:mm tt");
- int SourceIndex(){return lastSource==13?1:0;}
+ int SourceIndex(){return lastSource==playPort?1:0;}
 
  // ---- scene helpers: page views go into the content layer and are disposed with the page ----
  View Add(View v){content.Add(v);return v;}
@@ -148,8 +148,9 @@ public sealed partial class QuietHome : NUIApplication
  {
   RefreshSettings();
   // SHIELD is the main device: the wide Watch card. The Switch card sits beside it. No TV apps here.
-  Hero("Watch","hdmi:15","SHIELD","feature-watch.svg",100,170,1100,560,new Color(.76f,.94f,.56f,1));
-  Hero("Play","hdmi:13","Nintendo Switch","feature-play.svg",1240,170,580,560,new Color(1f,.74f,.78f,1));
+  // ports follow the TV's input names (Shield / Switch), so re-cabling needs no code change
+  Hero("Watch","hdmi:"+watchPort,"SHIELD","feature-watch.svg",100,170,1100,560,new Color(.76f,.94f,.56f,1));
+  Hero("Play","hdmi:"+playPort,"Nintendo Switch","feature-play.svg",1240,170,580,560,new Color(1f,.74f,.78f,1));
   Control("Inputs","inputs","inputs",0);
   Control("Ambient","ambient","ambient",1);
   Control("Sleep Timer","sleeptimer","sleep",2);
@@ -308,8 +309,8 @@ public sealed partial class QuietHome : NUIApplication
    if(!styledAll||i==styledSelected||i==focus||(areaChanged&&slots[i].Kind==1))StyleSlot(slots[i],i==focus,animate&&styledAll);
   styledAll=true;styledSelected=focus;styledArea=area;
   if(page==0){
-   string fa=focus>=0?slots[focus].Action:"";
-   FadeTo(glowWatch,fa=="hdmi:15"?1:0,animate);FadeTo(glowPlay,fa=="hdmi:13"?1:0,animate);
+   string fn=focus>=0&&slots[focus].Kind==1?slots[focus].Name:"";
+   FadeTo(glowWatch,fn=="Watch"?1:0,animate);FadeTo(glowPlay,fn=="Play"?1:0,animate);
   }
   focusAnimation?.Play();
   detail.Text=editing!=""?"Left / Right to adjust · Select to finish":"";
@@ -397,7 +398,7 @@ public sealed partial class QuietHome : NUIApplication
  void Activate()
  {
   string a=slots[selected].Action;notice.Text="";
-  if(a=="info"){BuildPage();return;}
+  if(a=="info"){BuildPage(false);return;} // refresh in place: no fade (it read as a flash)
   if(a=="inputs"){OpenInputs();return;}
   if(a=="ambient"){Launch("org.tizen.art-app");return;}
   if(a.StartsWith("hdmi:")){SelectSource(int.Parse(a.Substring(5)));return;}

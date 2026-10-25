@@ -39,9 +39,14 @@ public sealed partial class QuietHome
   int before=lastSource;RefreshSource();if(before==lastSource)return;
   UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();MarkState("source_changed");
  }
+ int watchPort=15,playPort=13;
+ // Watch = the input the TV calls "Shield", Play = "Switch"; falls back to HDMI 3 / HDMI 1
+ bool ResolveHeroPorts(){int w=PortNamed("shield",15),p=PortNamed("switch",13);bool changed=w!=watchPort||p!=playPort;watchPort=w;playPort=p;return changed;}
+ int PortNamed(string word,int fallback){var m=inputs.Find(i=>i.Known&&i.Type>=13&&i.Type<=16&&i.Name.IndexOf(word,StringComparison.OrdinalIgnoreCase)>=0);return m!=null?m.Type:fallback;}
  void OnInputsChanged(bool announce)
  {
   var before=inputs;RefreshInputs();RefreshSource();
+  if(ResolveHeroPorts()&&page==0){BuildPage(false);MarkState("hero_ports_changed");return;}
   if(announce&&visible)
    foreach(var now in inputs){
     var was=before.Find(i=>i.Type==now.Type);
@@ -165,6 +170,24 @@ public sealed partial class QuietHome
   StopAnimation(ref sheetAnimation);
   overlay.Remove(inputsLayer);inputsLayer.Dispose();inputsLayer=null;sheet=null;sheetRows.Clear();
   if(refocus)MarkState("inputs_closed");
+ }
+ // ---- Ambient's Home key: the Art app always opens Samsung Home (hard-coded); come back to Quiet Home instead ----
+ const string ForegroundKey="memory/appfw/current_fullscreen_appid";
+ [DllImport("libvconf.so.0")] static extern string vconf_get_str(string key); // malloc'd; the marshaller frees it
+ VconfChangedCallback foregroundCallback;
+ string lastForeground="",foregroundWatch="off";int ambientReturns;
+ void WatchForeground()
+ {
+  try{lastForeground=vconf_get_str(ForegroundKey)??"";foregroundCallback=(n,d)=>OnUi(OnForegroundChanged);int r=vconf_notify_key_changed(ForegroundKey,foregroundCallback,IntPtr.Zero);foregroundWatch=r==0?"on":"failed:"+r;}
+  catch(Exception ex){foregroundWatch="failed:"+ex.GetType().Name;}
+ }
+ static bool IsAmbient(string id)=>id=="org.tizen.art-app"||id=="com.samsung.tv.home.art"||id=="com.samsung.tv.ambientfte";
+ void OnForegroundChanged()
+ {
+  string now=null;try{now=vconf_get_str(ForegroundKey);}catch{}
+  if(string.IsNullOrEmpty(now))return;
+  string before=lastForeground;lastForeground=now;
+  if(now=="com.samsung.tv.csfs"&&IsAmbient(before)){ambientReturns++;Launch("com.samsung.tv.bixby-promotion");MarkState("ambient_home_redirect");}
  }
  string InputsState()=>string.Join(";",inputs.ConvertAll(i=>i.Type+","+i.Name+","+(i.Known?(i.Connected?"1":"0"):"?")+","+i.Power));
 }

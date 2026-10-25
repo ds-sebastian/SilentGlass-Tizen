@@ -32,11 +32,13 @@ class S90dPortTests(unittest.TestCase):
 
     def test_primary_shield_uses_observed_source(self):
         src = launcher()
-        self.assertIn('Hero("Watch","hdmi:15","SHIELD"', src)
+        self.assertIn('Hero("Watch","hdmi:"+watchPort,"SHIELD"', src)
         self.assertIn('lastSource=15', src)
+        # heroes follow the TV's own input names, falling back to the observed ports
+        self.assertIn('int w=PortNamed("shield",15),p=PortNamed("switch",13);', src)
 
     def test_secondary_keeps_the_tvs_stored_label(self):
-        self.assertIn('Hero("Play","hdmi:13","Nintendo Switch"', launcher())
+        self.assertIn('Hero("Play","hdmi:"+playPort,"Nintendo Switch"', launcher())
 
     def test_example_console_routes_are_removed(self):
         src = launcher()
@@ -225,6 +227,17 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("SourceListChangedCallback sourceListCallback;", src)
         self.assertIn("VconfChangedCallback sourceTypeCallback;", src)
         self.assertNotIn("new Tizen.NUI.Timer(", body(src, "void WatchInputs()"))  # no polling
+
+    def test_ambient_home_returns_to_quiet_home(self):
+        src = launcher()
+        fg = body(src, "void OnForegroundChanged()")
+        self.assertIn('now=="com.samsung.tv.csfs"&&IsAmbient(before)', fg)
+        self.assertIn('Launch("com.samsung.tv.bixby-promotion")', fg)
+        # only the Ambient -> Samsung Home hand-off is redirected; opening Samsung Home from Apps still works
+        self.assertEqual(src.count('Launch("com.samsung.tv.bixby-promotion")'), 1)
+
+    def test_info_card_select_does_not_flash(self):
+        self.assertIn('if(a=="info"){BuildPage(false);return;}', body(launcher(), "void Activate()"))
 
     def test_key_path_has_no_io_or_ipc(self):
         src = launcher()
