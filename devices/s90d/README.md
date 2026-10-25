@@ -41,13 +41,14 @@ verifies every file) and `restore-v(N-1).sh`. Build with `python3 tools/build.py
 | cleanup/batchc | ad targeting (`targeted-ad-service`), voice leftovers (`utterance-recommender-core`, `AICompanionAgent`, `aov-dashboard`) | batchc-restore.sh |
 | cleanup/prime* | Prime Video boot metadata removed, companion disabled, `disable.appbooting` (ineffective, kept) | prime-restore.sh, prime-noboot-restore.sh |
 | boot-units/quiet-recog-off | owner user-systemd watcher stopping content recognition (later boot targets restart it) | recog-boot-restore.sh |
-| boot-units/quiet-prime-off | closes Prime Video, Apple TV and the browser after Samsung's background preload (first 10 min) | prime-off-restore.sh |
+| boot-units/quiet-prime-off | janitor: closes Prime Video, Apple TV and the browser after Samsung's boot preload (first 10 min), then whenever they sit 5 min in the background (script `quiet-prime-off.sh`, read on stdin via `StandardInput=file:`) | prime-off-v5-restore.sh, prime-off-restore.sh |
 
-Install the units with `*-install.sh`, then the latest `*-update*.sh`. User units live in
+Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
 `DBUS_SESSION_BUS_ADDRESS=kernel:path=/sys/fs/kdbus/5001-user/bus XDG_RUNTIME_DIR=/run/user/5001 systemctl --user`.
 
 Not done on purpose: TV YouTube (`cobalt-yt`) is relaunched by litewebappservice within seconds when closed;
+Samsung Home (`csfs`, ~100-120 MB) and its media rows (`home.media`, ~70-150 MB) are relaunched within ~1 min (measured), so closing them only burns CPU;
 SmartThings/OTBR components are kept (custom Thread border router runs on `wpan0`); Art/Ambient services kept.
 
 ## Pi side (pi/)

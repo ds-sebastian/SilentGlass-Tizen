@@ -1,12 +1,11 @@
 [Unit]
-Description=Quiet Home: close Prime Video, Apple TV and the web browser after Samsung's boot preload (owner request)
+Description=Quiet Home janitor: close Samsung boot preloads, and Samsung Home / Apple TV / Prime / browser after 5 min in the background (owner request)
 
 [Service]
 Type=simple
-# For the first 10 min of uptime: if one of these is running but is not the fullscreen app, close it
-# (Samsung preloads them in the background at ~1-5 min). All stay installed and open normally. Log in /run/user/5001.
-# TV YouTube is NOT listed: litewebappservice relaunches it immediately when closed (restart churn).
-ExecStart=/bin/sh -c 'L=/run/user/5001/quiet-prime-off.log; exec >>$$L 2>&1; up(){ cut -d. -f1 /proc/uptime; }; echo "start up=$$(up)"; while [ $$(up) -lt 600 ]; do r=$$(app_launcher -S 2>/dev/null); for a in org.tizen.primevideo com.samsung.tv.aria-video org.tizen.browser; do case "$$r" in *"$$a ("*) fg=$$(buxton2ctl get memory memory/appfw/current_fullscreen_appid 2>&1); case "$$fg" in *"$$a"*) echo "up=$$(up) $$a is on screen - leaving it";; *) app_launcher -k $$a >/dev/null 2>&1; echo "up=$$(up) closed background $$a (fg: $${fg##* })";; esac;; esac; done; sleep 10; done; echo "done up=$$(up)"'
+# Script is read on stdin (unsigned files cannot be executed under UEP). Log: /run/user/5001/quiet-prime-off.log
+StandardInput=file:/opt/usr/home/owner/.config/quiet-home/prime-off.sh
+ExecStart=/bin/sh -s
 
 [Install]
 WantedBy=default.target
