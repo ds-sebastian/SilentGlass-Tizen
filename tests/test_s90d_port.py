@@ -74,10 +74,12 @@ class S90dPortTests(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         added_after_inventory = {"rTn6ClEurC.Jellyfin"}  # owner-installed 2026-10-24, verified in TV registry
         self.assertTrue(set(ids) <= enabled | added_after_inventory, set(ids) - enabled)
-        self.assertEqual(ids[:2], ["com.samsung.tv.cobalt-yt", "rTn6ClEurC.Jellyfin"])
+        self.assertEqual(ids[0], "rTn6ClEurC.Jellyfin")
         self.assertNotIn("HEPsqFNie0.tvplusstandalone", ids)
         # Uninstalled from this TV on 2026-10-24 at the owner's request.
-        for removed in ("org.tizen.netflix-app", "MCmYXNxgcu.DisneyPlus", "3KA0pm7a7V.TubiTV"):
+        # 2026-10-25: Prime Video and Apple TV uninstalled, TV YouTube disabled (cast to SHIELD instead)
+        for removed in ("org.tizen.netflix-app", "MCmYXNxgcu.DisneyPlus", "3KA0pm7a7V.TubiTV",
+                        "org.tizen.primevideo", "com.samsung.tv.aria-video", "com.samsung.tv.cobalt-yt", "org.tizen.browser"):
             self.assertNotIn(removed, ids)
         self.assertNotIn("org.tizen.netflix-app", launcher())
         for app in catalog:
@@ -162,7 +164,7 @@ class S90dPortTests(unittest.TestCase):
 
     def test_info_page_lists_match_applied_privacy_state(self):
         info = (SRC / "InfoStats.cs").read_text()
-        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 34)
+        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 36)
         self.assertNotIn("File.Delete", info.split("RecordLaunch")[0])
         # SMACK: marker files are unreadable to the app and other apps' /proc is hidden; never infer from those.
         self.assertNotIn("File.Exists(\"/opt/usr/share/systemd", info)

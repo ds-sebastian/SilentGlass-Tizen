@@ -20,7 +20,8 @@ public static class InfoStats
         "org.tizen.voice-app", "org.tizen.voice-app-service", "com.samsung.tv.wakeup-engine-bixby", "com.samsung.tv.bixby-prov",
         "com.samsung.tv.voiceassistant-music", "com.samsung.tv.vif", "com.samsung.tv.alexa-client", "com.samsung.tv.alexa-fullscreen-app",
         "com.samsung.tv.wakeup-engine-alexa", "AQKO41xyKP.AmazonAlexa", "HEPsqFNie0.tvplusstandalone",
-        "com.samsung.tv.targeted-ad-service", "com.samsung.tv.utterance-recommender-core", "com.samsung.tv.AICompanionAgent", "com.samsung.tv.aov-dashboard" };
+        "com.samsung.tv.targeted-ad-service", "com.samsung.tv.utterance-recommender-core", "com.samsung.tv.AICompanionAgent", "com.samsung.tv.aov-dashboard",
+        "com.samsung.tv.home.media", "com.samsung.tv.cobalt-yt" };
 
     static string Read(string path) { try { return File.ReadAllText(path); } catch { return null; } }
 
