@@ -19,7 +19,8 @@ public static class InfoStats
         "com.samsung.tv.farfieldvoice", "com.samsung.tv.ondevice-voice", "com.samsung.tv.voiceid-service", "org.tizen.voice-client", "org.tizen.stt-client",
         "org.tizen.voice-app", "org.tizen.voice-app-service", "com.samsung.tv.wakeup-engine-bixby", "com.samsung.tv.bixby-prov",
         "com.samsung.tv.voiceassistant-music", "com.samsung.tv.vif", "com.samsung.tv.alexa-client", "com.samsung.tv.alexa-fullscreen-app",
-        "com.samsung.tv.wakeup-engine-alexa", "AQKO41xyKP.AmazonAlexa", "HEPsqFNie0.tvplusstandalone" };
+        "com.samsung.tv.wakeup-engine-alexa", "AQKO41xyKP.AmazonAlexa", "HEPsqFNie0.tvplusstandalone",
+        "com.samsung.tv.targeted-ad-service", "com.samsung.tv.utterance-recommender-core", "com.samsung.tv.AICompanionAgent", "com.samsung.tv.aov-dashboard" };
 
     static string Read(string path) { try { return File.ReadAllText(path); } catch { return null; } }
 
@@ -205,6 +206,72 @@ public static class InfoStats
     }
 
     // ---- formatting ----
+    // Thread border router state from /proc/net/if_inet6 (readable in the app sandbox; ot-ctl is not).
+    // RLOC = mesh-local prefix + 0000:00ff:fe00:<rloc16>; ALOC 0xfc00 = leader; an off-mesh global/ULA address = OMR route.
+    public static (bool present, int rloc16, bool leader, bool homeRoute, int addresses) ParseThread(string text, string iface)
+    {
+        var rows = new List<(string addr, string scope)>();
+        foreach (var line in (text ?? "").Split('\n'))
+        {
+            var f = line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            if (f.Length >= 6 && f[5] == iface && f[0].Length == 32) rows.Add((f[0].ToLowerInvariant(), f[3]));
+        }
+        int rloc = -1; bool leader = false; string mesh = null;
+        foreach (var (a, _) in rows)
+        {
+            if (!a.Substring(16, 12).Equals("000000fffe00")) continue;
+            int v = Convert.ToInt32(a.Substring(28, 4), 16);
+            if (v == 0xfc00) leader = true; else if (v < 0xfc00) { rloc = v; mesh = a.Substring(0, 16); }
+        }
+        bool omr = false;
+        foreach (var (a, scope) in rows)
+            if (scope == "00" && !a.StartsWith("fe80") && mesh != null && a.Substring(0, 16) != mesh) omr = true;
+        return (rows.Count > 0, rloc, leader, omr, rows.Count);
+    }
+    public static (bool present, int rloc16, bool leader, bool homeRoute, int addresses) Thread() => ParseThread(Read("/proc/net/if_inet6"), "wpan0");
+    public static bool Ipv6Forwarding() => Read("/proc/sys/net/ipv6/conf/all/forwarding")?.Trim() == "1";
+    // ---- TV inputs: Samsung's own source list (libsource-api get_source_list JSON) ----
+    public sealed class InputSource { public int Type; public string Name, Port; public bool Connected; public int Power; }
+    static string Unescape(string v) { try { return Uri.UnescapeDataString(v ?? ""); } catch { return v ?? ""; } }
+    // HDMI 1-4 are source types 13-16 and always listed (not-connected ports included); Live TV (0) only if the TV reports it.
+    public static List<InputSource> ParseSources(string json)
+    {
+        var seen = new Dictionary<int, (string edit, string detected, bool conn, int power)>();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json ?? "[]");
+            foreach (var e in doc.RootElement.EnumerateArray())
+            {
+                int t = e.TryGetProperty("sourceType", out var st) && st.TryGetInt32(out var tv) ? tv : -1;
+                if (t != 0 && (t < 13 || t > 16)) continue;
+                string Str(string k) => e.TryGetProperty(k, out var p) && p.ValueKind == System.Text.Json.JsonValueKind.String ? Unescape(p.GetString()).Trim() : "";
+                bool conn = e.TryGetProperty("connectionState", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.True;
+                int pw = e.TryGetProperty("powerState", out var ps) && ps.TryGetInt32(out var pv) ? pv : 0;
+                seen[t] = (Str("editName"), Str("detectedName"), conn, pw);
+            }
+        }
+        catch { }
+        var list = new List<InputSource>();
+        for (int t = 13; t <= 16; t++)
+        {
+            string port = "HDMI " + (t - 12);
+            if (seen.TryGetValue(t, out var v))
+            {
+                string name = v.edit.Length > 0 ? v.edit : v.detected.Length > 0 ? v.detected : port;
+                list.Add(new InputSource { Type = t, Name = name, Port = port, Connected = v.conn, Power = v.power });
+            }
+            else list.Add(new InputSource { Type = t, Name = port, Port = port, Connected = false, Power = 0 });
+        }
+        if (seen.ContainsKey(0)) list.Add(new InputSource { Type = 0, Name = "Live TV", Port = "Antenna", Connected = true, Power = 0 });
+        return list;
+    }
+    [System.Runtime.InteropServices.DllImport("/usr/lib/libsource-api.so")] static extern IntPtr get_source_list();
+    public static List<InputSource> Sources()
+    {
+        try { var p = get_source_list(); return ParseSources(p == IntPtr.Zero ? null : System.Runtime.InteropServices.Marshal.PtrToStringUTF8(p)); }
+        catch { return ParseSources(null); }
+    }
+
     public static string Bytes(double b)
     {
         string[] u = { "B", "KB", "MB", "GB", "TB" }; int i = 0;

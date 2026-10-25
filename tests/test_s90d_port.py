@@ -13,11 +13,11 @@ INVENTORY = ROOT / ".local/device-inventory/catalog-apps.csv"
 
 class S90dPortTests(unittest.TestCase):
     def test_primary_shield_uses_observed_source(self):
-        self.assertIn('Feature("SHIELD","hdmi:15"', SOURCE.read_text())
+        self.assertIn('Hero("Watch","hdmi:15","SHIELD"', SOURCE.read_text())
         self.assertIn('lastSource=15;', SOURCE.read_text())
 
     def test_secondary_keeps_the_tvs_stored_label(self):
-        self.assertIn('Feature("Switch","hdmi:13"', SOURCE.read_text())
+        self.assertIn('Hero("Play","hdmi:13","Nintendo Switch"', SOURCE.read_text())
 
     def test_example_console_routes_are_removed(self):
         source = SOURCE.read_text()
@@ -26,8 +26,24 @@ class S90dPortTests(unittest.TestCase):
 
     def test_samsung_home_escape_and_quick_settings(self):
         source = SOURCE.read_text()
-        self.assertIn('Dock("Samsung Home","app:com.samsung.tv.csfs"', source)
-        self.assertIn('Feature("Quick Settings","page:2"', source)
+        # Samsung Home moved to the Apps page; Home keeps a one-press way to all controls
+        self.assertIn('Id="com.samsung.tv.csfs",Asset="tile-samsung-home.svg"', source)
+        self.assertIn('Control("More","page:2","more",4);', source)
+
+    def test_home_is_shield_first_without_tv_apps(self):
+        source = SOURCE.read_text()
+        home = source.split("if(page==0){\n   RefreshSettings();")[1].split("}else if(page==1){")[0]
+        # TV apps are backups: none of them is a target on Home, only the two inputs and controls
+        self.assertNotIn('"app:', home)
+        self.assertEqual(home.count("Hero("), 2)
+        self.assertEqual(home.count("Control("), 5)
+        self.assertIn('Control("Inputs","inputs","inputs",0);', home)
+        self.assertIn('Control("Ambient","ambient","ambient",1);', home)
+        # the apps that live on SHIELD are shown inside the Watch card
+        self.assertIn('HeroApps(watch,"rTn6ClEurC.Jellyfin","com.samsung.tv.cobalt-yt");', home)
+        self.assertIn('if(action=="hdmi:"+lastSource)', source)  # "On now" badge follows the real input
+        for noisy in ("Input name saved", "Direct input", "Everyday controls", "Back to input", "Most opened", "Select · ", "Let's watch"):
+            self.assertNotIn(noisy, source)
 
     def test_catalog_only_has_installed_enabled_apps(self):
         rows = list(csv.DictReader(INVENTORY.read_text().splitlines()))
@@ -39,7 +55,7 @@ class S90dPortTests(unittest.TestCase):
         added_after_inventory = {"rTn6ClEurC.Jellyfin"}  # owner-installed 2026-10-24, verified in TV registry
         self.assertTrue(set(ids) <= enabled | added_after_inventory, set(ids) - enabled)
         self.assertEqual(ids[:2], ["com.samsung.tv.cobalt-yt", "rTn6ClEurC.Jellyfin"])
-        self.assertIn('Dock("Jellyfin","app:rTn6ClEurC.Jellyfin"', SOURCE.read_text())
+        self.assertIn('HeroApps(watch,"rTn6ClEurC.Jellyfin"', SOURCE.read_text())
         self.assertNotIn("HEPsqFNie0.tvplusstandalone", ids)
         # Uninstalled from this TV on 2026-10-24 at the owner's request.
         for removed in ("org.tizen.netflix-app", "MCmYXNxgcu.DisneyPlus", "3KA0pm7a7V.TubiTV"):
@@ -51,7 +67,7 @@ class S90dPortTests(unittest.TestCase):
 
     def test_new_artwork_is_local_valid_svg(self):
         # Fixed locally authored SVGs only; no uploads, remote XML, or DTDs are accepted.
-        for name in ("feature-shield.svg", "feature-settings.svg", "free-dock-shield.svg", "free-dock-home.svg"):
+        for name in ("feature-watch.svg", "feature-play.svg", "tile-samsung-home.svg", "free-background.svg"):
             tree = ET.parse(ASSETS / name)
             self.assertTrue(tree.getroot().tag.endswith("svg"))
             self.assertNotIn("https://", (ASSETS / name).read_text())
@@ -64,7 +80,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertEqual(len(tiles), 12)
         self.assertEqual(sorted((int(c), int(r)) for *_, c, r in tiles), [(c, r) for c in range(4) for r in range(3)])
         for _, _, icon, _, _ in tiles:
-            path = ASSETS / f"quick-{icon}.svg"
+            path = ASSETS / f"glyph-{icon}.svg"
             self.assertTrue(ET.parse(path).getroot().tag.endswith("svg"), path)
             self.assertNotIn("https://", path.read_text())
 
@@ -89,8 +105,10 @@ class S90dPortTests(unittest.TestCase):
         source = SOURCE.read_text()
         for icon in re.findall(r'Toolbar\("[^"]+","[^"]+","([a-z_]+)"', source):
             self.assertGreater((ASSETS / f"symbol-{icon}.png").stat().st_size, 200)
-        for asset in re.findall(r'Dock\("[^"]+","[^"]+","([a-z]+)"', source):
-            ET.parse(ASSETS / f"free-dock-{asset}.svg")
+        glyphs = re.findall(r'Control\("[^"]+","[^"]+","([a-z]+)",\d\)', source)
+        self.assertEqual(len(glyphs), 5)
+        for glyph in glyphs:
+            ET.parse(ASSETS / f"glyph-{glyph}.svg")
         local = ASSETS / "apps.local.json"
         if not local.exists():
             self.skipTest("no device catalog")
@@ -107,18 +125,16 @@ class S90dPortTests(unittest.TestCase):
             # Repo-generated local assets; stdlib expat does not fetch external entities.
             ET.fromstring(text)
 
-    def test_info_page_navigation_and_toolbar_fit(self):
-        import re
+    def test_info_page_navigation_and_tab_bar(self):
         source = SOURCE.read_text()
-        self.assertIn('string[] nav={"Inputs","Apps","Settings","Info"}', source)
-        self.assertIn("next>3", source)
-        self.assertIn("page=n<0?3:0", source)
-        self.assertNotIn("next>2", source)
-        self.assertNotIn("i<3;i++){tabs", source)
-        base = int(re.search(r"int x=(\d+)\+n\*88;", source).group(1))
-        buttons = re.findall(r'Toolbar\("[^"]+","page:(\d)","([a-z_]+)",(\d)\)', source)
-        self.assertEqual(sorted(int(p) for p, _, _ in buttons), [0, 1, 2, 3])
-        self.assertLessEqual(base + max(int(n) for *_, n in buttons) * 88 + 34 + 68, 1920 - 40)
+        self.assertIn('string[] nav={"Home","Apps","Controls","Info"}', source)
+        self.assertIn("int next=Math.Max(0,Math.Min(3,page+d));", source)
+        self.assertNotIn("Toolbar(", source)
+        # Thread border router status replaces the usage panel
+        build_info = source.split("void BuildInfo()")[1].split("void InfoTick()")[0]
+        self.assertIn('"Thread border router"', build_info)
+        self.assertNotIn("UsageSummary", build_info)
+        self.assertNotIn("RecordLaunch", source)
         # the info timer must not run while another page or app is visible
         self.assertIn("infoTimer?.Stop();", source.split("void BuildPage()")[1].split("Add(new ImageView")[0])
         self.assertIn("if(page!=3)return false;", source)
@@ -126,7 +142,7 @@ class S90dPortTests(unittest.TestCase):
 
     def test_info_page_lists_match_applied_privacy_state(self):
         info = (SOURCE.parent / "InfoStats.cs").read_text()
-        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 30)
+        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 34)
         self.assertNotIn("File.Delete", info.split("RecordLaunch")[0])
         # SMACK: marker files are unreadable to the app and other apps' /proc is hidden; never infer from those.
         self.assertNotIn("File.Exists(\"/opt/usr/share/systemd", info)
@@ -150,7 +166,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("const long IdleMs=5*60*1000;", home)
         # idle check only runs from the clock timer, which is stopped while Quiet Home is in the background
         self.assertIn("IdleTick();return true;", home)
-        self.assertIn("protected override void OnPause(){base.OnPause();editing=\"\";clockTimer?.Stop();", home)
+        self.assertIn("protected override void OnPause(){base.OnPause();editing=\"\";CloseInputs(false);clockTimer?.Stop();", home)
         # first key press only wakes, never activates a tile
         on_key = home.split("void OnKey(")[1].split("try{")[0]
         self.assertIn("if(dimmed){Wake(true);", on_key)
@@ -158,6 +174,25 @@ class S90dPortTests(unittest.TestCase):
         dim = home.split("void Dim()")[1].split("void MoveDimClock()")[0]
         self.assertIn("infoTimer?.Stop();", dim)
         self.assertIn("new Color(0,0,0,1)", dim)
+
+    def test_inputs_sheet(self):
+        home = SOURCE.read_text()
+        # every key is consumed by the open sheet before page navigation; Back closes it
+        on_key = home.split("void OnKey(")[1].split("if(k==\"XF86Home\")")[0]
+        self.assertIn("if(inputsLayer!=null&&HandleInputsKey(k))return;", on_key)
+        sheet = home.split("bool HandleInputsKey(")[1].split("void CloseInputs(")[0]
+        self.assertIn("SelectSource(s.Type)", sheet)
+        self.assertIn("CloseInputs(true)", sheet)
+        self.assertIn("CloseInputs(false);", home.split("protected override void OnPause()")[1].split("\n")[0])
+        # read-only source API only: names come from the TV, never renamed from here
+        info = (SOURCE.parent / "InfoStats.cs").read_text()
+        self.assertIn("get_source_list()", info)
+        self.assertNotIn("set_edit_name", info + home)
+        # powerState is unreliable on this TV (the on-screen SHIELD reports Off), so it is never shown
+        self.assertNotIn("s.Power==", home)
+        self.assertNotIn("src.Power==", home)
+        for g in ("glyph-inputs.svg", "glyph-ambient.svg", "glow-watch.svg", "glow-play.svg"):
+            ET.parse(ASSETS / g)
 
     def test_dark_theme_background(self):
         self.assertIn("Window.Default.BackgroundColor=new Color(0,0,0,1);", SOURCE.read_text())

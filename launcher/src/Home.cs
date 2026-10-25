@@ -12,7 +12,7 @@ public sealed class QuietHome : NUIApplication
 {
  const string Root="/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
  const string StateFile="/tmp/quiet-home-state.txt";
- sealed class Slot { public View Card,Shadow,FocusRing; public TextLabel Label; public string Name,Action,Description; public int Row,X,Y,W,H; }
+ sealed class Slot { public View Card,FocusRing,Disc; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action,Description; public int Row,X,Y,W,H,Kind; } // Kind: 0 plain, 1 hero, 2 control tile
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
  readonly List<View> scene=new List<View>();
@@ -24,7 +24,7 @@ public sealed class QuietHome : NUIApplication
  string libraryError="";
  TextLabel clock, notice, detail;
  TextLabel[] tabs;
- TextLabel toolbarHint;
+ View[] tabBg;
  Animation focusAnimation;
  bool fontLoaded;
  Tizen.NUI.Timer clockTimer;
@@ -43,6 +43,7 @@ public sealed class QuietHome : NUIApplication
  readonly Color muted=new Color(0.62f,0.63f,0.68f,1);
  readonly Color white=new Color(1,1,1,1);
  readonly Color accent=new Color(0.47f,0.6f,1f,1);
+ readonly Color dark=new Color(0.07f,0.07f,0.09f,1);
  [DllImport("libsource-api.so")] static extern int connect_source(int sourceType);
  [DllImport("libvconf.so.0")] static extern int vconf_get_int(string key,out int value);
  [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_create(out IntPtr app);
@@ -67,6 +68,8 @@ public sealed class QuietHome : NUIApplication
   base.OnCreate();
   try{fontLoaded=FontClient.Instance.AddCustomFontDirectory(Root+"fonts");}catch{fontLoaded=false;}
   try{library=AppLibrary.Load(Root+"apps.json");}catch(Exception ex){libraryError=ex.Message;}
+  // Samsung Home lives on the Apps page now (no longer on Home); keep it before the "Get more apps" utility.
+  if(!library.Exists(a=>a.Id=="com.samsung.tv.csfs")){int at=library.FindIndex(a=>a.Utility);var sh=new LibraryApp{Name="Samsung Home",Id="com.samsung.tv.csfs",Asset="tile-samsung-home.svg",Description="Samsung's home screen",Fit="cover",Background="#1C2638",Width=640,Height=360};if(at<0)library.Add(sh);else library.Insert(at,sh);}
   Window.Default.BackgroundColor=new Color(0,0,0,1);
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   PreloadArtwork();
@@ -76,7 +79,7 @@ public sealed class QuietHome : NUIApplication
  }
  protected override void OnResume(){base.OnResume();Wake(false);clockTimer?.Start();RefreshSource();if(tabs!=null&&page==2){RefreshSettings();UpdateFocus(false);}if(tabs!=null&&page==3)infoTimer?.Start();WriteState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage();}else if(requested=="info"){page=3;area=1;selected=0;BuildPage();}else Home("home_request");}
- protected override void OnPause(){base.OnPause();editing="";clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
+ protected override void OnPause(){base.OnPause();editing="";CloseInputs(false);clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity){clockTimer?.Start();RefreshSource();if(tabs!=null){bool unchanged=page==0&&area==1&&editing==""&&selected==SourceIndex();page=0;area=1;editing="";selected=SourceIndex();if(!unchanged)BuildPage();WriteState(activity);}}
  void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage();WriteState(activity);}
  void RefreshSource(){try{int n;if(vconf_get_int("memory/system/source_type",out n)==0&&(n==13||n==15))lastSource=n;}catch{}}
@@ -92,76 +95,71 @@ public sealed class QuietHome : NUIApplication
   var stopwatch=Stopwatch.StartNew();
   if(focusAnimation!=null){focusAnimation.Stop();focusAnimation.Dispose();focusAnimation=null;}
   ParkArtwork();pageArtworkCold=0;
- infoTimer?.Stop();
+  infoTimer?.Stop();CloseInputs(false);glowWatch=glowPlay=null;
   foreach(var v in scene){Window.Default.Remove(v);v.Dispose();}scene.Clear();slots.Clear();
   Add(new ImageView{ResourceUrl=Root+"free-background.svg",Size2D=new Size2D(1920,1080)});
-  Text(page==0?"Home":page==1?"Your Apps":page==2?"Quick Settings":"TV Info",76,55,1350,100,76,ink,"Display");
-  tabs=new TextLabel[4];string[] nav={"Inputs","Apps","Settings","Info"};int[] tx={54,221,366,562};int[] tw={153,131,182,116};
-  for(int i=0;i<tabs.Length;i++){tabs[i]=Text(nav[i],tx[i],158,tw[i],68,30,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;}
-  clock=Text(DateTime.Now.ToString("h:mm tt"),1540,170,300,45,24,muted);clock.HorizontalAlignment=HorizontalAlignment.End;
+  // tvOS-style centred tab bar; the selected tab stays lit, and turns white while it has focus
+  string[] nav={"Home","Apps","Controls","Info"};int[] tw={132,122,178,110};int total=12;foreach(var w in tw)total+=w;
+  int px=960-total/2;Panel(px,36,total,68,new Color(1,1,1,.10f),34);
+  tabs=new TextLabel[4];tabBg=new View[4];int tabX=px+6;
+  for(int i=0;i<tabs.Length;i++){tabBg[i]=Panel(tabX,42,tw[i],56,new Color(0,0,0,0),28);tabs[i]=Text(nav[i],tabX,42,tw[i],56,28,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;tabX+=tw[i];}
+  clock=Text(DateTime.Now.ToString("h:mm tt"),1520,40,300,60,30,muted);clock.HorizontalAlignment=HorizontalAlignment.End;
   if(page==0){
-   var hero=Feature("SHIELD","hdmi:15","Direct input · your TV's SHIELD connection","feature-shield.svg",80,262,1040,442,"hero");
-   hero.Card.Add(Label("SHIELD",44,52,550,40,24,new Color(.86f,1,.82f,1),"Semibold"));
-   hero.Card.Add(Label("Let's watch.",40,124,560,100,72,white,"Display"));
-   hero.Card.Add(Label("Back to your content",46,246,470,48,30,new Color(.88f,1,.86f,1)));
-   Feature("Switch","hdmi:13","Input name saved on your TV","feature-switch.svg",1160,262,320,442,"portrait");
-   Feature("Quick Settings","page:2","Everyday controls","feature-settings.svg",1520,262,320,442,"portrait");
+   RefreshSettings();
+   // SHIELD is the main device: the wide Watch card carries the apps that live on it.
+   inputList=InfoStats.Sources();
+   glowWatch=(ImageView)Add(new ImageView{ResourceUrl=Root+"glow-watch.svg",Size2D=new Size2D(1920,1080),DesiredWidth=480,DesiredHeight=270,Opacity=0});
+   glowPlay=(ImageView)Add(new ImageView{ResourceUrl=Root+"glow-play.svg",Size2D=new Size2D(1920,1080),DesiredWidth=480,DesiredHeight=270,Opacity=0});
+   var watch=Hero("Watch","hdmi:15","SHIELD","feature-watch.svg",100,170,1100,560,new Color(.76f,.94f,.56f,1));
+   HeroApps(watch,"rTn6ClEurC.Jellyfin","com.samsung.tv.cobalt-yt");
+   Hero("Play","hdmi:13","Nintendo Switch","feature-play.svg",1240,170,580,560,new Color(1f,.74f,.78f,1));
+   Control("Inputs","inputs","inputs",0);
+   Control("Ambient","ambient","ambient",1);
+   Control("Sleep Timer","sleeptimer","sleep",2);
+   Control("Sound","output","output",3);
+   Control("More","page:2","more",4);
   }else if(page==1){
    BuildLibrary();
   }else if(page==3){
    BuildInfo();
   }else{
    RefreshSettings();
-   SettingsTile("Volume","volume","Select · Left / Right to adjust","volume",0,0);
-   SettingsTile("Sound","mute","Select to mute or unmute","mute",1,0);
-   SettingsTile("Soundbar Mode","cycle:external-sound-mode","Select to change the soundbar mode","soundmode",2,0);
-   SettingsTile("Output","output","Select · Soundbar or TV speaker","output",3,0);
-   SettingsTile("Picture Mode","cycle:picturemode","Select to change the picture mode","picture",0,1);
-   SettingsTile("Brightness","brightness","Select · Left / Right to adjust","brightness",1,1);
-   SettingsTile("Game Mode","game-mode","Select to switch on or off","game",2,1);
-   SettingsTile("Auto Game Mode","cycle:game-mode-auto","Select · Off, On or Auto","autogame",3,1);
-   SettingsTile("Sleep Timer","sleeptimer","Select to change the timer","sleep",0,2);
-   SettingsTile("Network","network","Wi-Fi and connection setup","network",1,2);
-   SettingsTile("Bluetooth","controllers","Pair a controller or device","bluetooth",2,2);
-   SettingsTile("Advanced","app:org.tizen.menu","Open Samsung's full settings","settings",3,2);
+   SettingsTile("Volume","volume","Left / Right to adjust","volume",0,0);
+   SettingsTile("Sound","mute","","mute",1,0);
+   SettingsTile("Soundbar Mode","cycle:external-sound-mode","","soundmode",2,0);
+   SettingsTile("Output","output","","output",3,0);
+   SettingsTile("Picture Mode","cycle:picturemode","","picture",0,1);
+   SettingsTile("Brightness","brightness","Left / Right to adjust","brightness",1,1);
+   SettingsTile("Game Mode","game-mode","","game",2,1);
+   SettingsTile("Auto Game Mode","cycle:game-mode-auto","","autogame",3,1);
+   SettingsTile("Sleep Timer","sleeptimer","","sleep",0,2);
+   SettingsTile("Network","network","","network",1,2);
+   SettingsTile("Bluetooth","controllers","","bluetooth",2,2);
+   SettingsTile("Advanced","app:org.tizen.menu","","settings",3,2);
   }
-  if(page==0){
-  Add(new ImageView{ResourceUrl=Root+"glass-shelf.svg",Position2D=new Position2D(0,784),Size2D=new Size2D(1920,280)});
-  Dock("YouTube","app:com.samsung.tv.cobalt-yt","youtube",0);
-  Dock("Jellyfin","app:rTn6ClEurC.Jellyfin","jellyfin",1);
-  Dock("SHIELD","hdmi:15","shield",2);
-  Dock("Switch","hdmi:13","switch",3);
-  Dock("Samsung Home","app:com.samsung.tv.csfs","home",4);
-  Dock("Your Apps","page:1","apps",5);
-  }
-  Toolbar("Apps","page:1","apps",0);Toolbar("Inputs","page:0","hdmi",1);Toolbar("Settings","page:2","settings",2);Toolbar("TV Info","page:3","info",3);
-  toolbarHint=Text("",1530,170,310,45,24,ink);toolbarHint.HorizontalAlignment=HorizontalAlignment.End;
-  detail=Text("",80,1030,1320,35,20,muted);
-  notice=Text("",80,1008,1760,34,22,accent);
-  var hint=Text(page==1?(AppLibrary.PageCount(library.Count)<=1?"Select to open · Back to Home":libraryPage+1<AppLibrary.PageCount(library.Count)?"Down for more apps · Back to Home":"Up for previous apps · Back to Home"):page==3?"Live values refresh while open · Back to input":"Back to input",1310,1030,530,35,20,muted);hint.HorizontalAlignment=HorizontalAlignment.End;
+  detail=Text("",100,952,1720,40,24,muted);detail.HorizontalAlignment=HorizontalAlignment.Center;
+  notice=Text("",100,1000,1720,40,24,new Color(1f,.76f,.46f,1));notice.HorizontalAlignment=HorizontalAlignment.Center;
   selected=Math.Max(0,Math.Min(selected,slots.Count-1));UpdateFocus(false);
   buildMilliseconds=stopwatch.ElapsedMilliseconds;WriteState("page_ready");
  }
  void BuildLibrary()
  {
-  if(library.Count==0){Text("Apps could not be loaded.",80,300,1500,70,32,ink);return;}
+  if(library.Count==0){Text("Apps could not be loaded.",100,300,1500,70,32,ink);return;}
   libraryPage=Math.Clamp(libraryPage,0,AppLibrary.PageCount(library.Count)-1);
   int start=libraryPage*AppLibrary.PageSize,count=AppLibrary.VisibleCount(library.Count,libraryPage);
   for(int i=0;i<count;i++)
   {
-   var app=library[start+i];int x=80+(i%5)*358,y=266+(i/5)*245,w=328,h=184;
-   var shadow=Panel(x-5,y+7,w+10,h+8,new Color(.12f,.15f,.25f,.08f),22);
+   var app=library[start+i];int x=100+(i%5)*346,y=180+(i/5)*262,w=316,h=178;
    var card=Panel(x+w/2,y+h/2,w,h,HexColor(app.Background),18);
    card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
    AddAppArtwork(card,app,w,h);
-   var ring=new View{Size2D=new Size2D(w,h),BackgroundColor=new Color(0,0,0,0),CornerRadius=new Vector4(18,18,18,18),BorderlineWidth=4,BorderlineColor=accent,Opacity=0};
+   var ring=new View{Size2D=new Size2D(w,h),BackgroundColor=new Color(0,0,0,0),CornerRadius=new Vector4(18,18,18,18),BorderlineWidth=4,BorderlineColor=white,Opacity=0};
    card.Add(ring);
-   var label=Text(app.Name,x,y+h+14,w,38,27,ink,"Semibold");
-   slots.Add(new Slot{Card=card,Shadow=shadow,FocusRing=ring,Label=label,Name=app.Name,Action="app:"+app.Id,Description=app.Description,Row=i/5,X=x,Y=y,W=w,H=h});
+   var label=Text(app.Name,x,y+h+16,w,38,26,muted,"Semibold");label.HorizontalAlignment=HorizontalAlignment.Center;
+   slots.Add(new Slot{Card=card,FocusRing=ring,Label=label,Name=app.Name,Action="app:"+app.Id,Description=app.Description,Row=i/5,X=x,Y=y,W=w,H=h});
   }
-  Text(library.FindAll(a=>!a.Utility).Count+" apps",80,218,500,30,21,muted);
   if(AppLibrary.PageCount(library.Count)>1){
-   var pages=Text((libraryPage+1)+" / "+AppLibrary.PageCount(library.Count),1650,218,190,30,21,muted);
+   var pages=Text((libraryPage+1)+" / "+AppLibrary.PageCount(library.Count),1620,120,200,30,22,muted);
    pages.HorizontalAlignment=HorizontalAlignment.End;
   }
  }
@@ -188,9 +186,9 @@ public sealed class QuietHome : NUIApplication
   // destroys their decoded textures. The zero-opacity parent is never drawn.
   artworkPreloadRoot=new View{Size2D=new Size2D(1920,1080),Opacity=0};
   Window.Default.Add(artworkPreloadRoot);
-  foreach(var app in library)if(!app.Utility)GetArtwork(app,328,184);
+  foreach(var app in library)if(!app.Utility)GetArtwork(app,316,178);
   foreach(var id in new[]{"com.samsung.tv.cobalt-yt","rTn6ClEurC.Jellyfin"}){
-   var app=library.Find(a=>a.Id==id);if(app!=null)GetArtwork(app,253,126);
+   var app=library.Find(a=>a.Id==id);if(app!=null)GetArtwork(app,210,118);
   }
  }
  CachedArtwork GetArtwork(LibraryApp app,int w,int h)
@@ -235,68 +233,96 @@ public sealed class QuietHome : NUIApplication
  }
  void SettingsTile(string name,string action,string description,string icon,int column,int row)
  {
-  int x=80+column*450,y=262+row*244,w=410,h=220;
-  var card=Panel(x+w/2,y+h/2,w,h,new Color(0,0,0,0),24);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
-  card.Add(new ImageView{ResourceUrl=Root+"quick-"+icon+".svg",Size2D=new Size2D(w,h)});
-  card.Add(Label(name,26,20,300,40,27,white,"Semibold"));
-  var value=Label("",26,86,358,56,34,white,"Display");value.Ellipsis=true;card.Add(value);
-  card.Add(Label(description,26,164,370,34,19,new Color(.80f,.82f,.88f,1)));
-  slots.Add(new Slot{Card=card,Label=value,Name=name,Action=action,Description=description,Row=row,X=x,Y=y,W=w,H=h});
+  int w=409,h=236,x=100+column*(w+28),y=150+row*262;
+  var card=Panel(x+w/2,y+h/2,w,h,new Color(1,1,1,.10f),30);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
+  var disc=new View{Position2D=new Position2D(26,26),Size2D=new Size2D(84,84),BackgroundColor=new Color(1,1,1,.14f),CornerRadius=new Vector4(42,42,42,42)};
+  var glyph=new ImageView{ResourceUrl=Root+"glyph-"+icon+".svg",Position2D=new Position2D(16,16),Size2D=new Size2D(52,52)};disc.Add(glyph);card.Add(disc);
+  var title=Label(name,28,124,w-56,38,26,new Color(1,1,1,.78f),"Semibold");title.Ellipsis=true;card.Add(title);
+  var value=Label("",28,164,w-56,50,36,white,"Display");value.Ellipsis=true;card.Add(value);
+  slots.Add(new Slot{Card=card,Label=value,Title=title,Glyph=glyph,Disc=disc,Name=name,Action=action,Description=description,Row=row,X=x,Y=y,W=w,H=h,Kind=2});
  }
- Slot Feature(string label,string action,string description,string asset,int x,int y,int w,int h,string shape)
+ Slot Hero(string word,string action,string sub,string asset,int x,int y,int w,int h,Color subColor)
  {
-  var shadow=Add(new ImageView{ResourceUrl=Root+"shadow-"+shape+".svg",Position2D=new Position2D(x-24,y-10),Size2D=new Size2D(w+48,h+64)});
-  var card=Panel(x+w/2,y+h/2,w,h,new Color(0,0,0,0),18);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
+  var card=Panel(x+w/2,y+h/2,w,h,new Color(0,0,0,0),40);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
   card.Add(new ImageView{ResourceUrl=Root+asset,Size2D=new Size2D(w,h)});
-  var caption=Text(label,x,716,w,45,31,ink,"Semibold");
-  Text(description,x,760,w,36,24,muted);
-  var slot=new Slot{Card=card,Shadow=shadow,Label=caption,Name=label,Action=action,Description=description,Row=0,X=x,Y=y,W=w,H=h};slots.Add(slot);return slot;
+  card.Add(Label(word,50,h-206,w-100,116,100,white,"Display"));
+  card.Add(Label(sub,56,h-96,w-112,46,30,subColor,"Semibold"));
+  var src=inputList.Find(i=>"hdmi:"+i.Type==action);
+  // Power state is not shown: on this TV powerState reads "Off" even for the input on screen (devices sit behind the soundbar).
+  if(action!="hdmi:"+lastSource&&src!=null&&!src.Connected){
+   var off=new View{Position2D=new Position2D(40,36),Size2D=new Size2D(210,50),BackgroundColor=new Color(0,0,0,.55f),CornerRadius=new Vector4(25,25,25,25)};
+   off.Add(new View{Position2D=new Position2D(20,18),Size2D=new Size2D(14,14),BackgroundColor=new Color(.62f,.63f,.68f,1),CornerRadius=new Vector4(7,7,7,7)});
+   off.Add(Label("Unplugged",44,0,160,50,24,new Color(1,1,1,.85f),"Semibold"));card.Add(off);
+  }
+  if(action=="hdmi:"+lastSource){
+   var badge=new View{Position2D=new Position2D(40,36),Size2D=new Size2D(160,50),BackgroundColor=new Color(1,1,1,.94f),CornerRadius=new Vector4(25,25,25,25)};
+   badge.Add(new View{Position2D=new Position2D(20,18),Size2D=new Size2D(14,14),BackgroundColor=new Color(.2f,.78f,.36f,1),CornerRadius=new Vector4(7,7,7,7)});
+   badge.Add(Label("On now",44,0,108,50,24,dark,"Semibold"));card.Add(badge);
+  }
+  var slot=new Slot{Card=card,Name=word,Action=action,Description=sub,Row=0,X=x,Y=y,W=w,H=h,Kind=1};slots.Add(slot);return slot;
  }
- void Dock(string label,string action,string asset,int n)
+ // App artwork chips inside a hero card (right to left) - shows which apps live on that device.
+ void HeroApps(Slot hero,params string[] ids)
  {
-  int x=(int)Math.Round(80+n*(253.333+48));
-  var shadow=Add(new ImageView{ResourceUrl=Root+"shadow-dock.svg",Position2D=new Position2D(x-24,842),Size2D=new Size2D(301,190)});
-  var card=Panel(x+126,917,253,126,new Color(0,0,0,0),22);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
-  var official=library.Find(a=>a.Id==action.Substring(action.IndexOf(':')+1));
-  if(official!=null){card.BackgroundColor=HexColor(official.Background);AddAppArtwork(card,official,253,126);}
-  else card.Add(new ImageView{ResourceUrl=Root+"free-dock-"+asset+".svg",Size2D=new Size2D(253,126)});
-  slots.Add(new Slot{Card=card,Shadow=shadow,Name=label,Action=action,Description=label,Row=1,X=x,Y=854,W=253,H=126});
+  int n=0;
+  foreach(var id in ids){
+   var app=library.Find(a=>a.Id==id);if(app==null||app.Utility)continue;
+   var chip=new View{Position2D=new Position2D(hero.W-52-210-n*230,hero.H-52-118),Size2D=new Size2D(210,118),BackgroundColor=HexColor(app.Background),CornerRadius=new Vector4(18,18,18,18)};
+   var cached=GetArtwork(app,210,118);
+   if(cached.Image.LoadingStatus!=ImageView.LoadingStatusType.Ready)pageArtworkCold++;
+   cached.Parent.Remove(cached.Image);chip.Add(cached.Image);cached.Parent=chip;hero.Card.Add(chip);n++;
+  }
  }
- void Toolbar(string label,string action,string icon,int n)
+ // Control Centre style tile: glyph disc, name, current value.
+ void Control(string name,string action,string glyph,int n)
  {
-  int x=1508+n*88;
-  var card=Panel(x+34,103,68,68,new Color(0,0,0,0),34);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
-  card.Add(new ImageView{ResourceUrl=Root+"glass-button.svg",Position2D=new Position2D(-16,-16),Size2D=new Size2D(100,112)});
-  card.Add(new ImageView{ResourceUrl=Root+"symbol-"+icon+".png",Color=ink,Position2D=new Position2D(19,19),Size2D=new Size2D(30,30)});
-  slots.Add(new Slot{Card=card,Name=label,Action=action,Description=label,Row=-1,X=x,Y=69,W=68,H=68});
+  const int Count=5,Gap=25;int w=(1720-(Count-1)*Gap)/Count,h=150,x=100+n*(w+Gap),y=780;
+  var card=Panel(x+w/2,y+h/2,w,h,new Color(1,1,1,.10f),30);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
+  var disc=new View{Position2D=new Position2D(22,35),Size2D=new Size2D(80,80),BackgroundColor=new Color(1,1,1,.14f),CornerRadius=new Vector4(40,40,40,40)};
+  var g=new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(15,15),Size2D=new Size2D(50,50)};disc.Add(g);card.Add(disc);
+  var title=Label(name,120,32,w-136,42,28,white,"Semibold");title.Ellipsis=true;card.Add(title);
+  var value=Label("",120,76,w-136,40,24,muted);value.Ellipsis=true;card.Add(value);
+  slots.Add(new Slot{Card=card,Label=value,Title=title,Glyph=g,Disc=disc,Name=name,Action=action,Description=name,Row=1,X=x,Y=y,W=w,H=h,Kind=2});
  }
  List<int> Row(int row){var r=new List<int>();for(int i=0;i<slots.Count;i++)if(slots[i].Row==row)r.Add(i);return r;}
+ int Nearest(List<int> row){var c=slots[selected];float cx=c.X+c.W/2f;int best=row[0];float bd=float.MaxValue;foreach(var i in row){float d=Math.Abs(slots[i].X+slots[i].W/2f-cx);if(d<bd){bd=d;best=i;}}return best;}
  void UpdateFocus(bool animate=true)
  {
   if(focusAnimation!=null){focusAnimation.Stop();focusAnimation.Dispose();focusAnimation=null;}
-  if(animate)focusAnimation=new Animation(180);
-  for(int i=0;i<tabs.Length;i++){tabs[i].TextColor=i==page?ink:muted;tabs[i].FontFamily="Quiet Inter "+(i==page?"Semibold":"Medium");tabs[i].BackgroundColor=area==0&&i==page?new Color(1,1,1,.14f):new Color(0,0,0,0);tabs[i].CornerRadius=new Vector4(34,34,34,34);}
+  if(animate)focusAnimation=new Animation(200);
+  for(int i=0;i<tabs.Length;i++){
+   bool cur=i==page;
+   tabs[i].TextColor=cur&&area==0?dark:cur?white:muted;tabs[i].FontFamily="Quiet Inter "+(cur?"Semibold":"Medium");
+   tabBg[i].BackgroundColor=cur?(area==0?white:new Color(1,1,1,.20f)):new Color(0,0,0,0);
+  }
+  if(page==0||page==2)foreach(var s in slots)if(s.Kind==2&&s.Label!=null)s.Label.Text=TileValue(s.Action);
   for(int i=0;i<slots.Count;i++){
    var s=slots[i];bool f=area!=0&&selected==i;
-   float scale=f?(page==1&&s.Row>=0?1.055f:page>=2&&s.Row>=0?(page==3?1.015f:1.035f):s.Row==0?1.05f:s.Row==1?1.20f:1.10f):1;
-   s.Card.BorderlineWidth=page==1&&s.Row>=0?(f?4:1):page>=2&&s.Row>=0?(f?3:page==3?1:0):s.Row==0?1:0;
-   s.Card.BorderlineColor=page==1&&f?accent:new Color(1,1,1,f?.8f:.28f);
-   var pos=new Position(s.X+s.W/2f,s.Y+s.H/2f-(f&&(s.Row==0||page==1&&s.Row>=0)?5:0),0);
-   if(animate){focusAnimation.AnimateTo(s.Card,"Scale",new Vector3(scale,scale,1));focusAnimation.AnimateTo(s.Card,"Position",pos);}else{s.Card.Scale=new Vector3(scale,scale,1);s.Card.Position=pos;}
-   if(s.Shadow!=null)s.Shadow.Opacity=f?1:.55f;
+   float scale=1,lift=0,opacity=1;
+   if(s.Kind==1){scale=f?1.045f:1;lift=f?-6:0;opacity=f||area==0?1:.7f;s.Card.BorderlineWidth=f?4:0;s.Card.BorderlineColor=new Color(1,1,1,.95f);}
+   else if(s.Kind==2){
+    scale=f?1.06f:1;
+    s.Card.BackgroundColor=f?white:new Color(1,1,1,.10f);
+    s.Disc.BackgroundColor=f?new Color(0,0,0,.07f):new Color(1,1,1,.14f);
+    s.Glyph.Color=f?dark:white;
+    s.Title.TextColor=f?dark:page==2?new Color(1,1,1,.78f):white;
+    s.Label.TextColor=f?(page==2?dark:new Color(.32f,.33f,.37f,1)):page==2?white:muted;
+   }
+   else if(page==1){scale=f?1.08f:1;lift=f?-6:0;if(s.Label!=null)s.Label.TextColor=f?white:muted;}
+   else{scale=f?1.015f:1;s.Card.BorderlineWidth=f?3:0;s.Card.BorderlineColor=new Color(1,1,1,.7f);}
+   var pos=new Position(s.X+s.W/2f,s.Y+s.H/2f+lift,0);
+   if(animate){focusAnimation.AnimateTo(s.Card,"Scale",new Vector3(scale,scale,1));focusAnimation.AnimateTo(s.Card,"Position",pos);focusAnimation.AnimateTo(s.Card,"Opacity",opacity);}
+   else{s.Card.Scale=new Vector3(scale,scale,1);s.Card.Position=pos;s.Card.Opacity=opacity;}
    if(s.FocusRing!=null)s.FocusRing.Opacity=f?1:0;
-   if(s.Label!=null&&page<2)s.Label.FontFamily="Quiet Inter "+(f?"Semibold":"Medium");
    if(f)s.Card.RaiseToTop();
   }
-  if(focusAnimation!=null)focusAnimation.Play();
-  clock.Opacity=area==TB?0:1;toolbarHint.Text=area==TB?slots[selected].Name:"";
-  detail.Text=page==1&&area==1&&slots[selected].Row>=0?slots[selected].Name+" · "+slots[selected].Description:area==0?"":area>=2&&area!=TB?slots[selected].Name:"";
-  if(page==2){
-   foreach(var s in slots)if(s.Row>=0&&s.Label!=null)s.Label.Text=TileValue(s.Action);
-   detail.Text="Your everyday controls";
+  if(page==0&&glowWatch!=null){
+   string fa=area==1&&selected<slots.Count?slots[selected].Action:"";
+   float gw=fa=="hdmi:15"?1:0,gp=fa=="hdmi:13"?1:0;
+   if(animate){focusAnimation.AnimateTo(glowWatch,"Opacity",gw);focusAnimation.AnimateTo(glowPlay,"Opacity",gp);}else{glowWatch.Opacity=gw;glowPlay.Opacity=gp;}
   }
-  if(page==3)detail.Text="Read live from this TV · nothing leaves it";
-  if(editing!="")detail.Text="Left / Right to adjust "+editing+" · Select or Back to finish";
+  if(focusAnimation!=null)focusAnimation.Play();
+  detail.Text=editing!=""?"Left / Right to adjust · Select to finish":"";
   WriteState("focus");
  }
  void OnKey(object sender,Window.KeyEventArgs e)
@@ -306,16 +332,16 @@ public sealed class QuietHome : NUIApplication
   lastActivity=Environment.TickCount64;
   long now=Environment.TickCount64;if(k==lastKey&&now-lastKeyAt<180)return;lastKey=k;lastKeyAt=now;
   try{
+   if(inputsLayer!=null&&HandleInputsKey(k))return;
    if(k=="XF86Home"){Home("home_key");return;}
    if(k=="XF86SysMenu"||k=="XF86More"){OpenSettings("settings_key");return;}
    if(page==1&&HandleLibraryKey(k))return;
    if(editing!=""){if(k=="Left"||k=="Right"){int d=k=="Left"?-1:1;if(editing=="volume")ChangeVolume(d);else ChangeBrightness(d);}else if(k=="Return"||k=="KP_Enter"||k=="XF86Back"||k=="Back"||k=="Escape"){editing="";UpdateFocus();}return;}
-   if(k=="Up"){if(area>=2&&area!=TB){int col=Row(area-1).IndexOf(selected);area--;var r=Row(area-1);selected=r[page>=2?Math.Min(col,r.Count-1):0];}else if(area==1)area=0;UpdateFocus();}
-   else if(k=="Down"){if(area==0||area==TB){area=1;selected=Row(0)[0];}else if(Row(area).Count>0){int col=Row(area-1).IndexOf(selected);area++;var r=Row(area-1);selected=r[page>=2?Math.Min(col,r.Count-1):0];}UpdateFocus();}
+   if(k=="Up"){if(area>=2&&area!=TB){area--;selected=Nearest(Row(area-1));}else if(area==1)area=0;UpdateFocus();}
+   else if(k=="Down"){if(area==0||area==TB){area=1;selected=page==0?SourceIndex():Row(0)[0];}else if(Row(area).Count>0){area++;selected=Nearest(Row(area-1));}UpdateFocus();}
    else if(k=="Left"||k=="Right"){
     int d=k=="Left"?-1:1;
-    if(area==0){int next=page+d;if(next<0||next>3){var tb=Row(-1);area=TB;selected=tb[next<0?tb.Count-1:0];UpdateFocus();}else{page=next;selected=0;BuildPage();}}
-    else if(area==TB){var r=Row(-1);int n=r.IndexOf(selected)+d;if(n<0||n>=r.Count){area=0;page=n<0?3:0;selected=0;BuildPage();}else{selected=r[n];UpdateFocus();}}
+    if(area==0){int next=Math.Max(0,Math.Min(3,page+d));if(next!=page){page=next;selected=page==0?SourceIndex():0;BuildPage();}}
     else{var r=Row(area-1);int n=r.IndexOf(selected);selected=r[(n+d+r.Count)%r.Count];UpdateFocus();}
    }
    else if(k=="Return"||k=="KP_Enter"){if(area==0){area=1;selected=0;UpdateFocus();}else Activate();}
@@ -341,7 +367,8 @@ public sealed class QuietHome : NUIApplication
  {
   string a=slots[selected].Action;notice.Text="";
   if(a=="info"){BuildPage();return;}
-  if(a.StartsWith("hdmi:")||a.StartsWith("app:")&&a!="app:org.tizen.menu")InfoStats.RecordLaunch(UsageFile(),slots[selected].Name,DateTime.Now);
+  if(a=="inputs"){OpenInputs();return;}
+  if(a=="ambient"){Launch("org.tizen.art-app");return;}
   if(a.StartsWith("hdmi:")){SelectSource(int.Parse(a.Substring(5)));return;}
   if(a.StartsWith("page:")){page=int.Parse(a.Substring(5));selected=page==0?SourceIndex():0;area=1;BuildPage();return;}
   if(a.StartsWith("app:")){Launch(a.Substring(4));return;}
@@ -394,6 +421,9 @@ public sealed class QuietHome : NUIApplication
    case "network":return "Connections";
    case "controllers":return "Pair a device";
    case "app:org.tizen.menu":return "More settings";
+   case "page:2":return "All controls";
+   case "ambient":return "Art & photos";
+   case "inputs":{var cur=inputList.Find(i=>i.Type==lastSource);return cur!=null?cur.Name:"Choose";}
   }
   return SettingName(action.StartsWith("cycle:")?action.Substring(6):action);
  }
@@ -437,77 +467,74 @@ public sealed class QuietHome : NUIApplication
  void DrawSpark()
  {
   double peak=50000;foreach(var v in sparkValues)peak=Math.Max(peak,v);
-  for(int i=0;i<spark.Count;i++){int h=Math.Max(2,(int)(150*sparkValues[i]/peak));spark[i].Size2D=new Size2D(10,h);spark[i].Position2D=new Position2D(28+i*14,284-h);}
+  for(int i=0;i<spark.Count;i++){int h=Math.Max(3,(int)(180*sparkValues[i]/peak));spark[i].Size2D=new Size2D(14,h);spark[i].Position2D=new Position2D(30+i*22,330-h);}
  }
- static string UsageFile(){try{return System.IO.Path.Combine(Tizen.Applications.Application.Current.DirectoryInfo.Data,"usage.tsv");}catch{return "/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data/usage.tsv";}}
  View InfoPanel(int x,int y,int w,int h,string title,Color dot,int row)
  {
-  var card=Panel(x+w/2,y+h/2,w,h,new Color(1,1,1,.07f),26);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
-  card.Add(new View{Position2D=new Position2D(28,37),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)});
-  card.Add(Label(title,52,24,w-80,40,27,white,"Semibold"));
+  var card=Panel(x+w/2,y+h/2,w,h,new Color(1,1,1,.08f),30);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
+  card.Add(new View{Position2D=new Position2D(30,39),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)});
+  card.Add(Label(title,56,24,w-86,44,29,white,"Semibold"));
   slots.Add(new Slot{Card=card,Name=title,Action="info",Description=title,Row=row,X=x,Y=y,W=w,H=h});
   return card;
  }
  TextLabel InfoRow(View card,int w,int n,string key,string value,Color color=null)
  {
-  int y=84+n*46;
-  card.Add(Label(key,28,y,190,40,21,muted));
-  var v=Label(value??"Unavailable",210,y,w-238,40,23,color??ink,"Semibold");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=true;card.Add(v);
+  int y=90+n*54;
+  card.Add(Label(key,30,y,200,42,23,muted));
+  var v=Label(value??"Unavailable",196,y,w-226,42,24,color??ink,"Semibold");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=true;card.Add(v);
   return v;
  }
  static string MemText((long totalKb,long availableKb)? m)=>m.HasValue?InfoStats.Bytes((m.Value.totalKb-m.Value.availableKb)*1024.0)+" of "+InfoStats.Bytes(m.Value.totalKb*1024.0)+" used":"Unavailable";
+ string infoThread="";
  void BuildInfo()
  {
   var good=new Color(.45f,.88f,.58f,1);var warn=new Color(1f,.74f,.36f,1);
   infoIface=InfoStats.DefaultInterface()??"eth0";
-  var tv=InfoPanel(80,262,560,330,"This TV",new Color(.56f,.66f,1f,1),0);
+  var tv=InfoPanel(100,140,540,390,"This TV",new Color(.56f,.66f,1f,1),0);
   string ver=InfoStats.SystemInfo("http://tizen.org/feature/platform.version");
   string build=InfoStats.ParseBuildDate(InfoStats.SystemInfo("http://tizen.org/system/build.string"));
-  InfoRow(tv,560,0,"Model",InfoStats.SystemInfo("http://tizen.org/system/model_name"));
-  InfoRow(tv,560,1,"Software",(ver!=null?"Tizen "+ver:"Tizen")+(build!=null?" · "+build:""));
-  var up=InfoStats.Uptime();InfoRow(tv,560,2,"Up for",up.HasValue?InfoStats.Duration(up.Value):null);
-  liveMem=InfoRow(tv,560,3,"Memory",MemText(InfoStats.Memory()));
-  int cores=InfoStats.Cores();liveCpu=InfoRow(tv,560,4,"Processor","Measuring…"+(cores>0?" · "+cores+" cores":""));
+  InfoRow(tv,540,0,"Model",InfoStats.SystemInfo("http://tizen.org/system/model_name"));
+  InfoRow(tv,540,1,"Software",(ver!=null?"Tizen "+ver:"Tizen")+(build!=null?" · "+build:""));
+  var up=InfoStats.Uptime();InfoRow(tv,540,2,"Up for",up.HasValue?InfoStats.Duration(up.Value):null);
+  liveMem=InfoRow(tv,540,3,"Memory",MemText(InfoStats.Memory()));
+  int cores=InfoStats.Cores();liveCpu=InfoRow(tv,540,4,"Processor","Measuring…"+(cores>0?" · "+cores+" cores":""));
 
-  var net=InfoPanel(680,262,560,330,"Network",new Color(.33f,.82f,.75f,1),0);
+  var net=InfoPanel(690,140,540,390,"Network",new Color(.33f,.82f,.75f,1),0);
   bool wifi=infoIface.StartsWith("wlan");int? level=wifi?InfoStats.WifiLevel(infoIface):null;
   string link=wifi?"Wi-Fi"+(level.HasValue?" · "+level+" dBm":""):"Wired"+(InfoStats.LinkSpeed(infoIface) is string spd?" · "+spd:"");
-  InfoRow(net,560,0,"Connection",InfoStats.DefaultInterface()==null?"Not connected":link);
-  InfoRow(net,560,1,"IP address",InfoStats.Ipv4(infoIface));
-  var dns=InfoStats.Nameservers();InfoRow(net,560,2,"DNS",dns.Count>0?string.Join(" · ",dns.ConvertAll(d=>d=="8.8.8.8"?"Google backup":d)):null);
-  liveTotal=InfoRow(net,560,3,"Since start",TotalsText(InfoStats.NetDev()));
-  InfoRow(net,560,4,"Interface",infoIface);
+  InfoRow(net,540,0,"Connection",InfoStats.DefaultInterface()==null?"Not connected":link);
+  InfoRow(net,540,1,"IP address",InfoStats.Ipv4(infoIface));
+  var dns=InfoStats.Nameservers();InfoRow(net,540,2,"DNS",dns.Count>0?string.Join(" · ",dns.ConvertAll(d=>d=="8.8.8.8"?"Google backup":d)):null);
+  liveTotal=InfoRow(net,540,3,"Since start",TotalsText(InfoStats.NetDev()));
 
-  var pv=InfoPanel(1280,262,560,330,"Privacy & Access",new Color(.72f,.56f,1f,1),0);
+  var pv=InfoPanel(1280,140,540,390,"Privacy",new Color(.72f,.56f,1f,1),0);
   infoMarkers=InfoStats.MarkersInPlace();int total=InfoStats.VendorMarkers.Length;
-  InfoRow(pv,560,0,"Vendor blocks",infoMarkers<0?"Unavailable":infoMarkers+" of "+total+" in place",infoMarkers<0?null:infoMarkers==total?good:warn);
+  InfoRow(pv,540,0,"Vendor blocks",infoMarkers<0?"Unavailable":infoMarkers+" of "+total+" in place",infoMarkers<0?null:infoMarkers==total?good:warn);
   infoDisabled=InfoStats.DisabledAppCount("com.samsung.tv.bixby-promotion");int apps=InfoStats.DisabledApps.Length;
-  InfoRow(pv,560,1,"Disabled apps",infoDisabled<0?"Unavailable":infoDisabled+" of "+apps+" off",infoDisabled<0?null:infoDisabled==apps?good:warn);
+  InfoRow(pv,540,1,"Disabled apps",infoDisabled<0?"Unavailable":infoDisabled+" of "+apps+" off",infoDisabled<0?null:infoDisabled==apps?good:warn);
   bool sdb=InfoStats.SdbListening();
-  InfoRow(pv,560,2,"Developer access",sdb?"SDB on · root path ready":"SDB off",sdb?good:muted);
-  pv.Add(Label("Checked live each time this page opens",28,268,504,40,19,muted));
+  InfoRow(pv,540,2,"Developer access",sdb?"SDB on":"SDB off",sdb?good:muted);
 
-  var use=InfoPanel(80,632,1160,340,"Most opened · last 7 days",new Color(1f,.62f,.38f,1),1);
-  List<(string name,int count)> usage;try{usage=InfoStats.UsageSummary(File.ReadAllLines(UsageFile()),DateTime.Now,7);}catch{usage=new List<(string,int)>();}
-  if(usage.Count==0)use.Add(Label("Nothing yet. Inputs and apps you open from Quiet Home will appear here.",28,140,1100,40,23,muted));
-  int max=usage.Count>0?usage[0].count:1;
-  for(int i=0;i<Math.Min(5,usage.Count);i++){
-   int y=80+i*42;
-   use.Add(Label(usage[i].name,28,y,230,40,23,ink,"Semibold"));
-   use.Add(new View{Position2D=new Position2D(270,y+13),Size2D=new Size2D(760,14),BackgroundColor=new Color(1,1,1,.08f),CornerRadius=new Vector4(7,7,7,7)});
-   use.Add(new View{Position2D=new Position2D(270,y+13),Size2D=new Size2D(Math.Max(14,760*usage[i].count/max),14),BackgroundColor=i==0?accent:new Color(.47f,.6f,1f,.55f),CornerRadius=new Vector4(7,7,7,7)});
-   var c=Label(usage[i].count+"×",1040,y,92,40,23,muted,"Semibold");c.HorizontalAlignment=HorizontalAlignment.End;use.Add(c);
-  }
-  use.Add(Label("Counted only when opened from Quiet Home · stored on this TV only",28,300,1100,30,19,muted));
+  // Thread border router: role from wpan0's RLOC/ALOC addresses, home reach from forwarding + an off-mesh address.
+  var th=InfoStats.Thread();bool fwd=InfoStats.Ipv6Forwarding();
+  bool routing=th.present&&th.rloc16>=0&&(th.rloc16&0x1ff)==0;
+  string status=!th.present?"Off":th.rloc16<0?"Starting…":routing?"Online · Router "+(th.rloc16>>10)+(th.leader?" · Leader":""):"Online · Child";
+  string home=!th.present?null:!fwd?"Forwarding off":th.homeRoute?"Connected":"Waiting for route";
+  var tr=InfoPanel(100,570,830,390,"Thread border router",routing?good:th.present?warn:muted,1);
+  InfoRow(tr,830,0,"Status",status,routing?good:th.present?warn:muted);
+  InfoRow(tr,830,1,"Home network",home,home=="Connected"?good:home==null?null:warn);
+  var all=InfoStats.NetDev();
+  InfoRow(tr,830,2,"Thread traffic",all.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):null);
+  InfoRow(tr,830,3,"Interface",th.present?"wpan0 · "+th.addresses+" addresses":"Not running");
+  infoThread=status+" | "+(home??"-")+" | fwd="+fwd;
 
-  var live=InfoPanel(1280,632,560,340,"Live · TV network",new Color(.4f,.78f,1f,1),1);
+  var live=InfoPanel(970,570,850,390,"Live · TV network",new Color(.4f,.78f,1f,1),1);
   bool fresh=Environment.TickCount64-lastNetAt>10000;
   if(fresh){Array.Clear(sparkValues,0,sparkValues.Length);lastNet=null;lastCpu=null;lastRateText="Measuring…";}
   if(lastCpuText!=null&&!fresh)liveCpu.Text=lastCpuText;
-  liveRate=Label(lastRateText,28,78,504,48,32,white,"Display");live.Add(liveRate);
+  liveRate=Label(lastRateText,30,86,790,52,36,white,"Display");live.Add(liveRate);
   spark.Clear();
-  for(int i=0;i<sparkValues.Length;i++){var b=new View{Position2D=new Position2D(28+i*14,284),Size2D=new Size2D(10,2),BackgroundColor=new Color(.4f,.78f,1f,.85f),CornerRadius=new Vector4(3,3,3,3)};spark.Add(b);live.Add(b);}
-  live.Add(Label("The TV's own traffic · SHIELD streams separately",28,296,504,30,19,muted));
+  for(int i=0;i<sparkValues.Length;i++){var b=new View{Position2D=new Position2D(30+i*22,330),Size2D=new Size2D(14,3),BackgroundColor=new Color(.4f,.78f,1f,.85f),CornerRadius=new Vector4(4,4,4,4)};spark.Add(b);live.Add(b);}
   DrawSpark();
   if(fresh)InfoTick();
   if(infoTimer==null){infoTimer=new Tizen.NUI.Timer(2000);infoTimer.Tick+=(s,e)=>{if(page!=3)return false;InfoTick();return true;};}
@@ -575,7 +602,64 @@ public sealed class QuietHome : NUIApplication
   if(page==3&&infoTimer!=null)infoTimer.Start();
   WriteState(fromKey?"woke_key":"woke");
  }
+ // ---- Inputs sheet: every HDMI port with its name, plus connection and power state ----
+ List<InfoStats.InputSource> inputList=new List<InfoStats.InputSource>();
+ ImageView glowWatch,glowPlay;
+ View inputsLayer;readonly List<View> inputRows=new List<View>();int inputSel;
+ void OpenInputs()
+ {
+  CloseInputs(false);inputList=InfoStats.Sources();
+  inputsLayer=new View{Size2D=new Size2D(1920,1080),BackgroundColor=new Color(0,0,0,.6f)};
+  int rowH=96,w=640,h=96+inputList.Count*rowH+20,x=100,y=Math.Max(60,760-h);
+  var sheet=new View{Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),BackgroundColor=new Color(.13f,.13f,.15f,.97f),CornerRadius=new Vector4(34,34,34,34),BorderlineWidth=1.5f,BorderlineColor=new Color(1,1,1,.12f)};
+  sheet.Add(Label("Inputs",36,22,w-72,56,36,white,"Display"));
+  inputRows.Clear();inputSel=Math.Max(0,inputList.FindIndex(i=>i.Type==lastSource));
+  for(int i=0;i<inputList.Count;i++){
+   var s=inputList[i];bool cur=s.Type==lastSource;
+   var row=new View{Position2D=new Position2D(16,96+i*rowH),Size2D=new Size2D(w-32,rowH-8),CornerRadius=new Vector4(22,22,22,22),Opacity=s.Connected||cur?1:.45f};
+   var g=new ImageView{ResourceUrl=Root+"glyph-inputs.svg",Position2D=new Position2D(20,22),Size2D=new Size2D(44,44)};row.Add(g);
+   bool sub=s.Name!=s.Port;
+   var name=Label(s.Name,84,sub?10:0,330,sub?44:rowH-8,30,white,"Semibold");name.Ellipsis=true;row.Add(name);
+   if(sub)row.Add(Label(s.Port,84,50,300,32,22,muted));
+   string st=cur?"On now":!s.Connected?"Not connected":"";
+   if(st!=""){
+    var pill=new View{Position2D=new Position2D(w-32-196,(rowH-8-44)/2),Size2D=new Size2D(180,44),CornerRadius=new Vector4(22,22,22,22),BackgroundColor=cur?new Color(.2f,.78f,.36f,.22f):new Color(1,1,1,.08f)};
+    var pl=Label(st,0,0,180,44,21,cur?new Color(.5f,.95f,.6f,1):muted,"Semibold");pl.HorizontalAlignment=HorizontalAlignment.Center;pill.Add(pl);row.Add(pill);
+   }
+   sheet.Add(row);inputRows.Add(row);
+  }
+  inputsLayer.Add(sheet);Window.Default.Add(inputsLayer);inputsLayer.RaiseToTop();
+  FocusInputs();WriteState("inputs_open");
+ }
+ void FocusInputs()
+ {
+  for(int i=0;i<inputRows.Count;i++){
+   bool f=i==inputSel;var row=inputRows[i];row.BackgroundColor=f?white:new Color(0,0,0,0);
+   for(uint c=0;c<row.ChildCount;c++){var v=row.GetChildAt(c);
+    if(v is TextLabel tl)tl.TextColor=f?dark:(c==2?muted:white);
+    else if(v is ImageView iv)iv.Color=f?dark:white;
+    else if(v.ChildCount>0&&v.GetChildAt(0) is TextLabel pl){ // status pill: stays readable on the white focused row
+     bool cur=inputList[i].Type==lastSource;
+     v.BackgroundColor=cur?new Color(.2f,.78f,.36f,f?1:.22f):new Color(f?0:1,f?0:1,f?0:1,f?.08f:.08f);
+     pl.TextColor=cur?(f?white:new Color(.5f,.95f,.6f,1)):f?new Color(.32f,.33f,.37f,1):muted;}}
+  }
+ }
+ bool HandleInputsKey(string k)
+ {
+  if(k=="Up"||k=="Down"){inputSel=Math.Clamp(inputSel+(k=="Up"?-1:1),0,inputRows.Count-1);FocusInputs();return true;}
+  if(k=="Return"||k=="KP_Enter"){var s=inputList[inputSel];CloseInputs(false);SelectSource(s.Type);return true;}
+  if(k=="XF86Back"||k=="Back"||k=="Escape"||k=="XF86Exit"){CloseInputs(true);return true;}
+  if(k=="XF86Home"){CloseInputs(false);return false;}
+  return true; // Left/Right and other keys stay inside the sheet
+ }
+ void CloseInputs(bool refocus)
+ {
+  if(inputsLayer==null)return;
+  Window.Default.Remove(inputsLayer);inputsLayer.Dispose();inputsLayer=null;inputRows.Clear();
+  if(refocus){UpdateFocus(false);WriteState("inputs_closed");}
+ }
+ string InputsState()=>string.Join(";",inputList.ConvertAll(i=>i.Type+","+i.Name+","+(i.Connected?1:0)+","+i.Power));
  void ShowError(string text){notice.Text=text;}
- void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv-dark\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nmute="+currentMute+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\nsound-mode="+SettingValue("external-sound-mode")+"\nsoundoutput="+SettingValue("soundoutput")+"\npicturemode="+SettingValue("picturemode")+"\ngame-mode-auto="+SettingValue("game-mode-auto")+"\ninfo_markers="+infoMarkers+"\ninfo_disabled_apps="+infoDisabled+"\ninfo_live="+lastRateText+" | "+lastCpuText+"\ndimmed="+dimmed+"\nidle_s="+(Environment.TickCount64-lastActivity)/1000+"\nstyle_theme=dark\n");}catch{}}
+ void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=tvos-dark-v10b\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nmute="+currentMute+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\nsound-mode="+SettingValue("external-sound-mode")+"\nsoundoutput="+SettingValue("soundoutput")+"\npicturemode="+SettingValue("picturemode")+"\ngame-mode-auto="+SettingValue("game-mode-auto")+"\ninfo_markers="+infoMarkers+"\ninfo_disabled_apps="+infoDisabled+"\ninfo_live="+lastRateText+" | "+lastCpuText+"\ninfo_thread="+infoThread+"\ninputs="+InputsState()+"\ninputs_open="+(inputsLayer!=null)+"\ndimmed="+dimmed+"\nidle_s="+(Environment.TickCount64-lastActivity)/1000+"\nstyle_theme=dark\n");}catch{}}
  public static void Main(string[] args){using(var app=new QuietHome())app.Run(args);}
 }

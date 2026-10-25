@@ -68,6 +68,30 @@ static class CatalogTests
         var today = new DateTime(2026, 10, 24);
         var usage = InfoStats.UsageSummary(new[] { "2026-10-24\tSHIELD", "2026-10-23\tSHIELD", "2026-10-20\tSwitch", "2026-10-17\tNetflix", "bad", "2026-10-25\tFuture", "2026-10-22\t" }, today, 7);
         True(usage.Count == 2 && usage[0].name == "SHIELD" && usage[0].count == 2 && usage[1].name == "Switch", "usage window");
+        // synthetic documentation-style prefixes, not this network's
+        string i6 = "fd00000000000a01000000fffe00b400 05 40 00 a2    wpan0\n"
+                  + "fd00000000000b02c6c92fc22fceb270 05 40 00 82    wpan0\n"
+                  + "fe800000000000002092eff5346c0df9 05 40 20 82    wpan0\n"
+                  + "fe800000000000000000000000000001 02 40 20 80     eth0\n";
+        var th = InfoStats.ParseThread(i6, "wpan0");
+        True(th.present && th.rloc16 == 0xb400 && (th.rloc16 >> 10) == 45 && !th.leader && th.homeRoute && th.addresses == 3, "thread router");
+        th = InfoStats.ParseThread(i6 + "fd00000000000a01000000fffe00fc00 05 40 00 a2    wpan0\n", "wpan0");
+        True(th.leader && th.rloc16 == 0xb400, "thread leader aloc");
+        th = InfoStats.ParseThread("fd00000000000a01000000fffe00b400 05 40 00 a2    wpan0\n", "wpan0");
+        True(th.present && !th.homeRoute, "thread no off-mesh route");
+        th = InfoStats.ParseThread("fe800000000000000000000000000001 02 40 20 80     eth0\n", "wpan0");
+        True(!th.present && th.rloc16 == -1, "thread absent");
+        True(!InfoStats.ParseThread(null, "wpan0").present, "thread null");
+        string src = "[{\"connectionState\":true,\"detectedName\":\"\",\"editName\":\"\",\"powerState\":0,\"sourceType\":0},"
+            + "{\"connectionState\":true,\"detectedName\":\"Game%20Console\",\"editName\":\"Switch\",\"powerState\":2,\"sourceType\":13},"
+            + "{\"connectionState\":true,\"detectedName\":\"Q-Series%20Soundbar\",\"editName\":\"\",\"powerState\":1,\"sourceType\":15},"
+            + "{\"connectionState\":true,\"editName\":\"Media%20Server\",\"sourceType\":56}]";
+        var ins = InfoStats.ParseSources(src);
+        True(ins.Count == 5 && ins[0].Type == 13 && ins[0].Name == "Switch" && ins[0].Port == "HDMI 1" && ins[0].Connected && ins[0].Power == 2, "input edit name");
+        True(ins[1].Type == 14 && ins[1].Name == "HDMI 2" && !ins[1].Connected, "input not connected");
+        True(ins[2].Name == "Q-Series Soundbar" && ins[2].Power == 1, "input detected name decoded");
+        True(ins[4].Type == 0 && ins[4].Name == "Live TV", "live tv last; DLNA skipped");
+        True(InfoStats.ParseSources("not json").Count == 4 && InfoStats.ParseSources(null).TrueForAll(i => !i.Connected), "inputs garbage");
         True(InfoStats.Bytes(999) == "999 B" && InfoStats.Bytes(58459740) == "58.5 MB" && InfoStats.Bytes(1.5e9) == "1.5 GB", "bytes");
         True(InfoStats.Duration(11586) == "3 h 13 min" && InfoStats.Duration(30) == "1 min" && InfoStats.Duration(90000) == "1 d 1 h", "duration");
         True(InfoStats.CountMarkers(InfoStats.VendorMarkers) == 10, "all markers");
