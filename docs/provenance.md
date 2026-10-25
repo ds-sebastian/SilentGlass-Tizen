@@ -17,11 +17,11 @@ reproducible benchmark dataset.
 Source: [chris-ritsen/samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b),
 commit `4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b`, Unlicense.
 
-Only the archive-route support modules and two .NET payload projects are
-vendored. The QN90B/QN90F kernel exploits, continuous host controller,
-firmware-key tooling and unrelated payloads are not bundled.
+Only the archive-route support modules and two .NET component projects are
+vendored. The QN90B/QN90F kernel access methods, continuous host controller,
+firmware-key tooling and unrelated components are not bundled.
 `resources.py` retains upstream profile names, but this toolkit explicitly
-builds and selects only the two common .NET 6 payloads.
+builds and selects only the two common .NET 6 runtime components.
 
 The one local change to the copied access code is in `archive_root.py`:
 if Samsung's host returns the exact `Unknown option --list-runtimes` error,
@@ -52,7 +52,7 @@ download manifest is an attribution/source record, not a license grant.
 
 ## What local validation establishes
 
-- Native launcher, bridge, Probe and root payload source compile with the
+- Native launcher, bridge, Probe and the administrative component source compile with the
   matching locally held references/SDK.
 - Synthetic registry tests verify targeted apply/restore behavior, preservation
   of unrelated fields and refusal of missing, duplicate or changed target rows.

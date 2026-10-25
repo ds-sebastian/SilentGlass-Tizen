@@ -23,7 +23,7 @@ gaming-hub helpers and TV Plus are optional features, not automatically malware.
 ## Work in phases
 
 1. Inventory first; record model, firmware, runtime, schemas, installed apps,
-   source IDs, root capabilities and current Home/startup selectors.
+   source IDs, admin capabilities and current Home/startup selectors.
 2. Stop before mutation if model/firmware differ. Explain the concrete gap
    and investigate a separate profile. Never fake the firmware argument.
 3. Build the source locally. Obtain necessary proprietary assemblies from the
@@ -41,10 +41,10 @@ gaming-hub helpers and TV Plus are optional features, not automatically malware.
    proof of persistence.
 8. Summarize actual evidence, limitations and how to undo the changes.
 
-Run SDB/root sessions sequentially. Keep scripts below the 30-second command
+Run SDB/admin sessions sequentially. Keep scripts below the 30-second command
 budget. A failed script may have completed earlier filesystem operations;
 inspect before retrying. Do not overwrite the first backup to make a retry
-succeed. Do not reboot or put the TV in standby inside the temporary root
+succeed. Do not reboot or put the TV in standby inside the temporary admin
 session; allow its cleanup checks to complete first.
 
 ## Implementation constraints

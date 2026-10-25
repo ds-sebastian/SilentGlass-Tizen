@@ -89,6 +89,6 @@ the DLL. Revert the relevant phase rather than changing unrelated firmware
 services.
 
 If root no longer works after an update, do not attempt another model's
-kernel exploit or flash an unverified image. Re-establish the exact model/
+kernel access method or flash an unverified image. Re-establish the exact model/
 firmware/capability evidence and use an appropriate recovery method for it.
 This project does not provide a hardware-level unbrick procedure.

@@ -32,7 +32,7 @@ Clone the repository, open it in Codex, and use:
 > or promising a particular speed improvement.
 
 If your TV differs, begin with an inventory. A matching brand, year, Tizen
-version or successful root check is **not** enough to establish launcher or
+version or successful admin-access check is **not** enough to establish launcher or
 cleanup compatibility.
 
 ## What is here
@@ -44,14 +44,14 @@ cleanup compatibility.
 | [Artwork tools](docs/06-artwork.md) | Vector/high-resolution artwork sources, optional local downloads and retained image views |
 | [Cleanup profile](profiles/un75u8000ffxza-1300.9.json) | Separately selectable advertising, voice, context, smart-extras, sidebar and TV Plus groups |
 | [Cleanup planner](tools/plan_cleanup.py) | Field-specific apply/restore SQL generated from your own fresh snapshot |
-| [Access helper](tools/tv.py) | Explicit-target SDB preflight, temporary authenticated root, bounded transfers and session cleanup checks |
+| [Access helper](tools/tv.py) | Explicit-target SDB preflight, temporary authenticated admin access, bounded transfers and session cleanup checks |
 | [Recipes](recipes) | Snapshot, stop-marker, launcher, settings-bridge and restoration scripts |
 | [Evidence](evidence/observations.json) | Sanitized observations and the limits of what was verified |
 
 Quiet Home uses Tizen's existing display, audio, HDMI and application stack.
 It can become the default Home/startup experience; Samsung's underlying OS
 continues to run. The TV does not need a laptop running after installation.
-Root access is reacquired from the computer when maintenance requires it.
+Admin access is reacquired from the computer when maintenance requires it.
 
 ## Tested scope and current status
 
@@ -60,7 +60,7 @@ Root access is reacquired from the computer when maintenance requires it.
 | Model | `UN75U8000FFXZA` |
 | Firmware | `T-KSU2EFAKUC-0090-1300.9` |
 | Platform | Tizen 9.0, Linux 5.4.261, ARMv7; .NET runtime 6.0.9 |
-| Temporary root | Authenticated UID/EUID 0; session staging cleaned; passwd/SDB key unchanged |
+| Temporary admin access | Authenticated UID/EUID 0; session staging cleaned; passwd/SDB key unchanged |
 | Home/startup | Quiet Home launch verified after a full restart |
 | Inputs and everyday controls | HDMI switching, volume and mute verified; native settings remain available |
 | Controller | Native DualSense pairing and launcher navigation verified |
@@ -105,7 +105,7 @@ python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
 GitHub Actions runs the offline tests and builds the open-source access
-payloads and app-catalog tests. The NUI launcher build needs Samsung reference
+components and app-catalog tests. The NUI launcher build needs Samsung reference
 assemblies and is deliberately not built from redistributed SDK files.
 
 ## Credits

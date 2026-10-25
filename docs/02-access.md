@@ -40,20 +40,20 @@ tv doctor
 tv root-check
 ```
 
-`doctor` checks the SDB foothold, runtime, file capabilities and tar support.
+`doctor` checks the SDB entry point, runtime, file capabilities and tar support.
 It does not obtain root or establish compatibility for every private API.
 `root-check` builds on that route, executes `id`, and requires an authenticated
 UID/EUID 0 callback plus successful staging/system-file cleanup.
 
 On this retail firmware, `sdb shell` returning `closed` is expected. The
-upstream tool uses the package-installer foothold and archive launcher instead.
+upstream tool uses the package-installer entry point and archive launcher instead.
 Do not respond by replacing passwd or Samsung's verification key.
 
 ## What the access route does
 
 The vendored source is a pinned subset of
 [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b).
-It uses the SDK foothold, capability-bearing Samsung dotnet host, a private
+It uses the SDK entry point, capability-bearing Samsung dotnet host, a private
 mount namespace and signed-archive launcher to run a temporary authenticated
 root agent. Our local runtime check handles the U8000F host's unsupported
 `--list-runtimes` option by checking the resolved CLR files.
@@ -61,7 +61,7 @@ root agent. Our local runtime check handles the U8000F host's unsupported
 Root remains constrained by Samsung's security mechanisms. This work did not
 unlock secure boot, flash another OS, disable every execution restriction or
 install a permanent TV-side root service. Do not use the upstream QN90B/QN90F
-kernel exploit commands as substitutes for this U8000F route.
+kernel access commands as substitutes for this U8000F route.
 
 ## Commands, files and cleanup
 

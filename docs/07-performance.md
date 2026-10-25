@@ -15,7 +15,7 @@ does not claim a universal speedup percentage.
 | App images appear late on every visit | Recreated image views, discarded textures, oversized or remote artwork |
 
 Use the same app screen and a similar workload for comparisons. Let the owner
-navigate naturally; stop automated button injection while asking about lag.
+navigate naturally; stop automated button input while asking about lag.
 A successful launch request or a changed process ID is not proof the intended
 screen is visible.
 
