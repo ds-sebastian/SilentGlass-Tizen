@@ -1,0 +1,14 @@
+[Unit]
+Description=Quiet Home: keep contents-recognition and contents-ui-detector off (owner request 2026-10-24)
+
+[Service]
+Type=simple
+# Samsung starts these several times during boot (starter.target, multi-user, vdtizen-bootseq-delayed; the detector
+# Requires= recognition and pulls it back up). A one-shot is not enough, so this watches: every 3 s for the first
+# 10 min of uptime, then every 30 s. Each time it finds one running, it kills it until systemd's start limit stops it.
+# Log (events only): /run/user/5001/quiet-recog-off.log
+ExecStart=/bin/sh -c 'L=/run/user/5001/quiet-recog-off.log; exec >>$$L 2>&1; up(){ cut -d. -f1 /proc/uptime; }; echo "start up=$$(up)"; zap(){ j=0; while [ $$j -lt 15 ]; do p=$$(systemctl show $$1 -p MainPID --value 2>/dev/null); case "$$p" in ""|0|*[!0-9]*) break;; esac; kill -9 $$p 2>/dev/null; j=$$((j+1)); sleep 0.3; done; [ $$j -gt 0 ] && echo "up=$$(up) $$1 kills=$$j state=$$(systemctl show $$1 -p ActiveState --value)"; }; while :; do zap contents-recognition-service; zap contents-ui-detector-service; if [ $$(up) -lt 600 ]; then sleep 3; else sleep 30; fi; done'
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

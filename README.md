@@ -1,5 +1,10 @@
 # Quiet Tizen
 
+> **This fork** carries the work for a **Samsung QN65S90D (2024 OLED)**: a SHIELD-first Quiet Home with live
+> inputs, Ambient shortcut and Thread status, plus reversible privacy cleanup and boot units.
+> Start with [devices/s90d/README.md](devices/s90d/README.md). The original U8000F case study below is kept
+> as the reference framework.
+
 A practical, agent-readable guide to making a Samsung Tizen TV quieter and
 more useful as an HDMI display.
 

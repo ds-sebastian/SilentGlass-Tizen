@@ -1,0 +1,52 @@
+{
+  "tv": "192.0.2.10",
+  "build": "TIZEN-TRUNK2025-PontusM-OSU-2024-HOTFIX-RELEASE_20260514.3",
+  "home_appid": "com.samsung.tv.bixby-promotion",
+  "startup_appid": "org.tizen.tv-viewer",
+  "markers": [
+    "pisa-service",
+    "canalysis-daemon",
+    "slive-provider-daemon",
+    "com.samsung.tv.bixby-prov",
+    "com.samsung.tv.farfieldvoice",
+    "com.samsung.tv.ondevice-voice",
+    "com.samsung.tv.voiceid-service",
+    "com.samsung.tv.wakeupless",
+    "org.tizen.voice-app",
+    "org.tizen.voice-client"
+  ],
+  "disabled_apps": [
+    "com.samsung.tv.acr",
+    "com.samsung.tv.iacr",
+    "com.samsung.tv.contents-recognition-dbmgr",
+    "com.samsung.tv.contents-cognition-dbmgr",
+    "com.samsung.tv.farfieldvoice",
+    "com.samsung.tv.ondevice-voice",
+    "com.samsung.tv.voiceid-service",
+    "org.tizen.voice-client",
+    "org.tizen.stt-client",
+    "org.tizen.voice-app",
+    "org.tizen.voice-app-service",
+    "com.samsung.tv.wakeup-engine-bixby",
+    "com.samsung.tv.bixby-prov",
+    "com.samsung.tv.voiceassistant-music",
+    "com.samsung.tv.vif",
+    "com.samsung.tv.alexa-client",
+    "com.samsung.tv.alexa-fullscreen-app",
+    "com.samsung.tv.wakeup-engine-alexa",
+    "AQKO41xyKP.AmazonAlexa",
+    "HEPsqFNie0.tvplusstandalone",
+    "org.tizen.primevideo_companionapp",
+    "com.samsung.tv.targeted-ad-service",
+    "com.samsung.tv.utterance-recommender-core",
+    "com.samsung.tv.AICompanionAgent",
+    "com.samsung.tv.aov-dashboard"
+  ],
+  "quiet_home_dlls": [
+    "3e031d4bdf26d3a8e2cbdd61a6fb8e0fbe40722ee0c2dee04eec69c7858892d6"
+  ],
+  "user_units": [
+    "quiet-recog-off.service",
+    "quiet-prime-off.service"
+  ]
+}
