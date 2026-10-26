@@ -261,9 +261,11 @@ class LauncherTests(unittest.TestCase):
     def test_info_privacy_list_covers_every_registry_batch(self):
         info = (SRC / "InfoStats.cs").read_text()
         listed = set(re.findall(r'"([A-Za-z0-9._-]+)"', info.split("DisabledApps = {")[1].split("};")[0]))
-        for batch in ("batchc-apply.sh", "batche-apply.sh"):
+        for batch in ("batchc-apply.sh", "batche-apply.sh", "batchf-apply.sh"):
             text = (ROOT / "devices/s90d/device/cleanup" / batch).read_text()
-            apps = set(re.findall(r"'([A-Za-z0-9._-]+)'", text.split("app_id IN (")[1].split(")")[0]))
+            ids = re.search(r'^IDS="([^"]+)"', text, re.M)  # batch F names its targets once
+            scope = ids.group(1) if ids else text.split("app_id IN (")[1].split(")")[0]
+            apps = set(re.findall(r"'([A-Za-z0-9._-]+)'", scope))
             self.assertTrue(apps and apps <= listed, (batch, apps - listed))
         # never anything the Thread border router or Samsung Home depends on
         for keep in ("smartthings", "iot-hub", "matter", "coba.adagent", "csfs"):

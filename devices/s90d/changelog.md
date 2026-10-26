@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v40i** + **batch F**: the drift check found Prime Video's companion enabled again - and Prime Video, Apple TV and
+  the web browser reinstalled ~3.5 h after batch D uninstalled them (Samsung's country preloads come back; Prime was
+  running in the background). Batch F keeps them installed but disabled, which sticks, as it has for TV YouTube;
+  stopping them freed ~90 MB. Info's privacy check and the drift check now cover them. The drift check reads clean
+  again. Deploy pair: `update-v40i.sh` (from v32a) / `restore-v32a.sh`. Installed; it takes over at the next Home
+  press (the TV was put in standby before an on-screen check).
 - **v40h** (+ HA bridge 2.3, installed and checked on the TV): first on-screen run of v40a, and the fixes it needed.
   - **Keys at cold start**: the TV's launch placeholder (`[WIND]com.samsung.tv.bixby-promotion`) holds the remote's
     keys until the app's main window has been shown once. v40a hid that window at start, so the bar appeared but
@@ -20,7 +26,6 @@ records. Conf keys mentioned in older entries may since have been removed - the 
     from a "phone" (QR decodes; wrong code refused; broker test; Home Assistant's Thread network found; save and
     reconnect; the password never sent back; Back closes the page and port 7680), a Home Assistant notification
     over SHIELD, the Ambient -> Home redirect with the wallpaper backdrop, and input switching from Home Assistant.
-  - Deploy pair: `launcher-deploy/update-v40h.sh` (from v32a) / `restore-v32a.sh`.
 - **v40a** (+ HA bridge 2.3): **the final shape - overlays only.** No full-screen pages any more: the Home, Apps,
   Controls and Info pages, the live preview and the glass shader are gone. Over a picture Home toggles the bar;
   Inputs and Apps open above it; Controls and Info are panels on the right that replace the bar (Info near-opaque,

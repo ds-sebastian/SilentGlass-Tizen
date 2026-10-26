@@ -22,6 +22,8 @@ public static class InfoStats
         "com.samsung.tv.wakeup-engine-alexa", "AQKO41xyKP.AmazonAlexa", "HEPsqFNie0.tvplusstandalone",
         "com.samsung.tv.targeted-ad-service", "com.samsung.tv.utterance-recommender-core", "com.samsung.tv.AICompanionAgent", "com.samsung.tv.aov-dashboard",
         "com.samsung.tv.home.media", "com.samsung.tv.cobalt-yt",
+        // batch F: Samsung's country preloads come back after an uninstall, so they stay installed but disabled
+        "org.tizen.primevideo", "org.tizen.primevideo-dummy", "org.tizen.primevideo_companionapp", "com.samsung.tv.aria-video", "org.tizen.browser",
         // batch E (2026-10-26)
         "com.samsung.tv.cis-api-service-app", "com.samsung.tv.cis", "com.samsung.tizen.samsung-analytics", "org.tizen.multi-assistant-service",
         "com.samsung.tv.aov-service", "com.samsung.tv.voice-instant-app", "org.tizen.voice-onboarding", "com.samsung.tv.mybixby",

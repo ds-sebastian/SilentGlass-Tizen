@@ -42,10 +42,14 @@
     "com.samsung.tv.AICompanionAgent",
     "com.samsung.tv.aov-dashboard",
     "com.samsung.tv.home.media",
-    "com.samsung.tv.cobalt-yt"
+    "com.samsung.tv.cobalt-yt",
+    "org.tizen.primevideo",
+    "org.tizen.primevideo-dummy",
+    "com.samsung.tv.aria-video",
+    "org.tizen.browser"
   ],
   "quiet_home_dlls": [
-    "a911a4121bc8566b030e56dee20adc2a34328b5543cd36fa7cb12db24427ab1c"
+    "f083a9ccf8738c63afb144b01e96160221ce392bad0a44f5147d33ff226aec19"
   ],
   "user_units": [
     "quiet-recog-off.service",
