@@ -14,9 +14,9 @@ public sealed partial class QuietHome
  // card subtitles use the TV's own input names (rename from Home Assistant or the TV's input list); nothing hard-coded
  string HeroPortValue(int chosen,int resolved)=>chosen==0?"Auto · "+InputName(resolved):InputName(chosen);
  // Select cycles Automatic -> HDMI 1..4 -> Automatic (never the other card's input); Home rebuilds with the new mapping
- void CycleHeroPort(bool watch)
+ void CycleHeroPort(bool watch,int dir=1)
  {
-  if(watch)prefs.Watch=HomeLogic.NextPort(prefs.Watch,playPort);else prefs.Play=HomeLogic.NextPort(prefs.Play,watchPort);
+  if(watch)prefs.Watch=HomeLogic.NextPort(prefs.Watch,playPort,dir);else prefs.Play=HomeLogic.NextPort(prefs.Play,watchPort,dir);
   SavePrefs();ResolveHeroPorts();RefreshTileValues();
   MarkState("heroport:"+(watch?"watch":"play")+":"+(watch?prefs.Watch:prefs.Play));
  }

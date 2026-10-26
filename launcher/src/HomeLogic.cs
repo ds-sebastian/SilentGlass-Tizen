@@ -52,10 +52,11 @@ public static class HomeLogic
  // tab bar Left/Right over Home 0, Apps 1, Controls 2, Info 3: a hidden Apps tab is skipped, the ends stop
  public static int NextTab(int page,int d,bool hideApps){int n=page+d;if(hideApps&&n==1)n+=d;return n<0||n>3?page:n;}
  // Select cycles Automatic -> HDMI 1..4 -> Automatic, skipping the input the other card already opens
- public static int NextPort(int current,int otherCard)
+ // dir +1: Automatic -> HDMI 1..4 -> Automatic; dir -1 the other way round
+ public static int NextPort(int current,int otherCard,int dir=1)
  {
   int n=current;
-  do n=n==0?Hdmi1:n>=Hdmi4?0:n+1; while(n!=0&&n==otherCard);
+  do n=dir>=0?(n==0?Hdmi1:n>=Hdmi4?0:n+1):(n==0?Hdmi4:n<=Hdmi1?0:n-1); while(n!=0&&n==otherCard);
   return n;
  }
 

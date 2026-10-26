@@ -6,6 +6,9 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v31b**: the bar's input items are **Watch** and **Play** again, with the device each opens as a second line; Watch
+  and Play can be re-pointed from the Controls panel (Left/Right, both directions; `HomeLogic.NextPort` gained a
+  direction). Controls rows tightened (88/64 px) to fit the new section.
 - **v31a**: Home over the picture rebuilt the way Vetro does it: a separate notification-level window above the TV
   viewer, which stays in front and playing (v30's full-screen video backdrop was dropped - it re-routed the video and
   was unreliable). New design: one glass bar (inputs, Inputs, Controls, Apps, Info), Inputs as a menu anchored above

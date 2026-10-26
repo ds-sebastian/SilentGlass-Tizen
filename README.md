@@ -19,8 +19,8 @@ plane cannot be captured, so it shows black in screenshots).*
 
 - **Home over the picture** (tvOS 26 style): press Home while something is playing and the picture is left alone -
   the TV's viewer stays in front and keeps playing. SilentGlass opens its own small window above it (a Samsung
-  notification window, the way Vetro's dock works): a glass bar with the Watch and Play inputs, Inputs, Controls,
-  Apps and Info. Inputs and Apps open as menus above the bar; Controls is a panel on the right, so brightness,
+  notification window, the way Vetro's dock works): a glass bar with Watch and Play (the device each opens underneath), Inputs,
+  Controls, Apps and Info; what Watch and Play open is set in Controls. Inputs and Apps open as menus above the bar; Controls is a panel on the right, so brightness,
   contrast and picture mode can be judged on the picture while they change. Back or Home closes it. With nothing
   playing, Home is the full-screen launcher below.
 - **Two big cards, no clutter**: *Watch* (e.g. an NVIDIA SHIELD) and *Play* (e.g. a Nintendo Switch). The input on

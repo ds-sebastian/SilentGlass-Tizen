@@ -18,7 +18,7 @@ A = ROOT / "launcher" / "assets"
 # ---- shared numbers (Home.Overlay.cs) ----
 BAR_H, BAR_R, BAR_BOTTOM, ITEM_H, ITEM_PAD, GLYPH, GAP, LABEL = 104, 52, 52, 80, 30, 40, 14, 30
 POP_GAP, ROW_H, POP_W, POP_R = 18, 88, 560, 36
-CC_X, CC_W, CC_R, SLIDER_H, VALUE_H = 1236, 624, 44, 96, 72
+CC_X, CC_W, CC_R, SLIDER_H, VALUE_H = 1236, 624, 44, 88, 64
 APP_W, APP_H, APP_GAP, APP_COLS = 256, 144, 24, 4
 GLASS = "rgba(30,30,34,.66)"
 GLASS_TOP = "rgba(255,255,255,.07)"
@@ -43,6 +43,7 @@ body{{margin:0;width:1920px;height:1080px;overflow:hidden;background:#000 center
 .item img,.row img{{width:{GLYPH}px;height:{GLYPH}px}}
 .f{{background:rgba(255,255,255,.95);color:#1c1c1e}} .f img{{filter:brightness(0) saturate(100%) invert(9%)}}
 .sep{{width:2px;height:40px;background:rgba(255,255,255,.22);margin:0 10px}}
+.two{{display:flex;flex-direction:column;line-height:1.12}} .two small{{font-size:21px;font-weight:500;opacity:.62;display:flex;align-items:center;gap:10px}}
 .dot{{width:12px;height:12px;border-radius:6px;background:#30d158}}
 .pop{{border-radius:{POP_R}px;padding:12px}}
 .row{{height:{ROW_H}px;border-radius:26px;display:flex;align-items:center;gap:18px;padding:0 22px;font-weight:600;font-size:30px}}
@@ -65,8 +66,8 @@ body{{margin:0;width:1920px;height:1080px;overflow:hidden;background:#000 center
 .tile.f{{transform:scale(1.07);box-shadow:0 0 0 4px #fff,0 18px 40px rgba(0,0,0,.45)}}
 """
 
-BAR = [("tv", "SHIELD", True), ("gamecontroller", "Switch", False), None,
-       ("inputs", "Inputs", False), ("controls", "Controls", False), ("apps", "Apps", False), ("info", "Info", False)]
+BAR = [("tv", "Watch", "SHIELD", True), ("gamecontroller", "Play", "Nintendo Switch", False), None,
+       ("inputs", "Inputs", None, False), ("controls", "Controls", None, False), ("apps", "Apps", None, False), ("info", "Info", None, False)]
 
 
 def sym(n):
@@ -79,9 +80,10 @@ def bar(focus):
         if it is None:
             out.append('<div class="sep"></div>')
             continue
-        g, label, live = it
-        out.append(f'<div class="item{" f" if i == focus else ""}"><img src="{sym(g)}">{label}'
-                   f'{"<span class=dot></span>" if live else ""}</div>')
+        g, label, sub, live = it
+        text = (f'<span class="two">{label}<small>{sub}{"<span class=dot></span>" if live else ""}</small></span>'
+                if sub else label)
+        out.append(f'<div class="item{" f" if i == focus else ""}"><img src="{sym(g)}">{text}</div>')
     return f'<div class="dim"></div><div class="glass bar" id="bar">{"".join(out)}</div>'
 
 
@@ -124,6 +126,7 @@ def controls(focus=0):
     rows = [("s", "sun", "Brightness", "50", .99), ("s", "contrast", "Contrast", "45", .9), ("s", "speaker", "Volume", "18", .18), "hr",
             ("v", "picture", "Picture Mode", "Movie (Calibrated)"), ("v", "waveform", "Sound Mode", "Adaptive Sound"),
             ("v", "soundbar", "Sound Output", "Soundbar"), ("t", "gamecontroller", "Game Mode", False), ("v", "moon", "Sleep Timer", "Off"), "hr",
+            ("v", "tv", "Watch", "Auto · SHIELD"), ("v", "gamecontroller", "Play", "Auto · Nintendo Switch"), "hr",
             ("a", "artframe", "Ambient", ""), ("a", "controls", "All Controls", ""), ("a", "gear", "TV Settings", "")]
     out, i = [], 0
     for r in rows:
@@ -133,7 +136,7 @@ def controls(focus=0):
         kind, g, name, val = r[0], r[1], r[2], r[3]
         f = " f" if i == focus else ""
         if kind == "s":
-            out.append(f'<div class="cr{f}" style="height:{SLIDER_H}px;align-items:flex-start;padding-top:16px;box-sizing:border-box"><img src="{sym(g)}">{name}'
+            out.append(f'<div class="cr{f}" style="height:{SLIDER_H}px;align-items:flex-start;padding-top:12px;box-sizing:border-box"><img src="{sym(g)}">{name}'
                        f'<span class="val big">{val}</span><div class="track"><i style="width:{int(r[4]*100)}%"></i></div></div>')
         elif kind == "t":
             out.append(f'<div class="cr{f}" style="height:{VALUE_H}px"><img src="{sym(g)}">{name}<span class="val"><span class="sw{"" if val else " off"}"><b></b></span></span></div>')
@@ -141,7 +144,7 @@ def controls(focus=0):
             chevron = f'<img src="{sym("chevron")}" style="width:26px;height:26px;opacity:.5">' if kind == "a" else ""
             out.append(f'<div class="cr{f}" style="height:{VALUE_H}px"><img src="{sym(g)}">{name}<span class="val">{val}</span>{chevron}</div>')
         i += 1
-    h = 16 * 2 + 3 * SLIDER_H + 6 * VALUE_H + 2 * 25 + 2 * VALUE_H
+    h = 16 * 2 + 3 * SLIDER_H + 10 * VALUE_H + 3 * 25
     return f'<div class="dimr"></div><div class="glass cc" style="left:{CC_X}px;top:{(1080-h)//2}px;width:{CC_W}px;height:{h}px">{"".join(out)}</div>'
 
 

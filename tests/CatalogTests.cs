@@ -123,6 +123,7 @@ static class CatalogTests
         True(HomeLogic.NextTab(0, 1, false) == 1 && HomeLogic.NextTab(0, -1, true) == 0 && HomeLogic.NextTab(3, 1, false) == 3, "tab ends");
         True(HomeLogic.NextPort(0, 15) == 13 && HomeLogic.NextPort(16, 15) == 0, "port cycle wraps through Automatic");
         True(HomeLogic.NextPort(0, 13) == 14 && HomeLogic.NextPort(14, 15) == 16, "port cycle skips the other card's input");
+        True(HomeLogic.NextPort(0, 15, -1) == 16 && HomeLogic.NextPort(13, 15, -1) == 0 && HomeLogic.NextPort(16, 15, -1) == 14, "port cycle backwards (Left)");
         for (int other = 13; other <= 16; other++)
             for (int cur = 0; cur <= 16; cur = cur == 0 ? 13 : cur + 1)
             {

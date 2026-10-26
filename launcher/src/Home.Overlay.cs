@@ -9,7 +9,8 @@ using Tizen.NUI.BaseComponents;
 // SilentGlass shows a second, partial, transparent window above it - a notification-level window (the app holds
 // http://tizen.org/privilege/window.priority.set), the kind of window Vetro's dock uses. The full-screen window is
 // hidden meanwhile, so the viewer is never covered, paused or re-synced, and nothing touches the video plane.
-//  bar       one glass capsule at the bottom: the Watch / Play inputs, Inputs, Controls, Apps (unless hidden), Info
+//  bar       one glass capsule at the bottom: Watch and Play (the device each opens underneath), Inputs, Controls,
+//            Apps (unless hidden), Info
 //  Inputs    a menu anchored above its bar item
 //  Apps      the TV's apps floating above the bar (their own menu, so the bar stays short)
 //  Controls  a Control Center panel on the right; the picture stays visible on the left while it changes
@@ -26,7 +27,7 @@ public sealed partial class QuietHome
  string oState="off",lastOther="";
  Animation oAnimation;Tizen.NUI.Timer oIdle;
  const int BandTop=240,BarH=104,BarR=52,BarBottom=52,ItemH=80,ItemPad=30,GlyphS=40,GlyphGap=14,LabelPx=30;
- const int PopGap=18,MenuRowH=88,PopW=560,PopR=36,CcX=1236,CcW=624,CcR=44,SliderH=96,ValueH=72;
+ const int PopGap=18,MenuRowH=88,PopW=560,PopR=36,CcX=1236,CcW=624,CcR=44,SliderH=88,ValueH=64;
  const int AppW=256,AppH=144,AppGap=24,AppCols=4,MaxApps=12,IdleOverlayMs=45000;
  const string TvViewer="org.tizen.tv-viewer",Self="com.samsung.tv.bixby-promotion";
  readonly Color glassTop=new Color(.15f,.15f,.17f,.70f),glassBottom=new Color(.115f,.115f,.13f,.66f),edge=new Color(1,1,1,.16f);
@@ -150,16 +151,20 @@ public sealed partial class QuietHome
   RefreshSource();RefreshInputs();ResolveHeroPorts();ReadSignal();
   oLayer=new View{Size2D=new Size2D(1920,1080)};oRoot.Add(oLayer);
   Dim(false,0,BandTop+180,1920,1080-BandTop-180,.5f);
-  var items=new List<(string glyph,string label,string action)>{(PortGlyph(watchPort,watchPort,playPort),InputName(watchPort),"hdmi:"+watchPort),(PortGlyph(playPort,watchPort,playPort),InputName(playPort),"hdmi:"+playPort),
-   (null,null,null),("inputs","Inputs","inputs"),("controls","Controls","controls")};
-  if(!prefs.HideApps&&library.Exists(a=>!a.Utility))items.Add(("apps","Apps","apps"));
-  items.Add(("info","Info","info"));
+  // Watch / Play keep their names; the device each opens (the TV's input name) is the line underneath
+  var items=new List<(string glyph,string label,string sub,string action)>{
+   (PortGlyph(watchPort,watchPort,playPort),"Watch",InputName(watchPort),"hdmi:"+watchPort),(PortGlyph(playPort,watchPort,playPort),"Play",InputName(playPort),"hdmi:"+playPort),
+   (null,null,null,null),("inputs","Inputs",null,"inputs"),("controls","Controls",null,"controls")};
+  if(!prefs.HideApps&&library.Exists(a=>!a.Utility))items.Add(("apps","Apps",null,"apps"));
+  items.Add(("info","Info",null,"info"));
   // measure the labels, then centre the capsule
-  var labels=new List<TextLabel>();int total=24;
+  var labels=new List<(TextLabel title,TextLabel sub,int text)>();int total=24;
   foreach(var it in items){
-   if(it.glyph==null){labels.Add(null);total+=22;continue;}
-   var l=Label(it.label,0,0,10,ItemH,LabelPx,white,"Semibold");l.Ellipsis=false;labels.Add(l);
-   total+=2*ItemPad+GlyphS+GlyphGap+TextWidth(l)+(HasPicture(it.action)?24:0);
+   if(it.glyph==null){labels.Add((null,null,0));total+=22;continue;}
+   var l=Label(it.label,0,0,10,ItemH,LabelPx,white,"Semibold");l.Ellipsis=false;
+   TextLabel s=null;if(it.sub!=null){s=Label(it.sub,0,0,10,28,21,white,"Medium");s.Ellipsis=false;}
+   int text=Math.Max(TextWidth(l),s==null?0:TextWidth(s)+(HasPicture(it.action)?22:0));
+   labels.Add((l,s,text));total+=2*ItemPad+GlyphS+GlyphGap+text;
   }
   int x=960-total/2;
   capsule=Glass(x,BarTop,total,BarH,BarR);
@@ -168,12 +173,16 @@ public sealed partial class QuietHome
   for(int i=0;i<items.Count;i++){
    var it=items[i];
    if(it.glyph==null){capsule.Add(new View{Position2D=new Position2D(ix+10,(BarH-40)/2),Size2D=new Size2D(2,40),BackgroundColor=new Color(1,1,1,.22f)});ix+=22;continue;}
-   var l=labels[i];int lw=TextWidth(l);bool dot=HasPicture(it.action);
-   int w=2*ItemPad+GlyphS+GlyphGap+lw+(dot?24:0);
+   var (l,s,text)=labels[i];int w=2*ItemPad+GlyphS+GlyphGap+text,tx=ix+ItemPad+GlyphS+GlyphGap;
    var g=Sym(it.glyph,ix+ItemPad,(BarH-GlyphS)/2,GlyphS);capsule.Add(g);
-   l.Position2D=new Position2D(ix+ItemPad+GlyphS+GlyphGap,(BarH-ItemH)/2);l.Size2D=new Size2D(lw+4,ItemH);capsule.Add(l);
-   View d=null;if(dot){d=LiveDot(ix+ItemPad+GlyphS+GlyphGap+lw+12,(BarH-12)/2,12);capsule.Add(d);}
-   bar.Add(new OItem{Glyph=g,Label=l,Dot=d,Action=it.action,X=ix,Y=(BarH-ItemH)/2,W=w,H=ItemH});
+   View d=null;
+   if(s==null){l.Position2D=new Position2D(tx,(BarH-ItemH)/2);l.Size2D=new Size2D(text+4,ItemH);capsule.Add(l);}
+   else{
+    l.Position2D=new Position2D(tx,19);l.Size2D=new Size2D(text+4,38);capsule.Add(l);
+    s.Position2D=new Position2D(tx,55);s.Size2D=new Size2D(TextWidth(s)+4,28);capsule.Add(s);
+    if(HasPicture(it.action)){d=LiveDot(tx+TextWidth(s)+10,55+8,12);capsule.Add(d);}
+   }
+   bar.Add(new OItem{Glyph=g,Label=l,Value=s,Dot=d,Action=it.action,X=ix,Y=(BarH-ItemH)/2,W=w,H=ItemH});
    ix+=w;
   }
   if(oSel<0||oSel>=bar.Count)oSel=Math.Max(0,bar.FindIndex(b=>b.Action=="hdmi:"+lastSource));
@@ -184,7 +193,10 @@ public sealed partial class QuietHome
  // the focused item is a white capsule; while one of its menus is open the item stays marked in faint white
  void FocusBar(bool animate)
  {
-  for(int i=0;i<bar.Count;i++){bool f=i==oSel&&oMode==0;bar[i].Label.TextColor=f?focusInk:white;bar[i].Glyph.Color=f?focusInk:white;}
+  for(int i=0;i<bar.Count;i++){
+   bool f=i==oSel&&oMode==0;bar[i].Label.TextColor=f?focusInk:white;bar[i].Glyph.Color=f?focusInk:white;
+   if(bar[i].Value!=null)bar[i].Value.TextColor=f?new Color(.11f,.11f,.12f,.6f):new Color(1,1,1,.62f);
+  }
   if(oHighlight==null||oSel<0||oSel>=bar.Count)return;
   var b=bar[oSel];oHighlight.BackgroundColor=oMode==0?focusFill:new Color(1,1,1,.18f);
   if(animate){var a=new Animation(150){DefaultAlphaFunction=Ease()};a.AnimateTo(oHighlight,"PositionX",(float)b.X);a.AnimateTo(oHighlight,"SizeWidth",(float)b.W);a.Finished+=(s,e)=>a.Dispose();a.Play();}
@@ -274,16 +286,17 @@ public sealed partial class QuietHome
   RefreshSettings(true);
   oLayer=new View{Size2D=new Size2D(1920,1080)};oRoot.Add(oLayer);
   Dim(true,wx,0,1920-wx,1080,.45f);
-  int h=32+3*SliderH+6*ValueH+2*25+2*ValueH,ry=16;
+  int h=32+3*SliderH+10*ValueH+3*25,ry=16;
   var panel=Glass(CcX,(1080-h)/2,CcW,h,CcR);
   // kind: 0 level (Left/Right), 1 value (Left/Right/Select cycle), 2 switch, 3 opens something
   void Row(int kind,string glyph,string name,string action)
   {
-   int rh=kind==0?SliderH:ValueH,top=kind==0?16:(rh-38)/2;
+   int rh=kind==0?SliderH:ValueH,top=kind==0?12:(rh-38)/2;
    var r=new View{Position2D=new Position2D(16,ry),Size2D=new Size2D(CcW-32,rh),CornerRadius=new Vector4(28,28,28,28)};
-   var g=Sym(glyph,24,kind==0?18:(rh-38)/2,38);r.Add(g);
+   var g=Sym(glyph,24,kind==0?14:(rh-38)/2,38);r.Add(g);
    var l=Label(name,82,top-2,300,42,28,white,"Semibold");l.Ellipsis=false;r.Add(l);
-   var v=Label("",CcW-32-24-280-(kind==3?34:0),top-2,280,42,kind==0?30:26,white,kind==0?"Display":"Medium");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=false;r.Add(v);
+   int vw=kind==1?360:280; // value rows: room for "Auto · Nintendo Switch"
+   var v=Label("",CcW-32-24-vw-(kind==3?34:0),top-2,vw,42,kind==0?30:26,white,kind==0?"Display":"Medium");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=false;r.Add(v);
    var item=new OItem{Box=r,Glyph=g,Label=l,Value=v,Action=action,Kind=kind};
    if(kind==0){item.Track=new View{Position2D=new Position2D(82,rh-26),Size2D=new Size2D(CcW-32-82-24,8),CornerRadius=new Vector4(4,4,4,4)};item.Fill=new View{Size2D=new Size2D(0,8),CornerRadius=new Vector4(4,4,4,4)};item.Track.Add(item.Fill);r.Add(item.Track);}
    if(kind==2){item.Switch=new View{Position2D=new Position2D(CcW-32-24-64,(rh-36)/2),Size2D=new Size2D(64,36),CornerRadius=new Vector4(18,18,18,18)};item.Knob=new View{Size2D=new Size2D(30,30),CornerRadius=new Vector4(15,15,15,15),BackgroundColor=white};item.Switch.Add(item.Knob);r.Add(item.Switch);v.Hide();}
@@ -294,6 +307,8 @@ public sealed partial class QuietHome
   Row(0,"sun","Brightness","brightness");Row(0,"contrast","Contrast","contrast");Row(0,"speaker","Volume","volume");Rule();
   Row(1,"picture","Picture Mode","cycle:picturemode");Row(1,"waveform","Sound Mode","cycle:external-sound-mode");Row(1,"soundbar","Sound Output","output");
   Row(2,"gamecontroller","Game Mode","game-mode");Row(1,"moon","Sleep Timer","sleeptimer");Rule();
+  // which input Watch and Play open (Automatic = by the TV's input name); Left/Right or Select cycle
+  Row(1,PortGlyph(watchPort,watchPort,playPort),"Watch","heroport:watch");Row(1,PortGlyph(playPort,watchPort,playPort),"Play","heroport:play");Rule();
   Row(3,"artframe","Ambient","ambient");Row(3,"controls","All Controls","full:2");Row(3,"gear","TV Settings","app:org.tizen.menu");
   oSub=0;UpdateControls();FocusRows();Fade(panel,0);MarkState("overlay_controls");
  }
@@ -325,6 +340,7 @@ public sealed partial class QuietHome
    case "volume":if(sel){if(sound_manager_get_master_mute(out int m)==0)sound_manager_set_master_mute(m==1?0:1);RefreshSettings(true);}else ChangeVolume(d);break;
    case "output":SetSetting("soundoutput",SettingValue("soundoutput")=="0"?"2":"0");break;
    case "game-mode":SetSetting("game-mode",SettingValue("game-mode")=="1"?"0":"1");break;
+   case "heroport:watch":case "heroport:play":CycleHeroPort(r.Action=="heroport:watch",d);break;
    case "sleeptimer":if(int.TryParse(SettingValue("sleeptimer"),out int n))SetSetting("sleeptimer",(((n+d)%5+5)%5).ToString());break;
    case "ambient":if(sel){HideOverlay("overlay_ambient");Launch("org.tizen.art-app");}return;
    case "full:2":if(sel)OpenFull(2);return;

@@ -406,8 +406,8 @@ class S90dPortTests(unittest.TestCase):
         create = body(src, "protected override void OnCreate()")
         self.assertLess(create.index("prefs=LoadPrefs();"), create.index("ResolveHeroPorts();"))
         # cycling never maps both cards to the same input (behaviour tested in tests/CatalogTests.cs)
-        self.assertIn("HomeLogic.NextPort(prefs.Watch,playPort)", prefs)
-        self.assertIn("HomeLogic.NextPort(prefs.Play,watchPort)", prefs)
+        self.assertIn("HomeLogic.NextPort(prefs.Watch,playPort,dir)", prefs)
+        self.assertIn("HomeLogic.NextPort(prefs.Play,watchPort,dir)", prefs)
         self.assertIn('SettingsTile("Watch Input","heroport:watch"', src)
         self.assertIn('SettingsTile("Play Input","heroport:play"', src)
         self.assertIn("prefs.Watch!=0?prefs.Watch:PortNamed(\"shield\",15)", src)
@@ -596,8 +596,9 @@ class S90dOverlayTests(unittest.TestCase):
 
     def test_bar_items_and_apps_in_their_own_menu(self):
         bar = body(self.src, "void OpenBar(")
-        self.assertIn('InputName(watchPort),"hdmi:"+watchPort', bar)
-        self.assertIn('if(!prefs.HideApps&&library.Exists(a=>!a.Utility))items.Add(("apps","Apps","apps"));', bar)
+        self.assertIn('"Watch",InputName(watchPort),"hdmi:"+watchPort', bar)  # Watch / Play titles, device underneath
+        self.assertIn('"Play",InputName(playPort),"hdmi:"+playPort', bar)
+        self.assertIn('if(!prefs.HideApps&&library.Exists(a=>!a.Utility))items.Add(("apps","Apps",null,"apps"));', bar)
         self.assertNotIn("NewArtwork", bar)  # no apps on the bar itself
         self.assertIn("card.Add(NewArtwork(app,AppW,AppH,20));", body(self.src, "void OpenAppsMenu()"))
 
@@ -614,6 +615,10 @@ class S90dOverlayTests(unittest.TestCase):
         keys = body(self.src, "void ControlsKey(")
         self.assertIn('case "brightness":case "contrast":if(!sel)ChangeLevel(r.Action,d);break;', keys)
         self.assertIn("CycleSetting(r.Action.Substring(6),d);", keys)
+        # what Watch and Play open is configurable right there, in both directions
+        self.assertIn('"Watch","heroport:watch"', cc)
+        self.assertIn('"Play","heroport:play"', cc)
+        self.assertIn('CycleHeroPort(r.Action=="heroport:watch",d);', keys)
 
     def test_no_shader_glass_over_the_picture(self):
         for banned in ("AddGlass(", "RimOverlay(", "SetRenderEffect"):
