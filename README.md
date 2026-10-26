@@ -1,9 +1,13 @@
 # Quiet Tizen
 
-> **This fork** carries the work for a **Samsung QN65S90D (2024 OLED)**: a SHIELD-first Quiet Home with live
-> inputs, Ambient shortcut and Thread status, plus reversible privacy cleanup and boot units.
-> Start with [devices/s90d/README.md](devices/s90d/README.md). The original U8000F case study below is kept
-> as the reference framework.
+> **This fork** carries the work for a **Samsung QN65S90D (2024 OLED)**: a SHIELD-first Quiet Home (Liquid Glass
+> look at 60 fps, live video in the current input's card, on-TV settings), reversible privacy cleanup and boot units,
+> and a standalone **Thread border router** that joins your existing Thread network (Samsung's SmartThings hub can
+> only create its own). Start with [devices/s90d/README.md](devices/s90d/README.md) and
+> [devices/s90d/thread-border-router.md](devices/s90d/thread-border-router.md). The original U8000F case study
+> below is kept as the reference framework.
+
+![Quiet Home on the S90D](docs/screenshots/s90d-home.jpg)
 
 ## Start here: agent maintenance guide
 

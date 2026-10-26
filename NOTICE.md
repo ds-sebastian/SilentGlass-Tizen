@@ -33,3 +33,7 @@ trademarks remain subject to their owners' terms and are not relicensed by
 this project. Source availability does not imply permission for every reuse.
 The repository and its contributors are not affiliated with Samsung, Sony,
 Nintendo, Microsoft, Amazon or any streaming service.
+
+The S90D photo wallpaper (macOS Catalina Day/Night) is Apple artwork: it is not distributed, and
+`tools/make_wallpapers.py` builds it from images you supply. The screenshots in `docs/screenshots/` show it as
+rendered on the owner's TV; remove or replace them before publishing this repository.
