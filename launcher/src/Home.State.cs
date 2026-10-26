@@ -19,7 +19,7 @@ public sealed partial class QuietHome
   if(stateTimer==null){stateTimer=new Tizen.NUI.Timer(600);stateTimer.Tick+=(s,e)=>{WriteState(stateActivity);return false;};}
   if(!stateTimer.IsRunning())stateTimer.Start();
  }
- const string StyleVersion="liquid-v31b";
+ const string StyleVersion="liquid-v31c";
  void WriteState(string activity)
  {
   stateTimer?.Stop();

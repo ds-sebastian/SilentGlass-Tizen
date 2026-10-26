@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## SilentGlass Home (v31b)
+## SilentGlass Home (v31c)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -44,7 +44,7 @@ LAN address blurred.*
 
 ### Pages
 
-**Over the picture** (v31b, default): when Home is pressed while the TV viewer shows an input with a picture, the
+**Over the picture** (v31c, default): when Home is pressed while the TV viewer shows an input with a picture, the
 viewer stays in front and keeps playing; SilentGlass shows its own partial, transparent window above it
 ([`Home.Overlay.cs`](../../launcher/src/Home.Overlay.cs)) and hides its full-screen window.
 
@@ -54,7 +54,8 @@ viewer stays in front and keeps playing; SilentGlass shows its own partial, tran
 - **Inputs**: a menu above its bar item - every input by the TV's name, a checkmark on the current one.
 - **Apps**: the TV's apps and Samsung Home floating above the bar (their own menu; the bar stays short).
 - **Controls**: a panel on the right - Brightness, Contrast, Volume (Left/Right adjust; Select on Volume mutes),
-  Picture Mode, Sound Mode, Sound Output, Game Mode, Sleep Timer (Left/Right or Select cycle); **Watch** and **Play**
+  Picture Mode, Sound Mode, Sound Output, Game Mode (Automatic / Always / Never - the TV's single three-way
+  setting), Sleep Timer (Left/Right or Select cycle); **Watch** and **Play**
   (which input each opens: Automatic by the TV's input name, or HDMI 1-4; Left/Right cycle, saved on the TV); then
   Ambient, All Controls (the full-screen page) and TV Settings. The left of the screen stays clear to judge the picture.
 - **Info** and **All Controls** open the full-screen pages; Back returns to the bar.

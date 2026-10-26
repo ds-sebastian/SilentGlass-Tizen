@@ -33,7 +33,7 @@ public sealed partial class QuietHome
  readonly Color glassTop=new Color(.15f,.15f,.17f,.70f),glassBottom=new Color(.115f,.115f,.13f,.66f),edge=new Color(1,1,1,.16f);
  readonly Color focusFill=new Color(1,1,1,.95f),focusInk=new Color(.11f,.11f,.12f,1),live=new Color(.19f,.82f,.35f,1),clearColor=new Color(0,0,0,0);
 
- sealed class OItem { public View Box,Dot,Track,Fill,Switch,Knob; public ImageView Glyph,Check; public TextLabel Label,Value; public string Action; public int X,Y,W,H,Kind; }
+ sealed class OItem { public View Box,Dot,Track,Fill; public ImageView Glyph,Check; public TextLabel Label,Value; public string Action; public int X,Y,W,H,Kind; }
  readonly List<OItem> bar=new List<OItem>(),rows=new List<OItem>();
 
  // ---- when ----
@@ -288,7 +288,7 @@ public sealed partial class QuietHome
   Dim(true,wx,0,1920-wx,1080,.45f);
   int h=32+3*SliderH+10*ValueH+3*25,ry=16;
   var panel=Glass(CcX,(1080-h)/2,CcW,h,CcR);
-  // kind: 0 level (Left/Right), 1 value (Left/Right/Select cycle), 2 switch, 3 opens something
+  // kind: 0 level (Left/Right), 1 value (Left/Right/Select cycle), 3 opens something
   void Row(int kind,string glyph,string name,string action)
   {
    int rh=kind==0?SliderH:ValueH,top=kind==0?12:(rh-38)/2;
@@ -299,14 +299,13 @@ public sealed partial class QuietHome
    var v=Label("",CcW-32-24-vw-(kind==3?34:0),top-2,vw,42,kind==0?30:26,white,kind==0?"Display":"Medium");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=false;r.Add(v);
    var item=new OItem{Box=r,Glyph=g,Label=l,Value=v,Action=action,Kind=kind};
    if(kind==0){item.Track=new View{Position2D=new Position2D(82,rh-26),Size2D=new Size2D(CcW-32-82-24,8),CornerRadius=new Vector4(4,4,4,4)};item.Fill=new View{Size2D=new Size2D(0,8),CornerRadius=new Vector4(4,4,4,4)};item.Track.Add(item.Fill);r.Add(item.Track);}
-   if(kind==2){item.Switch=new View{Position2D=new Position2D(CcW-32-24-64,(rh-36)/2),Size2D=new Size2D(64,36),CornerRadius=new Vector4(18,18,18,18)};item.Knob=new View{Size2D=new Size2D(30,30),CornerRadius=new Vector4(15,15,15,15),BackgroundColor=white};item.Switch.Add(item.Knob);r.Add(item.Switch);v.Hide();}
    if(kind==3){var c=Sym("chevron",CcW-32-24-26,(rh-26)/2,26);c.Opacity=.5f;r.Add(c);}
    panel.Add(r);rows.Add(item);ry+=rh;
   }
   void Rule(){panel.Add(new View{Position2D=new Position2D(24,ry+12),Size2D=new Size2D(CcW-48,1),BackgroundColor=new Color(1,1,1,.14f)});ry+=25;}
   Row(0,"sun","Brightness","brightness");Row(0,"contrast","Contrast","contrast");Row(0,"speaker","Volume","volume");Rule();
   Row(1,"picture","Picture Mode","cycle:picturemode");Row(1,"waveform","Sound Mode","cycle:external-sound-mode");Row(1,"soundbar","Sound Output","output");
-  Row(2,"gamecontroller","Game Mode","game-mode");Row(1,"moon","Sleep Timer","sleeptimer");Rule();
+  Row(1,"gamecontroller","Game Mode","cycle:game-mode-auto");Row(1,"moon","Sleep Timer","sleeptimer");Rule();
   // which input Watch and Play open (Automatic = by the TV's input name); Left/Right or Select cycle
   Row(1,PortGlyph(watchPort,watchPort,playPort),"Watch","heroport:watch");Row(1,PortGlyph(playPort,watchPort,playPort),"Play","heroport:play");Rule();
   Row(3,"artframe","Ambient","ambient");Row(3,"controls","All Controls","full:2");Row(3,"gear","TV Settings","app:org.tizen.menu");
@@ -317,7 +316,6 @@ public sealed partial class QuietHome
   foreach(var r in rows){
    switch(r.Action){
     case "volume":r.Value.Text=currentMute==1?"Muted":currentVolume<0?"–":currentVolume.ToString();break;
-    case "game-mode":{bool on=SettingValue("game-mode")=="1";r.Switch.BackgroundColor=on?live:new Color(.47f,.47f,.5f,.5f);r.Knob.Position2D=new Position2D(on?31:3,3);break;}
     case "ambient":case "full:2":case "app:org.tizen.menu":break;
     default:r.Value.Text=r.Kind==0?(SettingValue(r.Action)!=""?SettingValue(r.Action):"–"):TileValue(r.Action);break;
    }
@@ -339,7 +337,6 @@ public sealed partial class QuietHome
    case "brightness":case "contrast":if(!sel)ChangeLevel(r.Action,d);break;
    case "volume":if(sel){if(sound_manager_get_master_mute(out int m)==0)sound_manager_set_master_mute(m==1?0:1);RefreshSettings(true);}else ChangeVolume(d);break;
    case "output":SetSetting("soundoutput",SettingValue("soundoutput")=="0"?"2":"0");break;
-   case "game-mode":SetSetting("game-mode",SettingValue("game-mode")=="1"?"0":"1");break;
    case "heroport:watch":case "heroport:play":CycleHeroPort(r.Action=="heroport:watch",d);break;
    case "sleeptimer":if(int.TryParse(SettingValue("sleeptimer"),out int n))SetSetting("sleeptimer",(((n+d)%5+5)%5).ToString());break;
    case "ambient":if(sel){HideOverlay("overlay_ambient");Launch("org.tizen.art-app");}return;

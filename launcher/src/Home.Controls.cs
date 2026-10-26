@@ -84,10 +84,17 @@ public sealed partial class QuietHome
    case "page:2":return "All controls";
    case "ambient":return "Art & photos";
    case "inputs":{var cur=inputs.Find(i=>i.Type==lastSource);return cur!=null?cur.Name:"Choose";}
+   case "cycle:game-mode-auto":return GameModeName();
    case "heroport:watch":return HeroPortValue(prefs.Watch,watchPort);
    case "heroport:play":return HeroPortValue(prefs.Play,playPort);
   }
   return SettingName(action.StartsWith("cycle:")?action.Substring(6):action);
+ }
+ // the TV's Game Mode is one three-way setting (Off / On / Auto); the separate on/off "game-mode" item only mirrors
+ // whether it is engaged, so it is never offered as a control. Plain words, no On / Off.
+ string GameModeName(){
+  var n=SettingName("game-mode-auto");
+  return n.StartsWith("Auto",StringComparison.OrdinalIgnoreCase)?"Automatic":n.Equals("On",StringComparison.OrdinalIgnoreCase)?"Always":n.Equals("Off",StringComparison.OrdinalIgnoreCase)?"Never":n;
  }
  string SettingValue(string id){return settingValues.TryGetValue(id,out var v)?v:"";}
  string SettingName(string id){return settingNames.TryGetValue(id,out var v)?v:"Unavailable";}

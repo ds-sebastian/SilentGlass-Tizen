@@ -211,8 +211,8 @@ public sealed partial class QuietHome : NUIApplication
   SettingsTile("Sleep Timer","sleeptimer","sleep",4,0);
   SettingsTile("Picture Mode","cycle:picturemode","picture",0,1);
   SettingsTile("Brightness","brightness","brightness",1,1);
-  SettingsTile("Game Mode","game-mode","game",2,1);
-  SettingsTile("Auto Game Mode","cycle:game-mode-auto","autogame",3,1);
+  SettingsTile("Contrast","contrast","contrast",2,1);
+  SettingsTile("Game Mode","cycle:game-mode-auto","game",3,1); // the TV's one Game Mode: Automatic / Always / Never
   SettingsTile("Pixel Shift","cycle:pixel-shift-menu","picture",4,1); // OLED Panel Care; Pixel Refresh runs by itself
   SettingsTile("Watch Input","heroport:watch","inputs",0,2);
   SettingsTile("Play Input","heroport:play","inputs",1,2);
@@ -470,7 +470,7 @@ public sealed partial class QuietHome : NUIApplication
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
   if(a.StartsWith("heroport:")){CycleHeroPort(a.Substring(9)=="watch");return;}
   if(a.StartsWith("toggle:")){ToggleSetting(a.Substring(7));return;}
-  if(a=="volume"||a=="brightness"){RefreshSettings();RefreshTileValues();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
+  if(a=="volume"||a=="brightness"||a=="contrast"){RefreshSettings();RefreshTileValues();if(a!="volume"&&!CanEdit(a)){ShowError("This is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a.StartsWith("cycle:")){CycleSetting(a.Substring(6));return;}
   if(a=="output"){RefreshSettings();SetSetting("soundoutput",SettingValue("soundoutput")=="0"?"2":"0");return;}

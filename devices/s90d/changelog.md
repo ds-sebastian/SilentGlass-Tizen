@@ -6,6 +6,10 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v31c**: Game Mode is one three-way control (Automatic / Always / Never) on the TV's real setting
+  (`game-mode-auto`, Off / On / Auto). The old on/off switch drove `game-mode`, which only mirrors whether Game Mode
+  is engaged, so it disagreed with Auto. The full-screen Controls page drops the duplicate "Auto Game Mode" tile and
+  gains Contrast.
 - **v31b**: the bar's input items are **Watch** and **Play** again, with the device each opens as a second line; Watch
   and Play can be re-pointed from the Controls panel (Left/Right, both directions; `HomeLogic.NextPort` gained a
   direction). Controls rows tightened (88/64 px) to fit the new section.

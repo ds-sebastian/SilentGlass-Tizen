@@ -125,7 +125,7 @@ def apps_pop(apps):
 def controls(focus=0):
     rows = [("s", "sun", "Brightness", "50", .99), ("s", "contrast", "Contrast", "45", .9), ("s", "speaker", "Volume", "18", .18), "hr",
             ("v", "picture", "Picture Mode", "Movie (Calibrated)"), ("v", "waveform", "Sound Mode", "Adaptive Sound"),
-            ("v", "soundbar", "Sound Output", "Soundbar"), ("t", "gamecontroller", "Game Mode", False), ("v", "moon", "Sleep Timer", "Off"), "hr",
+            ("v", "soundbar", "Sound Output", "Soundbar"), ("v", "gamecontroller", "Game Mode", "Automatic"), ("v", "moon", "Sleep Timer", "Off"), "hr",
             ("v", "tv", "Watch", "Auto · SHIELD"), ("v", "gamecontroller", "Play", "Auto · Nintendo Switch"), "hr",
             ("a", "artframe", "Ambient", ""), ("a", "controls", "All Controls", ""), ("a", "gear", "TV Settings", "")]
     out, i = [], 0

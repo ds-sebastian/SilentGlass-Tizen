@@ -609,12 +609,16 @@ class S90dOverlayTests(unittest.TestCase):
     def test_controls_panel_adjusts_on_the_picture(self):
         cc = body(self.src, "void OpenControls()")
         for row in ('Row(0,"sun","Brightness","brightness")', 'Row(0,"contrast","Contrast","contrast")', 'Row(0,"speaker","Volume","volume")',
-                    'Row(1,"picture","Picture Mode","cycle:picturemode")', 'Row(2,"gamecontroller","Game Mode","game-mode")'):
+                    'Row(1,"picture","Picture Mode","cycle:picturemode")', 'Row(1,"gamecontroller","Game Mode","cycle:game-mode-auto")'):
             self.assertIn(row, cc)
         self.assertIn("PlaceOverlay(wx,0,1920-wx,1080);", cc)  # right side only: the picture stays visible on the left
         keys = body(self.src, "void ControlsKey(")
         self.assertIn('case "brightness":case "contrast":if(!sel)ChangeLevel(r.Action,d);break;', keys)
         self.assertIn("CycleSetting(r.Action.Substring(6),d);", keys)
+        # Game Mode is the TV's single three-way setting; the mirror switch is never offered
+        self.assertNotIn('"game-mode")', cc)
+        self.assertNotIn('SettingsTile("Game Mode","game-mode"', self.home)
+        self.assertIn('"Automatic"', (SRC / "Home.Controls.cs").read_text())
         # what Watch and Play open is configurable right there, in both directions
         self.assertIn('"Watch","heroport:watch"', cc)
         self.assertIn('"Play","heroport:play"', cc)
