@@ -19,7 +19,7 @@ public sealed partial class QuietHome : NUIApplication
  const string Root="/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
  const int TB=9; // toolbar focus area; 1..3 are content rows
  // Kind: 0 plain (Info panels), 1 hero, 2 control tile
- sealed class Slot { public Renderer Glass,Rim; public View Card,FocusRing,Disc,Badge,BadgeDot,Plate; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
+ sealed class Slot { public Renderer Glass,Rim; public View Card,FocusRing,Disc,Badge,BadgeDot; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
  readonly Dictionary<string,CachedArtwork> artworkCache=new Dictionary<string,CachedArtwork>();
@@ -112,7 +112,7 @@ public sealed partial class QuietHome : NUIApplication
   string[] nav={"Home","Apps","Controls","Info"};int[] tw={132,122,178,110};int total=12;foreach(var w in tw)total+=w;
   int px=960-total/2;
   var capsule=new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68),BackgroundColor=tileFill,CornerRadius=new Vector4(34,34,34,34)};
-  if(Liquid){win.Add(capsule);capsule.BackgroundColor=clear;AddGlass(capsule,0,px,36,34,persistent:true,tint:.07f,shadow:.3f,shadowY:8,blur:20,bevel:16,refract:18);}
+  if(Liquid){win.Add(capsule);capsule.BackgroundColor=clear;AddGlass(capsule,0,px,36,34,persistent:true,tint:.07f,shadow:.1f,shadowY:4,blur:14,focusShadow:0,bevel:16,refract:18);}
   else{Glass(capsule,34,total,68,false,tileFill);win.Add(capsule);}
   tabs=new TextLabel[4];tabBg=new View[4];int tabX=px+6;
   for(int i=0;i<tabs.Length;i++){
@@ -124,8 +124,6 @@ public sealed partial class QuietHome : NUIApplication
   notice=Label("",100,1000,1720,40,24,new Color(1f,.76f,.46f,1));notice.HorizontalAlignment=HorizontalAlignment.Center;win.Add(notice);
   overlay=new View{Size2D=new Size2D(1920,1080)};win.Add(overlay); // inputs sheet, toast and OLED dim: always on top
  }
- // text width estimate for the plate (Inter Display/Semibold average advance ~0.56 em; capitals wider)
- static int PlateWidth(string s,float px){double w=0;foreach(char c in s)w+=char.IsUpper(c)?.68:c==' '?.28:c=='i'||c=='l'||c=='t'?.3:.56;return (int)Math.Ceiling(w*px);}
  ImageView Glow(string name)
  {
   // tiny gradient art scaled to full screen; follows focus on Home (green = Watch, red/blue = Play)
@@ -165,8 +163,8 @@ public sealed partial class QuietHome : NUIApplication
   // ports follow the TV's input names (Shield / Switch), so re-cabling needs no code change
   playWide=PlayIsWide();
   int ww=playWide?HeroNarrow:HeroWide,pw=playWide?HeroWide:HeroNarrow;
-  Hero("Watch","hdmi:"+watchPort,"SHIELD","feature-watch-"+(playWide?"narrow":"wide")+".svg",100,170,ww,560,new Color(.76f,.94f,.56f,1));
-  Hero("Play","hdmi:"+playPort,"Nintendo Switch","feature-play-"+(playWide?"wide":"narrow")+".svg",100+ww+HeroGap,170,pw,560,new Color(1f,.74f,.78f,1));
+  Hero("Watch","hdmi:"+watchPort,HeroSubtitle(watchPort,"shield","SHIELD"),"feature-watch-"+(playWide?"narrow":"wide")+".svg",100,170,ww,560,new Color(.76f,.94f,.56f,1));
+  Hero("Play","hdmi:"+playPort,HeroSubtitle(playPort,"switch","Nintendo Switch"),"feature-play-"+(playWide?"wide":"narrow")+".svg",100+ww+HeroGap,170,pw,560,new Color(1f,.74f,.78f,1));
   Control("Inputs","inputs","inputs",0);
   Control("Ambient","ambient","ambient",1);
   Control("Sleep Timer","sleeptimer","sleep",2);
@@ -181,14 +179,17 @@ public sealed partial class QuietHome : NUIApplication
   SettingsTile("Sound","mute","","mute",1,0);
   SettingsTile("Soundbar Mode","cycle:external-sound-mode","","soundmode",2,0);
   SettingsTile("Output","output","","output",3,0);
+  SettingsTile("Sleep Timer","sleeptimer","","sleep",4,0);
   SettingsTile("Picture Mode","cycle:picturemode","","picture",0,1);
   SettingsTile("Brightness","brightness","Left / Right to adjust","brightness",1,1);
   SettingsTile("Game Mode","game-mode","","game",2,1);
   SettingsTile("Auto Game Mode","cycle:game-mode-auto","","autogame",3,1);
-  SettingsTile("Sleep Timer","sleeptimer","","sleep",0,2);
-  SettingsTile("Network","network","","network",1,2);
-  SettingsTile("Bluetooth","controllers","","bluetooth",2,2);
-  SettingsTile("Advanced","app:org.tizen.menu","","settings",3,2);
+  SettingsTile("Pixel Shift","cycle:pixel-shift-menu","","picture",4,1); // OLED Panel Care; Pixel Refresh runs by itself
+  SettingsTile("Watch Input","heroport:watch","","inputs",0,2);
+  SettingsTile("Play Input","heroport:play","","inputs",1,2);
+  SettingsTile("Network","network","","network",2,2);
+  SettingsTile("Bluetooth","controllers","","bluetooth",3,2);
+  SettingsTile("Advanced","app:org.tizen.menu","","settings",4,2);
   RefreshTileValues();
  }
  void BuildLibrary()
@@ -202,7 +203,7 @@ public sealed partial class QuietHome : NUIApplication
    var card=Card(x,y,w,h,HexColor(app.Background),18);
    AddAppArtwork(card,app,w,h);
    View ring=null;Renderer rim=null;
-   if(Liquid)rim=RimOverlay(card,18,.42f,12,26);
+   if(Liquid)rim=RimOverlay(card,18,.1f,6,16,focusShadow:.2f);
    else{ring=new View{Size2D=new Size2D(w,h),BackgroundColor=new Color(0,0,0,0),CornerRadius=new Vector4(18,18,18,18),BorderlineWidth=4,BorderlineColor=white,Opacity=0};card.Add(ring);}
    var label=Text(app.Name,x,y+h+16,w,38,26,muted,"Semibold");label.HorizontalAlignment=HorizontalAlignment.Center;
    slots.Add(new Slot{Card=card,FocusRing=ring,Rim=rim,Label=label,Name=app.Name,Action="app:"+app.Id,Row=i/5,X=x,Y=y,W=w,H=h});
@@ -279,12 +280,12 @@ public sealed partial class QuietHome : NUIApplication
  }
  void SettingsTile(string name,string action,string description,string icon,int column,int row)
  {
-  int w=409,h=236,x=100+column*(w+28),y=150+row*262;
+  int w=322,h=236,x=100+column*(w+27),y=150+row*262; // five across
   var card=Card(x,y,w,h,tileFill,30);Renderer glass=null;if(Liquid)glass=LiquidPanel(card,x,y,30);else Glass(card,30,w,h,false,tileFill);
   var disc=new View{Position2D=new Position2D(26,26),Size2D=new Size2D(84,84),BackgroundColor=new Color(1,1,1,.14f),CornerRadius=new Vector4(42,42,42,42)};
   var glyph=new ImageView{ResourceUrl=Root+"glyph-"+icon+".svg",Position2D=new Position2D(16,16),Size2D=new Size2D(52,52)};disc.Add(glyph);card.Add(disc);
   var title=Label(name,28,124,w-56,38,26,new Color(1,1,1,.78f),"Semibold");title.Ellipsis=true;card.Add(title);
-  var value=Label("",28,164,w-56,50,36,white,"Display");value.Ellipsis=true;card.Add(value);
+  var value=Label("",28,166,w-56,48,32,white,"Display");value.Ellipsis=true;card.Add(value);
   slots.Add(new Slot{Card=card,Glass=glass,Label=value,Title=title,Glyph=glyph,Disc=disc,Name=name,Action=action,Row=row,X=x,Y=y,W=w,H=h,Kind=2});
  }
  Slot Hero(string word,string action,string sub,string asset,int x,int y,int w,int h,Color subColor)
@@ -294,17 +295,12 @@ public sealed partial class QuietHome : NUIApplication
   // 150 tall around the same centre line: at 116 the 100px word did not fit its line height and the TV drew "..."
   var big=Label(word,50,h-223,w-100,150,100,white,"Display");big.Ellipsis=false;
   var subLabel=Label(sub,56,h-96,w-112,46,30,subColor,"Semibold");
-  // smoked-glass plate behind the words, shown only while live video plays under them (any picture stays readable)
-  int pw=Math.Min(w-40,Math.Max(PlateWidth(word,100),PlateWidth(sub,30))+64);
-  var plate=new View{Name="word-plate",Position2D=new Position2D(24,h-206),Size2D=new Size2D(pw,182),BackgroundColor=new Color(0,0,0,.46f),CornerRadius=new Vector4(32,32,32,32),Opacity=0};
-  Corners(plate,32,pw,182);
-  if(Liquid)RimOverlay(plate,32,0,0,0);else{plate.BorderlineWidth=1.5f;plate.BorderlineColor=Rim;}
-  card.Add(plate);card.Add(big);card.Add(subLabel);
+  card.Add(big);card.Add(subLabel);
   // status dot, no words: set by UpdateHeroBadges whenever the input or signal changes
   var badge=new View{Position2D=new Position2D(36,36),Size2D=new Size2D(44,44),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(22,22,22,22),Opacity=0};
   var dot=new View{Position2D=new Position2D(11,11),Size2D=new Size2D(22,22),CornerRadius=new Vector4(11,11,11,11)};badge.Add(dot);card.Add(badge);
-  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot,Plate=plate};
-  if(Liquid)slot.Rim=RimOverlay(card,40,.55f,20,40); // one ring: shadow outside, lit edge inside, above the video
+  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot};
+  if(Liquid)slot.Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f); // lit edge; shadow only when focused (tvOS lift)
   slots.Add(slot);return slot;
  }
  // Control Centre style tile: glyph disc, name, current value. Five across.
@@ -374,7 +370,7 @@ public sealed partial class QuietHome : NUIApplication
   if(s.FocusRing!=null)s.FocusRing.Opacity=f?1:0;
   var pos=new Position(s.X+s.W/2f,s.Y+s.H/2f+lift,0);var sc=new Vector3(scale,scale,1);
   // heroes dim by darkening, not fading: a faded card would show the photo wallpaper through its artwork
-  bool hero=s.Kind==1;var tint=new Color(opacity,opacity,opacity,1);
+  bool hero=s.Kind==1&&!style.HeroFade;var tint=new Color(opacity,opacity,opacity,1);
   if(animate){var a=FocusAnimation();a.AnimateTo(s.Card,"Scale",sc);a.AnimateTo(s.Card,"Position",pos);if(hero)a.AnimateTo(s.Card,"Color",tint);else a.AnimateTo(s.Card,"Opacity",opacity);}
   else{s.Card.Scale=sc;s.Card.Position=pos;if(hero)s.Card.Color=tint;else s.Card.Opacity=opacity;}
   if(f)s.Card.RaiseToTop();
@@ -438,6 +434,7 @@ public sealed partial class QuietHome : NUIApplication
   if(a.StartsWith("app:")){Launch(a.Substring(4));return;}
   if(a=="controllers"){Launch("org.tizen.menu","add-bluetooth-keyboard");return;}
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
+  if(a.StartsWith("heroport:")){CycleHeroPort(a.Substring(9)=="watch");return;}
   if(a=="volume"||a=="brightness"){RefreshSettings();RefreshTileValues();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a.StartsWith("cycle:")){CycleSetting(a.Substring(6));return;}

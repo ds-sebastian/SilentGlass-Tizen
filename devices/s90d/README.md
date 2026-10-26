@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v20d)
+## Quiet Home on the S90D (v21b)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -37,6 +37,14 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **v21**: live hero card gets an eased bottom band (clear -> 82% black over 330 px) instead of a word box - the
+  video plane is separate hardware and cannot be blurred, only darkened. Shadows follow Apple's restraint: none on
+  hero cards at rest (soft one only on focus), faint on tiles, light on the floating sheet/toast. Controls page is
+  5x3: adds Watch Input / Play Input (Select cycles Automatic -> HDMI 1-4, saved in the app's data directory as
+  `quiet-home-prefs.txt`; the card subtitle follows the TV's input name) and Pixel Shift (`pixel-shift-menu`, Panel
+  Care). Pixel Refresh is deliberately not offered: the TV runs it by itself in standby (Samsung's own help text);
+  the manual run (`DDDisplay.QDDisplayRequestELSensing`, platform privilege) is only for visible retention.
+  `herofade=1` in the conf restores the translucent unfocused hero card.
 - **Photo wallpaper, day/night (v20)**: macOS Catalina Day/Night (not in git - Apple artwork; build them with
   `tools/make_wallpapers.py DAY.jpg NIGHT.jpg`, Quiet Home falls back to the gradient wallpaper without them). Switches
   at local sunrise/sunset computed from UTC (time zone independent). The glass samples a pre-blurred 480x270 copy

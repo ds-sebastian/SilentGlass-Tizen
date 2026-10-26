@@ -192,12 +192,12 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
  }
 
  // a glass renderer on `host`; screen origin is the surface's top-left (for the wallpaper behind it)
- Renderer AddGlass(View host,int kind,int x,int y,int radius,bool persistent=false,float tint=.075f,float shadow=.38f,float shadowY=9,float blur=22,float focusShadow=.22f,float bevel=22,float refract=28)
+ Renderer AddGlass(View host,int kind,int x,int y,int radius,bool persistent=false,float tint=.075f,float shadow=.12f,float shadowY=6,float blur=18,float focusShadow=.16f,float bevel=22,float refract=28)
  {
   // rims and shadow-only passes use the ring mesh; glass panels need their inside too
   var r=new Renderer(kind==0?Quad():Ring(),GlassShader()){BlendMode=2};
   if(kind==0&&frostSet!=null)r.SetTextures(frostSet);
-  float ext=shadow>0?blur*1.4f+shadowY*1.6f+4:2;
+  float ext=shadow>0||focusShadow>0?blur*1.4f+shadowY*1.6f+4:2;
   r.RegisterProperty("uExtent",new PropertyValue(ext));
   r.RegisterProperty("uInset",new PropertyValue((float)Math.Max(radius,bevel)+4));
   r.RegisterProperty("uShape",new PropertyValue(new Vector4(radius,0,bevel,kind)));
@@ -216,11 +216,12 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
   return AddGlass(card,0,x,y,radius);
  }
  // a child overlay that follows its parent's size (rim + shadow over artwork, video or a blurred sheet)
- Renderer RimOverlay(View parent,int radius,float shadow=.5f,float shadowY=18,float blur=40,bool persistent=false)
+ // Apple-style shadows: none (or barely any) at rest, a soft low-contrast one when focused or floating
+ Renderer RimOverlay(View parent,int radius,float shadow=.12f,float shadowY=6,float blur=18,bool persistent=false,float focusShadow=.16f)
  {
   var v=new View{Name="glass-rim",WidthResizePolicy=ResizePolicyType.FillToParent,HeightResizePolicy=ResizePolicyType.FillToParent};
   parent.Add(v);
-  return AddGlass(v,1,0,0,radius,persistent,0,shadow,shadowY,blur,.2f);
+  return AddGlass(v,1,0,0,radius,persistent,0,shadow,shadowY,blur,focusShadow);
  }
  void ReleasePageRenderers(){foreach(var r in pageRenderers){try{r.Dispose();}catch{}}pageRenderers.Clear();}
 

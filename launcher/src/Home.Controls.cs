@@ -46,7 +46,7 @@ public sealed partial class QuietHome
   }
  }
  void RefreshTileValues(){foreach(var s in slots)if(s.Kind==2&&s.Label!=null){var v=TileValue(s.Action);if(s.Label.Text!=v)s.Label.Text=v;}}
- static readonly string[] SettingIds={"brightness","game-mode","sleeptimer","external-sound-mode","soundoutput","picturemode","game-mode-auto"};
+ static readonly string[] SettingIds={"brightness","game-mode","sleeptimer","external-sound-mode","soundoutput","picturemode","game-mode-auto","pixel-shift-menu"};
  static readonly string[] HomeSettingIds={"sleeptimer","soundoutput"};
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemDataList(string id,System.Text.StringBuilder list);
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemDataListEnable(string id,string value,out bool enabled);
@@ -79,6 +79,8 @@ public sealed partial class QuietHome
    case "page:2":return "All controls";
    case "ambient":return "Art & photos";
    case "inputs":{var cur=inputs.Find(i=>i.Type==lastSource);return cur!=null?cur.Name:"Choose";}
+   case "heroport:watch":return HeroPortValue(prefs.WatchPort,watchPort);
+   case "heroport:play":return HeroPortValue(prefs.PlayPort,playPort);
   }
   return SettingName(action.StartsWith("cycle:")?action.Substring(6):action);
  }

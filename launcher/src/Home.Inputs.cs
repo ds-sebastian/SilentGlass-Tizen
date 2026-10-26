@@ -42,8 +42,13 @@ public sealed partial class QuietHome
   UpdateHeroBadges();RefreshTileValues();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("source_changed");
  }
  int watchPort=15,playPort=13;
- // Watch = the input the TV calls "Shield", Play = "Switch"; falls back to HDMI 3 / HDMI 1
- bool ResolveHeroPorts(){int w=PortNamed("shield",15),p=PortNamed("switch",13);bool changed=w!=watchPort||p!=playPort;watchPort=w;playPort=p;return changed;}
+ // Watch / Play: the input chosen on the Controls page, or (Automatic) the input the TV calls "Shield" / "Switch",
+ // falling back to HDMI 3 / HDMI 1
+ bool ResolveHeroPorts()
+ {
+  int w=prefs.WatchPort!=0?prefs.WatchPort:PortNamed("shield",15),p=prefs.PlayPort!=0?prefs.PlayPort:PortNamed("switch",13);
+  bool changed=w!=watchPort||p!=playPort;watchPort=w;playPort=p;return changed;
+ }
  int PortNamed(string word,int fallback){var m=inputs.Find(i=>i.Known&&i.Type>=13&&i.Type<=16&&i.Name.IndexOf(word,StringComparison.OrdinalIgnoreCase)>=0);return m!=null?m.Type:fallback;}
  void OnInputsChanged(bool announce)
  {
@@ -97,7 +102,7 @@ public sealed partial class QuietHome
   var t=new View{Position2D=new Position2D(960-300,962),Size2D=new Size2D(600,68),BackgroundColor=new Color(.15f,.15f,.18f,.96f),CornerRadius=new Vector4(34,34,34,34),BorderlineWidth=1.5f,BorderlineColor=new Color(1,1,1,.12f),Opacity=0};
   Glass(t,34,600,68,true,new Color(.15f,.15f,.18f,.96f),dark:true);
   toastRim?.Dispose();toastRim=null;
-  if(Liquid){t.BorderlineWidth=0;toastRim=RimOverlay(t,34,.45f,12,28,persistent:true);}
+  if(Liquid){t.BorderlineWidth=0;toastRim=RimOverlay(t,34,.18f,6,18,persistent:true,focusShadow:0);}
   t.Add(new ImageView{ResourceUrl=Root+"glyph-inputs.svg",Position2D=new Position2D(24,12),Size2D=new Size2D(44,44)});
   var l=Label(text,80,0,600-120,68,28,white,"Semibold");l.Ellipsis=true;t.Add(l);
   overlay.Add(t);toast=t;
@@ -135,7 +140,7 @@ public sealed partial class QuietHome
   int keepType=inputSel>=0&&inputSel<sheetInputs.Count?sheetInputs[inputSel].Type:lastSource;
   while(sheet.ChildCount>0){var v=sheet.GetChildAt(0);sheet.Remove(v);v.Dispose();}
   sheetRim?.Dispose();sheetRim=null;
-  if(Liquid)sheetRim=RimOverlay(sheet,34,.55f,22,46,persistent:true); // edge light + shadow; the DALi blur stays the body
+  if(Liquid)sheetRim=RimOverlay(sheet,34,.22f,10,30,persistent:true,focusShadow:0); // edge light + shadow; the DALi blur stays the body
   sheetRows.Clear();sheetInputs=inputs;
   int h=96+sheetInputs.Count*RowH+20,y=Math.Max(60,SheetBottom-h);
   sheet.Size2D=new Size2D(SheetW,h);if(sheetAnimation==null||sheetAnimation.State!=Animation.States.Playing)sheet.Position2D=new Position2D(SheetX,y);

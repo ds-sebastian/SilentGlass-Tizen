@@ -14,7 +14,7 @@ public sealed partial class QuietHome
  //  enabled - show the preview at all;  still - the live card does not grow/lift on focus (the video plane does not
  //  follow scale/position animations);  sync - Graphic-Video sync mode;  scrim - darken the bottom for the words.
  const string LiveConfPath="/tmp/quiet-home-live.conf";
- sealed class LiveConf{public bool Enabled=true,Still=true,Sync=false,Scrim=false,Cover=true;public string Source="default";}
+ sealed class LiveConf{public bool Enabled=true,Still=true,Sync=false,Scrim=true,Cover=true;public string Source="default";}
  LiveConf liveConf=new LiveConf();
  static LiveConf ReadLiveConf()
  {
@@ -75,10 +75,12 @@ public sealed partial class QuietHome
    hero.Card.Add(canvas);canvas.LowerToBottom();art.LowerToBottom();
    View scrim=null;
    if(liveConf.Scrim){
-    // soft fade (clear -> 60% black) under the device name, not a hard band across the picture
-    scrim=new View{Name="live-scrim",Position2D=new Position2D(0,hero.H-260),Size2D=new Size2D(hero.W,260),CornerRadius=new Vector4(0,0,40,40)};
-    var stops=new PropertyArray();stops.PushBack(new PropertyValue(new Vector4(0,0,0,0)));stops.PushBack(new PropertyValue(new Vector4(0,0,0,.6f)));
-    var offsets=new PropertyArray();offsets.PushBack(new PropertyValue(0f));offsets.PushBack(new PropertyValue(1f));
+    // bottom band that eases from clear to 82% black behind the words (Apple TV app style). The video plane is
+    // separate hardware, so it cannot be blurred - darkening is the only option over a live picture.
+    const int Band=330;
+    scrim=new View{Name="live-scrim",Position2D=new Position2D(0,hero.H-Band),Size2D=new Size2D(hero.W,Band),CornerRadius=new Vector4(0,0,40,40)};
+    var stops=new PropertyArray();var offsets=new PropertyArray();
+    foreach(var (o,al) in new[]{(0f,0f),(.25f,.18f),(.5f,.48f),(.75f,.70f),(1f,.82f)}){offsets.PushBack(new PropertyValue(o));stops.PushBack(new PropertyValue(new Vector4(0,0,0,al)));}
     var fade=new PropertyMap();
     fade.Add(Visual.Property.Type,new PropertyValue((int)Visual.Type.Gradient));
     fade.Add(GradientVisualProperty.StartPosition,new PropertyValue(new Vector2(0,-.5f)));
@@ -94,7 +96,6 @@ public sealed partial class QuietHome
    canvas.DisableAutoUpdateVideoGeometry=liveConf.Cover;
    canvas.SetPlayer(tvWindow,liveConf.Sync?Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.GraphicVideoSync:Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.None);
    liveView=new VideoCanvasViewHolder{View=canvas};liveSlot=hero;
-   if(hero.Plate!=null){hero.Plate.Opacity=0;var pa=new Animation(220){DefaultAlphaFunction=Ease()};pa.AnimateTo(hero.Plate,"Opacity",1f);pa.Play();}
    int idx=slots.IndexOf(hero);StyleSlot(hero,idx==selected&&area==1,false); // settle any focus transform first
    // once layout has settled, push the final rectangle to the video plane explicitly
    liveGeometryTimer?.Stop();liveGeometryTimer=new Tizen.NUI.Timer(250);
@@ -130,7 +131,6 @@ public sealed partial class QuietHome
   liveGeometryTimer?.Stop();
   if(liveView==null)return;
   var was=liveSlot;liveSlot=null;
-  if(was?.Plate!=null)was.Plate.Opacity=0;
   try{
    var card=liveView.View.GetParent() as View;
    if(card!=null){for(uint i=0;i<card.ChildCount;i++){var c=card.GetChildAt(i);if(c.Name=="live-scrim"){card.Remove(c);c.Dispose();break;}}card.Remove(liveView.View);}

@@ -16,7 +16,7 @@ using Tizen.NUI.BaseComponents;
 // Read once at start from /tmp/quiet-home-live.conf (same file as the live-preview tunables), never on the key path.
 public sealed partial class QuietHome
 {
- sealed class StyleConf { public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true; public string Wall="photo",WallMode="auto"; public double Lat=40.7,Lon=-74.0; public string Source="default"; }
+ sealed class StyleConf { public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,HeroFade=false; public string Wall="photo",WallMode="auto"; public double Lat=40.7,Lon=-74.0; public string Source="default"; }
  StyleConf style=new StyleConf();
  static StyleConf ReadStyleConf()
  {
@@ -30,6 +30,7 @@ public sealed partial class QuietHome
     else if(k=="shadow")c.Shadow=v=="1";
     else if(k=="squircle")c.Squircle=v=="1";
     else if(k=="liquid")c.Liquid=v=="1";
+    else if(k=="herofade")c.HeroFade=v=="1";
     else if(k=="wall"&&(v=="photo"||v=="gradient"||v=="shader"))c.Wall=v;
     else if(k=="wallmode"&&(v=="auto"||v=="day"||v=="night"))c.WallMode=v;
     else if(k=="lat"&&double.TryParse(v,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double la))c.Lat=la;

@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs", "Home.Glass.cs", "Home.Wallpaper.cs")
+PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs", "Home.Glass.cs", "Home.Wallpaper.cs", "Home.Prefs.cs")
 
 
 def launcher():
@@ -32,13 +32,13 @@ class S90dPortTests(unittest.TestCase):
 
     def test_primary_shield_uses_observed_source(self):
         src = launcher()
-        self.assertIn('Hero("Watch","hdmi:"+watchPort,"SHIELD"', src)
+        self.assertIn('Hero("Watch","hdmi:"+watchPort,HeroSubtitle(watchPort,"shield","SHIELD")', src)
         self.assertIn('lastSource=15', src)
         # heroes follow the TV's own input names, falling back to the observed ports
-        self.assertIn('int w=PortNamed("shield",15),p=PortNamed("switch",13);', src)
+        self.assertIn('int w=prefs.WatchPort!=0?prefs.WatchPort:PortNamed("shield",15),p=prefs.PlayPort!=0?prefs.PlayPort:PortNamed("switch",13);', src)
 
     def test_secondary_keeps_the_tvs_stored_label(self):
-        self.assertIn('Hero("Play","hdmi:"+playPort,"Nintendo Switch"', launcher())
+        self.assertIn('Hero("Play","hdmi:"+playPort,HeroSubtitle(playPort,"switch","Nintendo Switch")', launcher())
 
     def test_example_console_routes_are_removed(self):
         src = launcher()
@@ -124,8 +124,8 @@ class S90dPortTests(unittest.TestCase):
     def test_settings_tiles_have_valid_local_artwork(self):
         import re
         tiles = re.findall(r'SettingsTile\("([^"]+)","([^"]+)","[^"]*","([a-z]+)",(\d),(\d)\)', launcher())
-        self.assertEqual(len(tiles), 12)
-        self.assertEqual(sorted((int(c), int(r)) for *_, c, r in tiles), [(c, r) for c in range(4) for r in range(3)])
+        self.assertEqual(len(tiles), 15)
+        self.assertEqual(sorted((int(c), int(r)) for *_, c, r in tiles), [(c, r) for c in range(5) for r in range(3)])
         for _, _, icon, _, _ in tiles:
             path = ASSETS / f"glyph-{icon}.svg"
             self.assertTrue(ET.parse(path).getroot().tag.endswith("svg"), path)
@@ -269,7 +269,7 @@ class S90dPortTests(unittest.TestCase):
     def test_apple_style_defaults_and_costs(self):
         style = (SRC / "Home.Style.cs").read_text()
         # glass + squircle on, shadows off by default (measured: shadows were the only real GPU cost)
-        self.assertIn('public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true; public string Wall="photo",WallMode="auto";', style)
+        self.assertIn('public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,HeroFade=false; public string Wall="photo",WallMode="auto";', style)
         # real backdrop blur only where the backdrop moves, unless glass=2
         self.assertIn("if(movingBackdrop||style.Glass==2)", style)
         src = launcher()
@@ -321,15 +321,28 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("else bg = texture2D(sFrost,vUV).rgb;", glass)
         self.assertIn("if(kind==0&&frostSet!=null)r.SetTextures(frostSet);", glass)
 
-    def test_live_word_plate(self):
+    def test_live_band_and_light_shadows(self):
         src = launcher()
-        # smoked plate behind the hero words, hidden until live video plays under them
-        self.assertIn('var plate=new View{Name="word-plate"', src)
-        self.assertIn("Opacity=0};", src[src.index('Name="word-plate"'):][:400])
-        self.assertIn('pa.AnimateTo(hero.Plate,"Opacity",1f);', src)
-        self.assertIn("if(was?.Plate!=null)was.Plate.Opacity=0;", body(src, "void HideLive("))
-        # words above the plate
-        self.assertIn("card.Add(plate);card.Add(big);card.Add(subLabel);", src)
+        # eased bottom band behind the words, only on the live card (no separate word box)
+        self.assertNotIn("word-plate", src)
+        self.assertIn("Scrim=true", src)
+        self.assertIn("(0f,0f),(.25f,.18f),(.5f,.48f),(.75f,.70f),(1f,.82f)", src)
+        # heroes: no shadow at rest, a soft one only when focused
+        self.assertIn("slot.Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f);", src)
+        glass = (SRC / "Home.Glass.cs").read_text()
+        self.assertIn("float shadow=.12f,float shadowY=6,float blur=18,float focusShadow=.16f,", glass)
+
+    def test_hero_inputs_are_user_choosable_and_persist(self):
+        src = launcher()
+        prefs = (SRC / "Home.Prefs.cs").read_text()
+        self.assertIn("DirectoryInfo.Data", prefs)
+        self.assertIn("int next=cur==0?13:cur>=16?0:cur+1;", prefs)
+        self.assertIn('SettingsTile("Watch Input","heroport:watch"', src)
+        self.assertIn('SettingsTile("Play Input","heroport:play"', src)
+        self.assertIn("prefs.WatchPort!=0?prefs.WatchPort:PortNamed(\"shield\",15)", src)
+        # Panel Care: Pixel Shift is a real setting; Pixel Refresh is never triggered from here
+        self.assertIn('"cycle:pixel-shift-menu"', src)
+        self.assertNotIn("ELSensing", src)
 
     def test_live_preview_is_deferred_and_released(self):
         src = launcher()
