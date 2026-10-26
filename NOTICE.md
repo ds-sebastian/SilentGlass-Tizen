@@ -2,41 +2,30 @@
 
 SilentGlass-Tizen is a fork of [Quiet Tizen](https://github.com/jss8649/quiet-tizen), commit
 `cf518d7a9278dca7990e27756218258e44044a29`, copyright 2026 Quiet Tizen contributors, MIT (kept in `LICENSE`).
-"Quiet Home" below is the launcher as inherited; this fork's launcher is SilentGlass Home.
+Its reversible-cleanup method, install recipes, Probe tool and agent workflow are the base this project builds on;
+the original U8000F-specific access tooling and case study were removed, and what they taught about Samsung's
+services is kept in [docs/samsung-tizen-notes.md](docs/samsung-tizen-notes.md).
 
-Quiet Home is a native Tizen .NET/NUI implementation. Its layout measurements,
-palette, dock proportions and focus treatment adapt
+Quiet Home, the launcher SilentGlass grew out of, adapted layout and palette ideas from
 [Free My TV](https://github.com/simbasjungles/free-my-tv/tree/73409804e5085e720dccea9ab95078a515cae098),
-commit `73409804e5085e720dccea9ab95078a515cae098`, copyright 2026 FreeMyTV
-contributors, under the MIT license in `licenses/FreeMyTV-MIT.txt`.
-The Android APK is not used.
+commit `73409804e5085e720dccea9ab95078a515cae098`, copyright 2026 FreeMyTV contributors, MIT
+(`licenses/FreeMyTV-MIT.txt`). The Android APK is not used.
 
-The bundled Quiet Inter fonts are static derivatives of Inter, copyright
-2016 The Inter Project Authors, renamed after conversion. Medium: weight 500,
-optical size 14; Semibold: weight 600, optical size 14; Display: weight 600,
-optical size 32. See `licenses/Inter-OFL.txt`. These font files retain the
-SIL Open Font License; the repository's MIT license does not replace it.
+The bundled Quiet Inter fonts are static derivatives of Inter, copyright 2016 The Inter Project Authors, renamed
+after conversion (Medium: weight 500, optical size 14; Semibold: 600 / 14; Display: 600 / 32). See
+`licenses/Inter-OFL.txt`; the fonts keep the SIL Open Font License.
 
-The Material Symbols PNGs come through Free My TV and retain Apache 2.0:
-`licenses/Material-Symbols-Apache-2.txt`. Console illustrations, gradient
-cards and text-only app placeholders were produced for this launcher.
+The symbols (`launcher/assets/sym-*.svg`) are drawn by `tools/make_symbols.py` for this project.
+`devices/s90d/device/privacy/helper/` adapts native metadata bindings from
+[s90c-tools](https://github.com/invaliddayta/s90c-tools) (MIT), as noted in its source.
 
-The source subset in `vendor/samsung_tv_root/` and `vendor/payload-source/`
-comes from [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b),
-commit `4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b`, under the
-Unlicense in `licenses/samsung-tv-root-Unlicense.txt`. The local runtime
-fallback is described in [provenance](docs/provenance.md).
+No Samsung SDB executable, firmware, SDK/reference assembly, stock app binary, account database or private backup is
+distributed.
 
-No Samsung SDB executable, firmware, SDK/reference assembly, stock app
-binary, account database or private backup is distributed.
-
-Publisher streaming-app artwork is not bundled. `launcher/artwork-sources.json`
-records optional sources and transformations; `tools/fetch_artwork.py` downloads
-selected artwork into ignored local files. Those assets and associated
-trademarks remain subject to their owners' terms and are not relicensed by
-this project. Source availability does not imply permission for every reuse.
-The repository and its contributors are not affiliated with Samsung, Sony,
-Nintendo, Microsoft, Amazon or any streaming service.
+Publisher streaming-app artwork is not bundled. `launcher/artwork-sources.json` records optional sources and
+transformations; `tools/fetch_artwork.py` downloads selected artwork into ignored local files. Those assets and
+trademarks remain subject to their owners' terms. The repository and its contributors are not affiliated with
+Samsung, NVIDIA, Nintendo, Sony, Microsoft, Amazon, Apple, Google, the Thread Group or any streaming service.
 
 The S90D photo wallpaper (macOS Catalina Day/Night) is Apple artwork: it is not distributed, and
 `tools/make_wallpapers.py` builds it from images you supply. The screenshots in `docs/screenshots/` show it as

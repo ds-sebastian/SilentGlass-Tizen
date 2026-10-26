@@ -6,7 +6,7 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDES = tuple(ROOT / "docs" / name for name in (
-    "10-agent-workflow.md", "11-access-and-persistence.md", "12-upstream-notes.md",
+    "agent-workflow.md", "access-and-persistence.md", "upstream-notes.md",
 ))
 
 

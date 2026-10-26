@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """1:1 HTML mockups of the SilentGlass overlay (Home over the picture), rendered with headless Chromium on the Pi
-before anything goes to the TV. Geometry and colours mirror launcher/src/Home.Overlay.cs (OverlayLayout); keep the
+before anything goes to the TV. Geometry and colours mirror launcher/src/Overlay.cs, Menus.cs, Panels.cs and Ui.cs; keep the
 two in step.
 
     python3 tools/overlay_mockup.py OUTDIR [BACKGROUND.jpg]
@@ -122,12 +122,10 @@ def apps_pop(apps):
     return f'<div class="glass" style="left:{left}px;top:{top}px;width:{w}px;height:{h}px;border-radius:44px"></div>{"".join(tiles)}'
 
 
-def controls(focus=0):
-    rows = [("s", "sun", "Brightness", "50", .99), ("s", "contrast", "Contrast", "45", .9), ("s", "speaker", "Volume", "18", .18), "hr",
-            ("v", "picture", "Picture Mode", "Movie (Calibrated)"), ("v", "waveform", "Sound Mode", "Adaptive Sound"),
-            ("v", "soundbar", "Sound Output", "Soundbar"), ("v", "gamecontroller", "Game Mode", "Automatic"), ("v", "moon", "Sleep Timer", "Off"), "hr",
-            ("v", "tv", "Watch", "Auto · SHIELD"), ("v", "gamecontroller", "Play", "Auto · Nintendo Switch"), "hr",
-            ("a", "artframe", "Ambient", ""), ("a", "controls", "All Controls", ""), ("a", "gear", "TV Settings", "")]
+PANEL_PAD, RULE_H = 16, 25
+
+
+def panel_rows(rows, focus):
     out, i = [], 0
     for r in rows:
         if r == "hr":
@@ -139,13 +137,64 @@ def controls(focus=0):
             out.append(f'<div class="cr{f}" style="height:{SLIDER_H}px;align-items:flex-start;padding-top:12px;box-sizing:border-box"><img src="{sym(g)}">{name}'
                        f'<span class="val big">{val}</span><div class="track"><i style="width:{int(r[4]*100)}%"></i></div></div>')
         elif kind == "t":
-            out.append(f'<div class="cr{f}" style="height:{VALUE_H}px"><img src="{sym(g)}">{name}<span class="val"><span class="sw{"" if val else " off"}"><b></b></span></span></div>')
+            out.append(f'<div class="cr{f}" style="height:{VALUE_H}px"><img src="{sym(g)}">{name}<span class="sw{"" if val else " off"}" style="margin-left:auto"><b></b></span></div>')
+        elif kind == "d":  # status row: coloured dot, name, value
+            out.append(f'<div class="cr" style="height:{VALUE_H - 8}px"><span style="width:14px;height:14px;border-radius:7px;background:{r[4]};margin:0 12px"></span>{name}<span class="val">{val}</span></div>')
         else:
             chevron = f'<img src="{sym("chevron")}" style="width:26px;height:26px;opacity:.5">' if kind == "a" else ""
             out.append(f'<div class="cr{f}" style="height:{VALUE_H}px"><img src="{sym(g)}">{name}<span class="val">{val}</span>{chevron}</div>')
-        i += 1
-    h = 16 * 2 + 3 * SLIDER_H + 10 * VALUE_H + 3 * 25
-    return f'<div class="dimr"></div><div class="glass cc" style="left:{CC_X}px;top:{(1080-h)//2}px;width:{CC_W}px;height:{h}px">{"".join(out)}</div>'
+        if kind != "d":
+            i += 1
+    return "".join(out)
+
+
+def panel(rows, focus, title=None, opaque=False):
+    body = panel_rows(rows, focus)
+    head = (f'<div style="padding:14px 24px 6px;display:flex;align-items:baseline;gap:14px"><span style="font-family:QID;font-size:34px">{title[0]}</span>'
+            f'<span style="font-size:22px;opacity:.5">{title[1]}</span></div>') if title else ""
+    bg = "background:rgba(22,22,26,.95)" if opaque else ""
+    return (f'<div class="dimr"></div><div class="glass cc" style="left:{CC_X}px;top:50%;transform:translateY(-50%);width:{CC_W}px;{bg}">'
+            f'{head}{body}</div>')
+
+
+def controls(focus=0):
+    rows = [("s", "sun", "Brightness", "50", .99), ("s", "contrast", "Contrast", "45", .9), ("s", "speaker", "Volume", "18", .18), "hr",
+            ("v", "picture", "Picture Mode", "Movie (Calibrated)"), ("v", "waveform", "Sound Mode", "Adaptive Sound"),
+            ("v", "soundbar", "Sound Output", "Soundbar"), ("v", "gamecontroller", "Game Mode", "Automatic"),
+            ("v", "moon", "Sleep Timer", "Off"), ("v", "pixelshift", "Pixel Shift", "On"), "hr",
+            ("a", "artframe", "Ambient", ""), ("a", "bluetooth", "Bluetooth", ""), ("a", "network", "Network", ""), ("a", "gear", "TV Settings", "")]
+    return panel(rows, focus)
+
+
+def info(focus=0):
+    green, grey = "#30d158", "#8e8e93"
+    rows = [("d", "", "Privacy", "Protected", green), ("d", "", "Network", "Wired · 1 Gb/s", green),
+            ("d", "", "Thread", "Router · home reachable", green), ("d", "", "This TV", "Up 3 h · 41 °C", green), "hr",
+            ("v", "tv", "Watch", "Auto · SHIELD"), ("v", "gamecontroller", "Play", "Auto · Nintendo Switch"),
+            ("t", "apps", "Apps in the bar", False), ("t", "moon", "Dim when idle", True), ("v", "picture", "Wallpaper", "Follows sunset"),
+            ("t", "thread", "Thread border router", True), ("t", "bell", "Notifications", True), "hr",
+            ("a", "homeassistant", "Home Assistant", "Connected")]
+    return panel(rows, focus, title=("SilentGlass", "v40a · nothing sent anywhere"), opaque=True)
+
+
+def setup_sheet(qr):
+    w, h = 900, 520
+    x, y = (1920 - w) // 2, (1080 - h) // 2 - 40
+    qr_img = f'<img src="{uri(qr)}" style="width:300px;height:300px">' if qr and Path(qr).exists() else '<div style="width:300px;height:300px;background:#ccc"></div>'
+    return (f'<div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>'
+            f'<div class="glass" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;border-radius:44px;background:rgba(22,22,26,.96)">'
+            f'<div style="position:absolute;left:48px;top:48px;width:340px;height:340px;border-radius:28px;background:#fff;display:flex;align-items:center;justify-content:center">{qr_img}</div>'
+            f'<div style="position:absolute;left:430px;top:52px;right:48px">'
+            f'<div style="font-family:QID;font-size:44px;line-height:1.1">Set up Home Assistant</div>'
+            f'<div style="font-size:27px;opacity:.7;margin-top:18px;line-height:1.35">Scan with your phone, or open<br><b style="opacity:1;font-weight:600">192.168.1.50:7680</b> and enter</div>'
+            f'<div style="font-family:QID;font-size:72px;letter-spacing:10px;margin-top:22px">482 913</div></div>'
+            f'<div style="position:absolute;left:48px;right:48px;bottom:40px;display:flex;align-items:center;gap:14px;font-size:26px;opacity:.85">'
+            f'<span style="width:14px;height:14px;border-radius:7px;background:#ff9f0a"></span>Waiting for your phone…'
+            f'<span style="margin-left:auto;opacity:.6">Back to close</span></div></div>')
+
+
+def backdrop():
+    return ('<div style="position:absolute;right:72px;top:44px;font-family:QID;font-size:40px;opacity:.9">7:42 PM</div>')
 
 
 # ---- notification banner (Home.Notice.cs) ----
@@ -185,7 +234,10 @@ def main():
     pages = {"notice": notice(sample if sample.exists() else None, "large", "bottom-right", "Doorbell",
                               "A person was detected on the Doorbell camera in the Porch.")
              + notice(None, "medium", "top-right", "Washer", "The laundry is done."),
-             "bar": bar(0), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
+             "bar": bar(0),
+             "info": bar(6) + info(5),
+             "backdrop": backdrop() + bar(0),
+             "setup": bar(6) + setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
     for name, body in pages.items():
         (out / f"{name}.html").write_text(page(name, body, bg))
         subprocess.run(["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",

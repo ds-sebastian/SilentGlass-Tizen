@@ -30,7 +30,7 @@ CREATE TEMP TABLE guard(ok INTEGER CHECK(ok=1));
 INSERT INTO guard SELECT count(*)=2 FROM key_filter live JOIN before.key_filter old ON live.appid=old.appid AND live.key=old.key
 WHERE ((live.appid='com.samsung.tv.quicklaunch' AND live.key='XF86More') OR (live.appid='org.tizen.menu' AND live.key='XF86SysMenu'))
 AND live.target_selector IS old.target_selector AND live.args IS old.args;
-UPDATE key_filter SET target_selector='package:com.samsung.tv.bixby-promotion',args='quiet_page:settings __K_SPLASH_SCREEN:LA_UI_VR_TRANSPARENT'
+UPDATE key_filter SET target_selector='package:com.samsung.tv.bixby-promotion',args='sg_open:controls __K_SPLASH_SCREEN:LA_UI_VR_TRANSPARENT'
 WHERE (appid='com.samsung.tv.quicklaunch' AND key='XF86More') OR (appid='org.tizen.menu' AND key='XF86SysMenu');
 DROP TABLE guard;
 COMMIT;

@@ -19,9 +19,9 @@ static class NoticeHarness
             Console.WriteLine(JsonSerializer.Serialize(new { method = "POST", n.Title, n.Message, n.Size, n.Position, n.Duration, n.Ext, n.W, n.H, image = n.Image?.Length ?? 0 }));
         }
         Console.WriteLine(JsonSerializer.Serialize(new {
-            app_hidden = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "page=0\noverlay=off:mode0:ready:main-hidden:fg=org.tizen.tv-viewer\n"),
-            app_shown = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "overlay=off:mode0:ready:main-shown:fg=org.tizen.tv-viewer\n"),
-            app_bar = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "overlay=on:mode0:ready:main-hidden:fg=org.tizen.tv-viewer\n"),
+            app_hidden = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=none\nbackdrop=hidden\nfg=org.tizen.tv-viewer\n"),
+            app_shown = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=none\nbackdrop=shown\nfg=org.tizen.tv-viewer\n"),
+            app_bar = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=bar\nbackdrop=hidden\nfg=org.tizen.tv-viewer\n"),
             game = new[] { "Auto", "On", "Off" }.Select(Bridge.GameName).ToArray() }));
         return 0;
     }

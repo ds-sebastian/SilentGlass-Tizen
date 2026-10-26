@@ -6,6 +6,18 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v40a** (+ HA bridge 2.3; source and offline tests - not yet installed on the TV): **the final shape - overlays only.** No full-screen pages any more: the Home, Apps,
+  Controls and Info pages, the live preview and the glass shader are gone. Over a picture Home toggles the bar;
+  Inputs and Apps open above it; Controls and Info are panels on the right that replace the bar (Info near-opaque,
+  with all of SilentGlass's settings); with nothing to draw over, the app's window is only a wallpaper backdrop.
+  Pixel Shift is a switch in Controls. **Phone setup**: Info > Home Assistant shows a QR code + 6-digit code; the
+  bridge serves a setup page while it is open (MQTT with a live test, TV name, notifications, Thread from Home
+  Assistant or a pasted dataset, wallpaper location) and installs unconfigured. The launcher source was rewritten
+  into nine files (`SilentGlass.cs`, `Overlay.cs`, `Menus.cs`, `Panels.cs`, `Setup.cs`, `Notice.cs`, `Backdrop.cs`,
+  `Tv.cs`, `Ui.cs`) plus NUI-free `Logic.cs` and `Qr.cs`; the bridge into `Bridge.cs`, `TvApi.cs`, `Notices.cs`,
+  `Setup.cs`, `Mqtt.cs`, `Http.cs`. Launch extras are now `sg_open` / `sg_source` / `sg_notice` (older QuickLaunch
+  builds' `quiet_page` still works). The U8000F-specific toolkit was removed; its Samsung findings are in
+  [docs/samsung-tizen-notes.md](../../docs/samsung-tizen-notes.md).
 - **v32a** (+ HA bridge 2.2): **notifications on any input**. The bridge accepts Home Assistant's *Notifications for
   Android TV* protocol (port 7676, from the broker host only) and hands each notification to SilentGlass Home, which
   shows a tvOS-style banner in its own non-focusable notification window (image, title, message; position, size and

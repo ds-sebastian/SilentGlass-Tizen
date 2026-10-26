@@ -1,0 +1,137 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using Tizen.Applications;
+using Tizen.NUI;
+
+// SilentGlass: the S90D's Home button, SHIELD-first, as overlays only (tvOS 26 style). There are no full-screen pages.
+//  Backdrop.cs  the app's own window: the wallpaper + clock, shown only when there is no picture to draw over
+//  Overlay.cs   the bar (Watch, Play, Inputs, Controls, Apps, Info) in a partial notification window above the TV
+//               viewer, which keeps playing untouched; Menus.cs (Inputs, Apps), Panels.cs (Controls, Info),
+//               Setup.cs (phone setup sheet) all live in that window
+//  Notice.cs    notifications from Home Assistant and short toasts, in their own non-focusable window
+//  Tv.cs        the TV underneath (settings, inputs, picture, apps); Logic.cs and Qr.cs are NUI-free and tested off the TV
+// The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
+public sealed partial class SilentGlass : NUIApplication
+{
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v40a";
+    const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
+    List<LibraryApp> library = new();
+    Tizen.NUI.Timer minuteTimer;
+
+    protected override void OnCreate()
+    {
+        base.OnCreate();
+        ui = System.Threading.SynchronizationContext.Current;
+        try { FontClient.Instance.AddCustomFontDirectory(Res + "fonts"); } catch { }
+        try { library = AppLibrary.Load(Res + "apps.json").FindAll(a => !a.Utility); } catch { }
+        if (!library.Exists(a => a.Id == "com.samsung.tv.csfs"))
+            library.Add(new LibraryApp { Name = "Samsung Home", Id = "com.samsung.tv.csfs", Asset = "tile-samsung-home.svg", Fit = "cover", Background = "#1C2638", Width = 640, Height = 360 });
+        try { SetRenderRefreshRate(1); } catch { }  // DALi draws every 2nd vsync here by default: 60 fps
+        LoadPrefs();
+        BuildBackdrop();  // hidden until there is nothing to draw over; never flashes over the picture
+        WatchTv(); WatchData();
+        minuteTimer = new Tizen.NUI.Timer(30000);
+        minuteTimer.Tick += (s, e) => { MinuteTick(); return true; };
+        minuteTimer.Start();
+        if (NoticePending()) TakeNotice("start");  // started by the bridge only to show a notification
+        Note("created");
+    }
+    // AMD resumes us for every launch request; what to show is decided in OnAppControlReceived
+    protected override void OnResume() { base.OnResume(); Note("resumed"); }
+    // another app is in front: nothing of ours may stay up, or the next Home press would flash it
+    protected override void OnPause() { base.OnPause(); CloseOverlay(null); HideBackdrop(); WriteState("paused"); }
+
+    protected override void OnAppControlReceived(AppControlReceivedEventArgs e)
+    {
+        base.OnAppControlReceived(e);
+        var x = e.ReceivedAppControl.ExtraData;
+        // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
+        if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }
+        if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
+        // from the bridge, QuickLaunch (Samsung's quick-settings key) or Home Assistant: open one part directly
+        // (QuickLaunch builds before v40 send quiet_page=settings: the installed copy is not replaced by launcher updates)
+        if (!x.TryGet("sg_open", out string open) && x.TryGet("quiet_page", out string page)) open = page == "settings" ? "controls" : page == "home" ? "" : page;
+        Home(open ?? "", "launch");
+    }
+
+    // The Home button. Over a picture it toggles the bar; with nothing to draw over, the wallpaper comes up behind it.
+    void Home(string open, string why)
+    {
+        Wake();
+        bool picture = HasPicture && (lastOther == Viewer || lastOther == "");
+        if (open == "" && overlayShown && !backdropShown) { CloseOverlay(why + ":close"); return; }
+        if (picture && !backdropShown) HideBackdrop(); else ShowBackdrop();
+        OpenBar(open == "" && overlayShown);
+        switch (open) {
+            case "controls": OpenControls(); break;
+            case "info": OpenInfo(); break;
+            case "apps": OpenApps(); break;
+            case "inputs": OpenInputs(); break;
+            case "setup": OpenInfo(); OpenSetup(); break;
+        }
+        Note(why + (open == "" ? "" : ":" + open) + (backdropShown ? ":backdrop" : ":picture"));
+    }
+
+    // ---- keys: both windows route here ----
+    string lastKey = ""; long lastKeyAt, keyCount, keyTicksMax;
+    void OnKey(object sender, Window.KeyEventArgs e)
+    {
+        if (e.Key == null || e.Key.State != Key.StateType.Down) return;
+        string k = e.Key.KeyPressedName; long now = Environment.TickCount64;
+        bool arrow = k == "Up" || k == "Down" || k == "Left" || k == "Right";
+        if (k == lastKey && now - lastKeyAt < (arrow ? 90 : 300)) return;  // drop auto-repeat floods only
+        lastKey = k; lastKeyAt = now; lastActivity = now;
+        if (dimmed) { Wake(); return; }  // the first press only wakes
+        long t0 = Stopwatch.GetTimestamp();
+        try { HandleKey(k, arrow); } catch (Exception ex) { Note("key-error:" + ex.GetType().Name); }
+        keyCount++; keyTicksMax = Math.Max(keyTicksMax, Stopwatch.GetTimestamp() - t0);
+    }
+    static bool IsBack(string k) => k == "XF86Back" || k == "Back" || k == "Escape" || k == "XF86Exit";
+    static bool IsSelect(string k) => k == "Return" || k == "KP_Enter";
+    void HandleKey(string k, bool arrow)
+    {
+        if (k == "XF86Home") return;  // Home arrives as a launch request (OnAppControlReceived)
+        if (k == "XF86SysMenu" || k == "XF86More") { if (!overlayShown) OpenBar(false); OpenControls(); return; }
+        if (!overlayShown) { if (backdropShown) OpenBar(false); return; }
+        OverlayKey(k, arrow);
+    }
+
+    void MinuteTick()
+    {
+        if (backdropShown) { UpdateClock(); CheckWallpaper(); IdleTick(); }
+        if (overlayShown && mode == Mode.Bar && PortsChanged()) OpenBar(true);  // a renamed input fires no event
+    }
+
+    // ---- diagnostics for the Pi-side checks and the bridge's app sensor: /tmp/silentglass-state.txt. Coalesced
+    // (one write per 600 ms at most, never on the key path). ----
+    const string StateFile = "/tmp/silentglass-state.txt";
+    Tizen.NUI.Timer stateTimer; string activity = "";
+    void Note(string what)
+    {
+        activity = what;
+        if (stateTimer == null) { stateTimer = new Tizen.NUI.Timer(600); stateTimer.Tick += (s, e) => { WriteState(activity); return false; }; }
+        if (!stateTimer.IsRunning()) stateTimer.Start();
+    }
+    void WriteState(string what)
+    {
+        stateTimer?.Stop();
+        var b = new System.Text.StringBuilder(DateTime.UtcNow.ToString("o"));
+        void Put(string key, object value) => b.Append('\n').Append(key).Append('=').Append(value);
+        Put("version", ModVersion); Put("activity", what);
+        // read by the bridge: while SilentGlass shows nothing full-screen, the app on screen is `fg`
+        Put("ui", overlayShown ? mode.ToString().ToLowerInvariant() : "none"); Put("backdrop", backdropShown ? "shown" : "hidden"); Put("fg", lastOther);
+        Put("focus", FocusName()); Put("key", lastKey); Put("key_count", keyCount);
+        Put("key_ms_max", (keyTicksMax * 1000.0 / Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+        Put("source", lastSource); Put("signal", signal); Put("ports", watchPort + "," + playPort + "(" + prefs.Watch + "," + prefs.Play + ")");
+        Put("inputs", string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + (i.Known ? i.Connected ? "1" : "0" : "?"))));
+        Put("prefs", Logic.FormatPrefs(prefs).Trim().Replace('\n', ','));
+        Put("brightness", Setting("brightness")); Put("contrast", Setting("contrast")); Put("picturemode", Setting("picturemode"));
+        Put("game", Setting("game-mode-auto")); Put("volume", volume);
+        Put("notice", noticeState); Put("setup", setupState); Put("dimmed", dimmed); Put("library", library.Count);
+        b.Append('\n');
+        try { File.WriteAllText(StateFile, b.ToString()); } catch { }
+    }
+    public static void Main(string[] args) { using var app = new SilentGlass(); app.Run(args); }
+}

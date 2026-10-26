@@ -1,4 +1,4 @@
-"""S90D port configuration checks, not a substitute for on-TV rendering tests."""
+"""SilentGlass launcher checks (source-level invariants; not a substitute for on-TV tests or the Pi mockups)."""
 import csv
 import json
 import re
@@ -7,14 +7,18 @@ import unittest
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs",
-         "Home.Style.cs", "Home.Glass.cs", "Home.Wallpaper.cs", "Home.Prefs.cs", "HomeLogic.cs")
+BRIDGE = ROOT / "devices/s90d/device/ha-bridge/src"
+PARTS = ("SilentGlass.cs", "Ui.cs", "Backdrop.cs", "Overlay.cs", "Menus.cs", "Panels.cs", "Setup.cs", "Notice.cs", "Tv.cs",
+         "Logic.cs", "Qr.cs", "AppLibrary.cs", "InfoStats.cs")
 
 
 def launcher():
     return "\n".join((SRC / p).read_text() for p in PARTS)
+
+
+def bridge():
+    return "\n".join(p.read_text() for p in sorted(BRIDGE.glob("*.cs")))
 
 
 def body(source, signature):
@@ -49,68 +53,162 @@ ASSETS = ROOT / "launcher/assets"
 INVENTORY = ROOT / ".local/device-inventory/catalog-apps.csv"
 
 
-class S90dPortTests(unittest.TestCase):
-    def test_all_partials_are_compiled(self):
-        proj = (SRC / "Home.csproj").read_text()
+class LauncherTests(unittest.TestCase):
+    def test_every_source_is_compiled_and_the_logic_is_testable_off_the_tv(self):
+        proj = (SRC / "SilentGlass.csproj").read_text()
+        self.assertEqual(sorted(p.name for p in SRC.glob("*.cs") if p.name != "QuickLaunch.cs"), sorted(PARTS))
         for p in PARTS:
             self.assertIn(f'<Compile Include="{p}" />', proj)
-        # the NUI-free logic is also compiled into the off-TV C# tests
-        self.assertIn('<Compile Include="../launcher/src/HomeLogic.cs" />', (ROOT / "tests/CatalogTests.csproj").read_text())
-        self.assertNotIn("Tizen.", (SRC / "HomeLogic.cs").read_text())
+        tests = (ROOT / "tests/CatalogTests.csproj").read_text()
+        for p in ("Logic.cs", "Qr.cs"):
+            self.assertIn(f'<Compile Include="../launcher/src/{p}" />', tests)
+            self.assertNotIn("Tizen.", (SRC / p).read_text())
 
     def test_body_helper_stops_at_the_member(self):
         src = "class C\n{\n void A(){x(\"}\"); // the TV's }\n }\n void B(){y();}\n}\n"
         self.assertEqual(body(src, "void A("), 'void A(){x("}"); // the TV\'s }\n }')
-        self.assertEqual(body(launcher(), "protected override void OnResume()").count("\n"), 0)
 
-    def test_primary_shield_uses_observed_source(self):
+    def test_no_full_screen_pages(self):
         src = launcher()
-        self.assertIn('Hero("Watch","hdmi:"+watchPort,InputName(watchPort)', src)
-        self.assertIn('lastSource=15', src)
-        # heroes follow the TV's own input names, falling back to the observed ports
-        self.assertIn('int w=prefs.Watch!=0?prefs.Watch:PortNamed("shield",15),p=prefs.Play!=0?prefs.Play:PortNamed("switch",13);', src)
+        # owner: "get rid of our full screen app pages ... just do layovers and popups"
+        for gone in ("BuildPage", "VideoCanvas", "TVWindowControl", "Shader", "Home.Live", "HomeLogic", "Hero(", "editing"):
+            self.assertNotIn(gone, src)
+        # the app's own window only ever holds the backdrop (wallpaper, clock, idle dim)
+        backdrop = (SRC / "Backdrop.cs").read_text()
+        self.assertEqual(src.count("Window.Default.Add("), 1)  # the dim layer; BuildBackdrop adds via `w`
+        self.assertIn("try { w.Hide(); } catch { }", body(backdrop, "void BuildBackdrop()"))
+        # shown only when there is nothing to draw over
+        home = body(src, "void Home(")
+        self.assertIn("bool picture = HasPicture && (lastOther == Viewer || lastOther == \"\");", home)
+        self.assertIn("if (picture && !backdropShown) HideBackdrop(); else ShowBackdrop();", home)
+        # Home over the picture toggles the bar
+        self.assertIn('if (open == "" && overlayShown && !backdropShown) { CloseOverlay(why + ":close"); return; }', home)
 
-    def test_secondary_keeps_the_tvs_stored_label(self):
-        self.assertIn('Hero("Play","hdmi:"+playPort,InputName(playPort)', launcher())
-        # renames fire no source-list event: Home, resume and the 30 s clock tick re-read and compare the card names
-        self.assertIn("if(page==0&&(watchName!=InputName(watchPort)||playName!=InputName(playPort))){BuildPage(false);", launcher())
-        self.assertIn("clockTimer?.Start();CloseInputs(false);OnInputsChanged(false);", launcher())
+    def test_overlay_is_a_partial_notification_window_above_the_viewer(self):
+        ov = (SRC / "Overlay.cs").read_text()
+        ensure = body(ov, "void EnsureOverlay()")
+        for line in ("ow.Type = WindowType.Notification;", "ow.SetNotificationLevel(NotificationLevel.Top);",
+                     'ow.AddAuxiliaryHint("wm.policy.win.user.geometry", "1");', "ow.BackgroundColor = Clear;", "ow.SetAcceptFocus(true);"):
+            self.assertIn(line, ensure)
+        self.assertIn("new Rectangle(0, BandTop, 1920, 1080 - BandTop)", ensure)  # never full screen over the picture
+        self.assertIn("oRoot.Position2D = new Position2D(-x, -y);", body(ov, "void Place("))
+        # the package may raise notification windows
+        manifest = (ROOT / "launcher/package/tizen-manifest.xml")
+        if manifest.exists():
+            self.assertIn("http://tizen.org/privilege/window.priority.set", manifest.read_text())
+        # nothing of ours stays up when another app comes to the front
+        pause = body(launcher(), "protected override void OnPause()")
+        self.assertIn("CloseOverlay(null); HideBackdrop();", pause)
+
+    def test_panels_replace_the_bar_and_menus_sit_above_it(self):
+        src = launcher()
+        build = body(src, "void BuildPanel(")
+        self.assertIn("ClearOverlay();", build)  # the bar goes; the picture stays visible on the left
+        self.assertIn("Place(wx, 0, 1920 - wx, 1080);", build)
+        self.assertIn("int h = 24 + inputs.Count * MenuRowH, x = Math.Clamp(BarItemCentre(\"inputs\") - PopW / 2, 40, 1880 - PopW), y = BarTop - PopGap - h;", src)
+        # Back from a menu or panel lands on the bar item that opened it
+        self.assertIn('BackToBar(mode == Mode.Controls ? "controls" : "info")', src)
+        self.assertIn('BackToBar("inputs")', src)
+        self.assertIn('BackToBar("apps")', src)
+        # Info is near-opaque for reading; Controls is translucent so the picture shows the change
+        self.assertIn('BuildPanel(Mode.Info, "SilentGlass " + ModVersion, true, list);', src)
+        self.assertRegex(body(src, "void OpenControls()"), r"BuildPanel\(Mode\.Controls, null, false,")
+
+    def test_watch_and_play_with_the_device_underneath(self):
+        src = launcher()
+        self.assertIn('("tv", "Watch", InputName(watchPort), "hdmi:" + watchPort), ("gamecontroller", "Play", InputName(playPort), "hdmi:" + playPort)', src)
+        self.assertIn('watchPort = prefs.Watch != 0 ? prefs.Watch : PortNamed("shield", 15);', src)
+        self.assertIn('playPort = prefs.Play != 0 ? prefs.Play : PortNamed("switch", 13);', src)
+        self.assertIn("prefs.Watch = Logic.NextPort(prefs.Watch, playPort, dir)", src)
         # no device names baked into the UI: the TV's input names are used as they are
         for name in ("Nintendo Switch", '"SHIELD"', "PlayStation"):
-            self.assertNotIn(name, launcher())
+            self.assertNotIn(name, src)
+        # apps can be kept out of the bar
+        self.assertIn("if (!prefs.HideApps && library.Count > 0) items.Add((\"apps\", \"Apps\", null, \"apps\"));", src)
 
-    def test_example_console_routes_are_removed(self):
+    def test_words_the_owner_asked_for(self):
         src = launcher()
-        self.assertNotIn('"hdmi:14"', src)
-        self.assertNotIn('"PlayStation 5"', src)
+        ui = src.replace((SRC / "Logic.cs").read_text(), "")  # Logic maps the TV's own words
+        # no On/Off words; status is a dot or a switch; Game Mode is Automatic / Always / Never
+        for word in ('"On"', '"Off"', '" On"', '"Not connected"', '"On now"'):
+            self.assertNotIn(word, ui)
+        self.assertIn('"Game Mode", () => Logic.GameName(SettingName("game-mode-auto"))', src)
+        self.assertIn('CycleSetting("game-mode-auto", d)', src)
+        # Pass-Through feeds Dolby Atmos to the soundbar; it must not be one press away
+        self.assertNotIn("audio-format", src)
+        # every drawn symbol exists, local SVG only
+        for name in set(re.findall(r'Sym\("([a-z]+)"', src)) | set(re.findall(r'(?<![\w.])(?:Level|Choice|Toggle|Open)\("([a-z]+)", "', src)) | {"tv", "gamecontroller", "antenna", "hdmi", "inputs", "controls", "apps", "info"}:
+            path = ASSETS / f"sym-{name}.svg"
+            self.assertTrue(ET.parse(path).getroot().tag.endswith("svg"), path)
+            self.assertNotIn("https://", path.read_text())
 
-    def test_samsung_home_escape_and_quick_settings(self):
+    def test_key_path_has_no_io_or_ipc(self):
         src = launcher()
-        self.assertIn('Id="com.samsung.tv.csfs",Asset="tile-samsung-home.svg"', src)
-        self.assertIn('Control("More","page:2","more",4);', src)
+        for member in ("void OnKey(", "void HandleKey(", "void OverlayKey(", "void FocusBar(", "void FocusMenu()", "void FocusApps(", "void InputsKey("):
+            text = body(src, member)
+            for slow in ("WriteState(", "File.", "RefreshSettings(", "InfoStats.", "Options("):
+                self.assertNotIn(slow, text, f"{slow} in {member}")
+        # the state file is written by a coalescing timer, or at once on pause only
+        self.assertEqual(src.count("WriteState("), 3)
+        self.assertIn("stateTimer = new Tizen.NUI.Timer(600)", src)
 
-    def test_home_is_shield_first_without_tv_apps(self):
-        src = launcher()
-        home = body(src, "void BuildHome()")
-        # TV apps are backups: none of them is a target on Home, only the two inputs and controls
-        self.assertNotIn('"app:', home)
-        self.assertEqual(home.count("Hero("), 2)
-        self.assertEqual(home.count("Control("), 5)
-        self.assertIn('Control("Inputs","inputs","inputs",0);', home)
-        self.assertIn('Control("Ambient","ambient","ambient",1);', home)
-        # owner: the app chips inside the Watch card looked messy - the card is art only
-        self.assertNotIn("HeroApps", src)
-        # owner: "On now" only meant "selected" - badges now come from the TV's signal state
-        self.assertNotIn("On now", src)
-        # status is a dot, never words; "selected" is a separate checkmark in the Inputs list
-        self.assertIn('if(type==lastSource)return signal==1?Dot.On:signal==0?Dot.Off:Dot.None;', src)
-        inputs = (SRC / "Home.Inputs.cs").read_text()
-        for word in ('"On"', '"Off"', '"Not connected"', '"Unplugged"'):
-            self.assertNotIn(word, inputs)
-        self.assertIn('if(cur){r.Check=new ImageView{ResourceUrl=Root+"glyph-check.svg"', inputs)
-        ET.parse(ASSETS / "glyph-check.svg")
-        for noisy in ("Input name saved", "Direct input", "Everyday controls", "Back to input", "Most opened", "Select · ", "Let's watch"):
-            self.assertNotIn(noisy, src)
+    def test_interrupted_animation_lands_on_its_end(self):
+        self.assertIn("a.EndAction = Animation.EndActions.StopFinal;", launcher())
+
+    def test_native_callbacks_are_kept_alive_and_posted_to_the_ui_thread(self):
+        tv = (SRC / "Tv.cs").read_text()
+        self.assertIn("SourceListChangedCallback sourceListCallback; VconfChangedCallback sourceTypeCallback, signalCallback, foregroundCallback;", tv)
+        for cb in ("sourceListCallback = (t, d) => OnUi(", "sourceTypeCallback = (n, d) => OnUi(", "signalCallback = (n, d) => OnUi(", "foregroundCallback = (n, d) => OnUi("):
+            self.assertIn(cb, tv)
+        # the signal flag flaps while an input syncs
+        self.assertIn("signalSettle = new Tizen.NUI.Timer(800)", tv)
+
+    def test_ambient_home_returns_to_silentglass(self):
+        self.assertIn('if (now == "com.samsung.tv.csfs" && IsAmbient(before)) { Launch(SelfId);', (SRC / "Tv.cs").read_text())
+
+    def test_oled_idle_dim_only_on_the_backdrop(self):
+        b = (SRC / "Backdrop.cs").read_text()
+        self.assertIn("const long IdleMs = 5 * 60 * 1000;", b)
+        self.assertIn("if (prefs.Dim && backdropShown && Environment.TickCount64 - lastActivity >= IdleMs) Dim();", b)
+        self.assertIn("if (dimmed) { Wake(); return; }  // the first press only wakes", launcher())
+
+    def test_notifications_never_take_focus_or_wake(self):
+        n = (SRC / "Notice.cs").read_text()
+        self.assertIn("nw.SetAcceptFocus(false);", n)
+        self.assertIn("if (image.Contains('/') || image.Contains(\"..\")", n)  # bare file names in our data dir only
+        self.assertIn("NoticeMaxAgeMs", n)
+        self.assertNotIn("Launch(", n)
+
+    def test_launcher_and_bridge_agree(self):
+        src, br = launcher(), bridge()
+        # launch extras
+        for key in ("sg_notice", "sg_source"):
+            self.assertIn(f'"{key}"', src); self.assertIn(f'"{key}"', br)
+        self.assertIn('"sg_open", "controls"'.replace(", ", ","), (SRC / "QuickLaunch.cs").read_text().replace(", ", ","))
+        # files in the launcher's data directory
+        for f in ("notice.json", "setup.json", "setup-request", "setup-close", "bridge-status.txt", "location.txt", "notify-off", "thread-off"):
+            self.assertIn(f, src, f); self.assertIn(f, br, f)
+        # the state file the bridge reads for the app on screen
+        self.assertIn('"/tmp/silentglass-state.txt"', src); self.assertIn('"/tmp/silentglass-state.txt"', br)
+        for key in ('Put("ui"', 'Put("backdrop"', 'Put("fg"'):
+            self.assertIn(key, src)
+        self.assertIn('V("ui") == "none" && V("backdrop") == "hidden"', br)
+
+    def test_setup_sheet(self):
+        s = (SRC / "Setup.cs").read_text()
+        self.assertIn('File.WriteAllText(file, Qr.Svg(Qr.Encode(url + "?code=" + code)));', s)
+        self.assertIn('string file = DataFile("setup-qr-" + (++qrN) + ".svg");', s)  # DALi caches by URL
+        self.assertIn("if (back) CloseSetup();", (SRC / "Overlay.cs").read_text())
+        # closing the overlay any way also closes the phone page
+        self.assertIn("CloseSetupServer();", body(launcher(), "void CloseOverlay("))
+
+    def test_backdrop_art_is_local_svg(self):
+        for name in ("tile-samsung-home.svg", "free-background.svg"):
+            tree = ET.parse(ASSETS / name)
+            self.assertTrue(tree.getroot().tag.endswith("svg"))
+            self.assertNotIn("https://", (ASSETS / name).read_text())
+        self.assertIn('fill="#000"', (ASSETS / "free-background.svg").read_text())
+        self.assertIn('Id = "com.samsung.tv.csfs", Asset = "tile-samsung-home.svg"', launcher())
 
     def test_catalog_only_has_installed_enabled_apps(self):
         if not INVENTORY.is_file():
@@ -134,347 +232,13 @@ class S90dPortTests(unittest.TestCase):
         for app in catalog:
             self.assertTrue((ASSETS / app["Asset"]).is_file())
 
-    def test_new_artwork_is_local_valid_svg(self):
-        # Fixed locally authored SVGs only; no uploads, remote XML, or DTDs are accepted.
-        cards = [f"feature-{c}-{w}.svg" for c in ("watch", "play") for w in ("wide", "narrow")]
-        for name in cards + ["tile-samsung-home.svg", "free-background.svg"]:
-            tree = ET.parse(ASSETS / name)
-            self.assertTrue(tree.getroot().tag.endswith("svg"))
-            self.assertNotIn("https://", (ASSETS / name).read_text())
-        for name in cards:
-            art = (ASSETS / name).read_text()
-            self.assertNotIn("<text", art)
-            self.assertNotIn("<image", art)  # drawn art, no embedded app logos
-            # drawn at the size the card is shown at
-            self.assertIn(f'width="{996 if "wide" in name else 684}" height="560"', art)
-
-    def test_current_input_gets_the_wide_16x9_card(self):
-        src = launcher()
-        self.assertIn("const int HeroWide=996,HeroNarrow=684,HeroGap=40;", src)
-        # the big word fits its line (was drawn as "..." on the TV)
-        self.assertIn('var big=Label(word,50,h-223,w-100,150,100,white,"Display");big.Ellipsis=false;', src)
-        self.assertEqual(996 * 9 // 16, 560)  # 996x560 is 16:9 to the pixel, so Cover() returns the card itself
-        self.assertEqual(996 + 40 + 684, 1720)
-        self.assertIn("bool PlayIsWide()=>lastSource==playPort;", src)
-        # follows input changes, without a fade
-        self.assertIn("if(RelayoutHeroes())return;", body(src, "void OnInputsChanged("))
-        self.assertIn("BuildPage(false)", body(src, "bool RelayoutHeroes()"))
-
-    def test_settings_tiles_have_valid_local_artwork(self):
-        import re
-        tiles = re.findall(r'SettingsTile\("([^"]+)","([^"]+)","([a-z]+)",(\d),(\d)\)', launcher())
-        self.assertEqual(len(tiles), 15)
-        self.assertEqual(sorted((int(c), int(r)) for *_, c, r in tiles), [(c, r) for c in range(5) for r in range(3)])
-        for _, _, icon, _, _ in tiles:
-            path = ASSETS / f"glyph-{icon}.svg"
-            self.assertTrue(ET.parse(path).getroot().tag.endswith("svg"), path)
-            self.assertNotIn("https://", path.read_text())
-
-    def test_cycled_settings_are_refreshed_and_audio_format_is_not_a_tile(self):
-        import re
-        src = launcher()
-        ids = re.search(r' SettingIds=\{([^}]*)\}', src).group(1)
-        home_ids = re.search(r'HomeSettingIds=\{([^}]*)\}', src).group(1)
-        for cycled in re.findall(r'"cycle:([a-z-]+)"', src):
-            self.assertIn(f'"{cycled}"', ids)
-        self.assertIn('"soundoutput"', ids)
-        # Home reads only what its tiles show, and only ids the Controls page also knows
-        self.assertEqual(set(re.findall(r'"([a-z-]+)"', home_ids)), {"sleeptimer", "soundoutput"})
-        self.assertTrue(set(re.findall(r'"([a-z-]+)"', home_ids)) <= set(re.findall(r'"([a-z-]+)"', ids)))
-        # Pass-Through feeds Dolby Atmos to the soundbar; it must not be one press away.
-        self.assertNotIn("audio-format", src)
-
-    def test_toolbar_area_does_not_collide_with_third_settings_row(self):
-        src = launcher()
-        self.assertIn("const int TB=9;", src)
-        self.assertNotIn("area==3", src)
-        self.assertNotIn("area=3", src)
-
-    def test_every_drawn_icon_exists_and_local_catalog_has_no_placeholders(self):
-        import json, re
-        src = launcher()
-        glyphs = re.findall(r'Control\("[^"]+","[^"]+","([a-z]+)",\d\)', src)
-        self.assertEqual(len(glyphs), 5)
-        for glyph in glyphs:
-            ET.parse(ASSETS / f"glyph-{glyph}.svg")
-        local = ASSETS / "apps.local.json"
-        if not local.exists():
-            self.skipTest("no device catalog")
-        for app in json.loads(local.read_text()):
-            if app.get("Utility"):
-                # the utility plus is drawn in the (light) ink colour; its tile must be dark
-                n = int(app["Background"].lstrip("#"), 16)
-                self.assertLess(sum((n >> s) & 255 for s in (16, 8, 0)) / 3, 96, app["Name"])
-                continue
-            self.assertNotIn("placeholders/", app["Asset"], app["Name"])
-            text = (ASSETS / app["Asset"]).read_text()
-            self.assertNotIn("<text", text, app["Name"])
-            self.assertNotRegex(text, r"href|https?://(?!www\.w3\.org)", app["Name"])
-            # Repo-generated local assets; stdlib expat does not fetch external entities.
-            ET.fromstring(text)
-
-    def test_info_page_navigation_and_tab_bar(self):
-        src = launcher()
-        self.assertIn('Nav={"Home","Apps","Controls","Info"}', src)
-        self.assertIn("int next=HomeLogic.NextTab(page,d,prefs.HideApps);", src)
-        self.assertNotIn("Toolbar(", src)
-        build_info = src.split("void BuildInfo()")[1].split("void InfoTick()")[0]
-        self.assertIn('"Thread border router"', build_info)
-        self.assertNotIn("UsageSummary", src + (SRC / "InfoStats.cs").read_text())
-        self.assertNotIn("RecordLaunch", src + (SRC / "InfoStats.cs").read_text())
-        # the info timer must not run while another page or app is visible
-        self.assertIn("infoTimer?.Stop();", body(src, "void BuildPage("))
-        self.assertIn("if(page!=3)return false;", src)
-        self.assertIn("clockTimer?.Stop();infoTimer?.Stop();", body(src, "protected override void OnPause()"))
-
-    def test_info_page_lists_match_applied_privacy_state(self):
+    def test_info_privacy_is_read_only_and_unknown_is_not_a_failure(self):
         info = (SRC / "InfoStats.cs").read_text()
-        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 47)
         self.assertNotIn("File.Delete", info)
-        self.assertNotIn("File.Write", info)  # Info is read-only
-        # SMACK: marker files are unreadable to the app and other apps' /proc is hidden; never infer from those.
-        self.assertNotIn("File.Exists(\"/opt/usr/share/systemd", info)
+        self.assertNotIn("File.Write", info)
         self.assertNotIn("attr/current", info)
         self.assertIn("if (AppEnabled(selfId) != true) return -1;", info)
-        src = launcher()
-        # unreadable counts show as unknown, never as a failed check
-        self.assertIn('!known?"Unknown":ok?"Protected":"Check"', src)
-        self.assertIn("infoMarkers<0?null:", src)
-        self.assertIn("infoDisabled<0?null:", src)
-
-    def test_info_live_state_survives_card_select(self):
-        src = launcher()
-        info = body(src, "void BuildInfo()")
-        # rebuilding Info (after a setting flips) keeps the live rate and sparkline unless the last sample is stale
-        self.assertIn("bool fresh=Environment.TickCount64-lastNetAt>10000;", info)
-        self.assertIn("if(fresh){Array.Clear(sparkValues", info)
-        self.assertIn("InfoStats.Ipv4(infoIface),detail,lastRateText);", info)
-        self.assertEqual(info.count("InfoStats.NetDev()"), 1)  # one read of /proc/net/dev per build
-        # the timer only runs while Info is visible
-        self.assertIn("if(page!=3)return false;InfoTick();return true;", info)
-
-    def test_oled_idle_dim(self):
-        src = launcher()
-        self.assertIn("const long IdleMs=5*60*1000;", src)
-        # idle check only runs from the clock timer, which is stopped while Quiet Home is in the background
-        self.assertIn("IdleTick();if(visible&&page==0&&inputsLayer==null)OnInputsChanged(false);return true;", src)
-        on_pause = body(src, "protected override void OnPause()")
-        self.assertIn("CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();", on_pause)
-        # first key press only wakes, never activates a tile
-        on_key = body(src, "void OnKey(")
-        self.assertLess(on_key.index("if(dimmed){Wake(true);"), on_key.index("HandleKey(k)"))
-        self.assertIn("Wake(false);", body(src, "protected override void OnResume()"))
-        dim = src.split("void Dim()")[1].split("void MoveDimClock()")[0]
-        self.assertIn("infoTimer?.Stop();", dim)
-        self.assertIn("new Color(0,0,0,1)", dim)
-        self.assertIn("overlay.Add(dimLayer)", dim)  # above the sheet and toast
-
-    def test_inputs_sheet(self):
-        src = launcher()
-        # every key is consumed by the open sheet before page navigation; Back closes it
-        handle = body(src, "void HandleKey(")
-        self.assertTrue(handle.split("\n")[2].strip().startswith("if(inputsLayer!=null&&HandleInputsKey(k))return;"))
-        sheet = body(src, "bool HandleInputsKey(")
-        self.assertIn("SelectSource(s.Type)", sheet)
-        self.assertIn("CloseInputs(true)", sheet)
-        self.assertIn("CloseInputs(false);", body(src, "protected override void OnPause()"))
-        # read-only source API only: names come from the TV, never renamed from here
-        info = (SRC / "InfoStats.cs").read_text()
-        self.assertIn("static extern string get_source_list();", info)  # marshaller frees the native buffer
-        self.assertNotIn("set_edit_name", info + src)
-        # powerState is unreliable on this TV (the on-screen SHIELD reports Off), so it is never shown
-        self.assertNotIn(".Power==", src)
-        # connection states are only claimed when the TV actually answered
-        self.assertIn("src.Known&&!src.Connected", src)
-        for g in ("glyph-inputs.svg", "glyph-ambient.svg", "glow-watch.svg", "glow-play.svg"):
-            ET.parse(ASSETS / g)
-
-    def test_inputs_are_event_driven_and_on_the_ui_thread(self):
-        src = launcher()
-        watch = body(src, "void WatchInputs()")
-        self.assertIn("register_sourcelist_changed_callback(sourceListCallback", watch)
-        self.assertIn('vconf_notify_key_changed("memory/system/source_type",sourceTypeCallback', watch)
-        # native callbacks only hop onto the UI thread; delegates are fields so the GC keeps them
-        self.assertEqual(watch.count("OnUi(()=>"), 2)
-        self.assertIn("SourceListChangedCallback sourceListCallback;", src)
-        self.assertIn("VconfChangedCallback sourceTypeCallback;", src)
-        self.assertNotIn("new Tizen.NUI.Timer(", body(src, "void WatchInputs()"))  # no polling
-
-    def test_ambient_home_returns_to_quiet_home(self):
-        src = launcher()
-        fg = body(src, "void OnForegroundChanged()")
-        self.assertIn('now=="com.samsung.tv.csfs"&&IsAmbient(before)', fg)
-        self.assertIn('Launch("com.samsung.tv.bixby-promotion")', fg)
-        # only the Ambient -> Samsung Home hand-off is redirected; opening Samsung Home from Apps still works
-        self.assertEqual(src.count('Launch("com.samsung.tv.bixby-promotion")'), 1)
-
-    def test_info_card_select_does_not_flash(self):
-        self.assertIn('if(a=="info"){BuildPage(false);return;}', body(launcher(), "void Activate()"))
-
-    def test_apple_style_defaults_and_costs(self):
-        style = (SRC / "Home.Style.cs").read_text()
-        self.assertIn('Squircle=HomeLogic.Flag(c,"squircle",true)', style)
-        self.assertIn('Vsync=HomeLogic.Int(c,"vsync",1,1,4)', style)  # 60 fps by default
-        # measured-and-dropped experiments stay dropped: flat fallback, BoxShadow, procedural wallpaper
-        src = launcher()
-        for gone in ("BoxShadow", "ProceduralWallpaper", "style.Liquid", "style.Glass", '"shader"', "FocusRing"):
-            self.assertNotIn(gone, src)
-        # real backdrop blur only on the floating sheet and toast (their backdrop moves)
-        self.assertEqual(src.count("Frosted("), 3)  # definition, sheet, toast
-        self.assertIn("Frosted(sheet,34,SheetW,400);", src)
-        self.assertIn("Frosted(t,34,600,68);", src)
-        # squircles never turn circles or capsules into squares
-        self.assertIn("radius*2<Math.Min(w,h)", style)
-        # nothing style-related is read or built on the key path
-        key = body(src, "void OnKey(")
-        for word in ("ReadStyleConf", "Frosted", "CreateBackgroundBlurEffect", "KeepRendering"):
-            self.assertNotIn(word, key)
-
-    def test_liquid_glass_shader(self):
-        glass = (SRC / "Home.Glass.cs").read_text()
-        # GLSL ES 1.0 like Samsung FLUX; no screen readback or blur passes
-        self.assertIn("gl_FragColor", glass)
-        self.assertNotIn("FrameBuffer", glass)
-        self.assertNotIn("RenderTask", glass)
-        # the gradient backdrop formula must match the SVG wallpaper it stands in for
-        bg = (ASSETS / "free-background.svg").read_text()
-        for stop in ("#2B3F8F", "#0F4D3A", "#4A2366"):
-            self.assertIn(stop, bg)
-        self.assertIn("vec3(0.169,0.247,0.561),0.42", glass)
-        # per-page renderers are released with the page; sheet/toast rims with their views
-        src = launcher()
-        self.assertIn("ReleasePageRenderers();", body(src, "void BuildPage("))
-        self.assertIn("sheetRim?.Dispose();", body(src, "void CloseInputs("))
-        # one shared quad geometry and one shared shader
-        self.assertIn("if(glassQuad!=null)return glassQuad;", glass)
-        self.assertIn("if(glassShader!=null)return glassShader;", glass)
-
-    def test_photo_wallpaper_day_night_and_fallback(self):
-        wall = (SRC / "Home.Wallpaper.cs").read_text()
-        # missing images (they are not in git) fall back to the gradient wallpaper
-        self.assertIn('File.Exists(Root+"wallpapers/wall-day.jpg")', wall)
-        self.assertIn('ResourceUrl=Root+"free-background.svg",Size2D=new Size2D(1920,1080),DesiredWidth=960,DesiredHeight=540', wall)
-        # sunrise/sunset from UTC, so the TV time zone cannot break it (behaviour tested in tests/CatalogTests.cs)
-        self.assertIn("HomeLogic.IsNight(DateTime.UtcNow,style.Lat,style.Lon)", wall)
-        # one shared texture set: every glass surface switches at once
-        self.assertIn("frostSet.SetTexture(0,tex);", wall)
-        src = launcher()
-        self.assertIn("CheckWallpaper();", body(src, "protected override void OnResume("))
-        # no glow layers over the photo
-        self.assertIn('if(wallpaper==null){glowWatch=Glow("watch");', src)
-        self.assertIn("if(glassShader==null||wallpaper!=null)return;", body(src, "void GlowTo("))
-        glass = (SRC / "Home.Glass.cs").read_text()
-        self.assertIn("else bg = texture2D(sFrost,vUV).rgb;", glass)
-        self.assertIn("if(kind==0&&frostSet!=null)r.SetTextures(frostSet);", glass)
-
-    def test_interrupted_focus_animation_lands_on_final_state(self):
-        src = launcher()
-        self.assertIn("a.EndAction=Animation.EndActions.StopFinal;a.Stop();", src)
-        self.assertIn("styledAll=false;UpdateFocus(false);", body(src, "protected override void OnResume("))
-
-    def test_home_key_on_home_does_not_rebuild(self):
-        src = launcher()
-        home = body(src, "void FullHome(")
-        # on Home already: refocus only (rebuilding flashed the cards and re-attached the video)
-        self.assertIn("if(page==0){", home)
-        self.assertIn("if(!RelayoutHeroes()){UpdateHeroBadges(false);UpdateFocus();ScheduleLive();}", home)
-        on_home = home[home.index("if(page==0){"):]
-        self.assertLess(on_home.index("return;"), on_home.index("BuildPage(false)"))
-        live = (SRC / "Home.Live.cs").read_text()
-        self.assertIn("var rect=HomeLogic.VideoRect(hero.X,hero.Y,hero.W,hero.H,4);", live)
-        self.assertIn("if(liveView!=null&&liveSlot==hero){PushLiveGeometry(liveRect);", live)
-
-    def test_live_band_and_light_shadows(self):
-        src = launcher()
-        # eased bottom band behind the words, only on the live card (no separate word box)
-        self.assertNotIn("word-plate", src)
-        self.assertIn("Scrim=true", src)
-        self.assertIn("(0f,0f),(.25f,.18f),(.5f,.48f),(.75f,.70f),(1f,.82f)", src)
-        # heroes: no shadow at rest, a soft one only when focused
-        self.assertIn("Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f)", src)
-        glass = (SRC / "Home.Glass.cs").read_text()
-        self.assertIn("float shadow=.12f,float shadowY=6,float blur=18,float focusShadow=.16f,", glass)
-
-    def test_hero_inputs_are_user_choosable_and_persist(self):
-        src = launcher()
-        prefs = (SRC / "Home.Prefs.cs").read_text()
-        self.assertIn("DirectoryInfo.Data", prefs)
-        # read in OnCreate: in a field initializer the app framework (and its data directory) does not exist yet,
-        # so the saved choice was never read back
-        self.assertNotRegex(prefs, r"prefs\s*=\s*LoadPrefs\(\)")
-        self.assertIn("prefs=LoadPrefs();", body(src, "protected override void OnCreate()"))
-        create = body(src, "protected override void OnCreate()")
-        self.assertLess(create.index("prefs=LoadPrefs();"), create.index("ResolveHeroPorts();"))
-        # cycling never maps both cards to the same input (behaviour tested in tests/CatalogTests.cs)
-        self.assertIn("HomeLogic.NextPort(prefs.Watch,playPort,dir)", prefs)
-        self.assertIn("HomeLogic.NextPort(prefs.Play,watchPort,dir)", prefs)
-        self.assertIn('SettingsTile("Watch Input","heroport:watch"', src)
-        self.assertIn('SettingsTile("Play Input","heroport:play"', src)
-        self.assertIn("prefs.Watch!=0?prefs.Watch:PortNamed(\"shield\",15)", src)
-        # Panel Care: Pixel Shift is a real setting; Pixel Refresh is never triggered from here
-        self.assertIn('"cycle:pixel-shift-menu"', src)
-        self.assertNotIn("ELSensing", src)
-
-    def test_apps_tab_can_be_hidden_from_info(self):
-        src = launcher()
-        self.assertIn('SettingTile(n++,"Apps tab","Samsung apps and Home","apps","toggle:apps",!prefs.HideApps);', body(src, "void BuildInfo()"))
-        self.assertIn('if(a.StartsWith("toggle:")){ToggleSetting(a.Substring(7));return;}', body(src, "void Activate()"))
-        self.assertIn("SavePrefs();BuildTabs();", body(src, "void ToggleSetting("))
-        # the tab bar is rebuilt inside its own layer, so it stays under the sheet, toast and OLED dim
-        self.assertIn("tabBar=new View{Size2D=new Size2D(1920,120)};win.Add(tabBar);BuildTabs();", body(src, "void BuildChrome()"))
-        self.assertNotIn("win.Add", body(src, "void BuildTabs()"))
-        self.assertIn("if(tabs[i]==null)continue;", body(src, "void StyleTabs()"))
-
-    def test_thread_switch_on_info(self):
-        src = launcher()
-        info = body(src, "void BuildInfo()")
-        # only TVs with the switchable border router units get the switch
-        self.assertIn('if(ThreadSwitchable())SettingTile(n++,"Thread border router","Smart-home mesh","thread","toggle:thread",ThreadWanted());', info)
-        self.assertIn('case "thread":ToggleThread();return;', body(src, "void ToggleSetting("))
-        toggle = body(src, "void ToggleThread()")
-        # the marker decides (also at boot); thread-switch only wakes the path unit, so it is written last
-        self.assertLess(toggle.index('DataFile("thread-off")'), toggle.index('DataFile("thread-switch")'))
-        self.assertIn("DirectoryInfo.Data", body(src, "static string DataFile("))
-        # the card follows the daemons after a flip
-        self.assertIn("UpdateThread(all);", body(src, "void InfoTick()"))
-        unit = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-cpcd.service").read_text()
-        self.assertIn("com.samsung.tv.bixby-promotion/data/thread-off", unit)
-
-    def test_info_page_layout(self):
-        src = launcher()
-        info = body(src, "void BuildInfo()")
-        # four status cards side by side, fitting the 1720 px content width; none of them takes focus
-        self.assertEqual(4 * 415 + 3 * 20, 1720)
-        self.assertNotIn("slots.Add", body(src, "Status StatusCard("))
-        for card in ('StatusCard(0,"Privacy"', 'StatusCard(1,"Network",', 'StatusCard(2,"Thread"', 'StatusCard(3,"This TV"'):
-            self.assertIn(card, info)
-        # settings grid: 3 x 560 + 2 gaps; rows map to focus rows 0 and 1 (Down from the tab bar lands on Row(0))
-        self.assertEqual(3 * 560 + 2 * 20, 1720)
-        self.assertIn("Row=n/3", body(src, "void SettingTile("))
-        self.assertIn("SetY+n/3*(SetH+SetGap)", src)
-        self.assertLessEqual(610 + 2 * 120 + 20, 1000)  # ends above the notice line
-        # the page header goes through content (rebuilt with the page), never straight onto the window
-        self.assertIn('Text("SilentGlass Home"', info)
-        self.assertNotIn("win.Add", info)
-        # the throughput graph is a small sparkline inside the Network card
-        self.assertIn("netCard.Card.Add(b);", info)
-        self.assertIn("(int)(34*sparkValues[i]/peak)", body(src, "void DrawSpark()"))
-        # the Network card shows a wired or a Wi-Fi glyph to match the connection
-        self.assertIn('StatusCard(1,"Network",wifi?"network":"wired"', info)
-        # every glyph the page uses ships
-        for g in re.findall(r'"(shield|network|wired|thread|tv|apps|picture|sleep|wallpaper)"', info):
-            self.assertTrue((ASSETS / f"glyph-{g}.svg").exists(), g)
-
-    def test_info_settings_apply_and_persist(self):
-        src = launcher()
-        toggle = body(src, "void ToggleSetting(")
-        for case in ('case "apps":', 'case "live":', 'case "dim":', 'case "wall":', 'case "thread":'):
-            self.assertIn(case, toggle)
-        self.assertEqual(toggle.count("SavePrefs();"), 5)  # thread is stored as its marker file instead
-        self.assertIn("prefs.Live&&page==0", (SRC / "Home.Live.cs").read_text())
-        self.assertIn("if(prefs.Dim&&editing==", (SRC / "Home.Idle.cs").read_text())
-        self.assertIn('string WallMode=>prefs.Wall!="auto"?prefs.Wall:style.WallMode;', (SRC / "Home.Wallpaper.cs").read_text())
-        self.assertIn("CheckWallpaper();", toggle)
+        self.assertIn('if (marks < 0 || apps < 0) return ("Unknown", Grey);', launcher())
 
     def test_info_privacy_list_covers_every_registry_batch(self):
         info = (SRC / "InfoStats.cs").read_text()
@@ -487,149 +251,13 @@ class S90dPortTests(unittest.TestCase):
         for keep in ("smartthings", "iot-hub", "matter", "coba.adagent", "csfs"):
             self.assertNotIn(keep, (ROOT / "devices/s90d/device/cleanup/batche-apply.sh").read_text().split("set -eu")[1])
 
-    def test_chip_temperature_on_info(self):
-        self.assertIn('Read("/sys/devices/platform/soc/thermal/temperature")', (SRC / "InfoStats.cs").read_text())
-        self.assertIn("InfoStats.ChipTemperature()", body(launcher(), "void InfoTick()"))
-
     def test_csfs_watcher_only_closes_unused_samsung_home(self):
         unit = (ROOT / "devices/s90d/device/boot-units/quiet-csfs-off.service").read_text()
         self.assertIn('[ "$$home" = com.samsung.tv.bixby-promotion ]', unit)
         self.assertIn('[ "$$fg" != com.samsung.tv.csfs ]', unit)
         self.assertIn("seen -ge 2", unit)
 
-    def test_tab_bar_select_enters_at_the_current_input(self):
-        key = body(launcher(), "void HandleKey(")
-        self.assertIn("if(area==0||area==TB){area=1;selected=page==0?SourceIndex():0;", key)
-        self.assertIn("if(selected<0||selected>=slots.Count)return;", body(launcher(), "void Activate()"))
-
-    def test_live_preview_is_deferred_and_released(self):
-        src = launcher()
-        # never built during the page build itself: posted to after the frame
-        self.assertIn("void ScheduleLive(){OnUi(UpdateLive);}", src)
-        self.assertNotIn("UpdateLive()", body(src, "void BuildPage(").replace("ScheduleLive()", ""))
-        # only for the current input, only with a picture, only while Quiet Home is visible and awake
-        update = body(src, "void UpdateLive()")
-        # tunables come from a file read only when the preview is rebuilt, never on the key path
-        self.assertLess(update.index("liveConf=ReadLiveConf();"), update.index("TVWindowControlAPI"))
-        self.assertNotIn("ReadLiveConf", body(src, "void OnKey("))
-        # the live card does not grow or lift on focus (the video plane does not follow those animations)
-        self.assertIn("bool live=IsLive(s);scale=f&&!live?1.02f:1;lift=f&&!live?-3:0;", src)
-        # crop to fill (16:9 plane covering the card) instead of squashing into the card's shape
-        self.assertIn("canvas.DisableAutoUpdateVideoGeometry=true;", update)
-        self.assertLess(update.index("DisableAutoUpdateVideoGeometry"), update.index("canvas.SetPlayer("))
-        # video directly above the artwork, below the words
-        self.assertIn("var art=hero.Card.GetChildAt(0);", update)
-        # the status dot must not flicker with the signal flag
-        self.assertIn("signalTimer=new Tizen.NUI.Timer(800)", src)
-        self.assertIn('page==0&&visible&&!dimmed&&CurrentHasSignal', update)
-        self.assertIn('s.Action=="hdmi:"+lastSource', update)
-        self.assertIn("catch(Exception ex){liveState=\"failed:\"", update)
-        # released whenever Home is left: pause, OLED dim, page rebuild
-        self.assertIn("ReleaseLiveWindow();", body(src, "protected override void OnPause()"))
-        self.assertIn("HideLive();", src.split("void Dim()")[1].split("void MoveDimClock()")[0])
-        self.assertIn("HideLive();", body(src, "void BuildPage("))
-        # the TV window hint is only turned off when Home is left - toggling it per preview re-synced the input
-        self.assertNotIn('SetAuxiliaryHintValue(tvsHint,"0")', body(src, "void HideLive()"))
-        self.assertIn('SetAuxiliaryHintValue(tvsHint,"0")', body(src, "void ReleaseLiveWindow()"))
-
-    def test_key_path_has_no_io_or_ipc(self):
-        src = launcher()
-        for member in ("void UpdateFocus(", "void StyleSlot(", "void StyleTabs(", "void OnKey(", "void HandleKey("):
-            text = body(src, member)
-            for slow in ("WriteState(", "File.", "RefreshSettings(", "InfoStats.", "TileValue(", "Sources("):
-                self.assertNotIn(slow, text, f"{slow} in {member}")
-        # the state file is written by a coalescing timer, or immediately on pause only
-        self.assertEqual(src.count("WriteState("), 3)  # definition, timer tick, OnPause - nowhere else
-        self.assertIn("stateTimer=new Tizen.NUI.Timer(600)", src)
-
-    def test_chrome_is_built_once(self):
-        src = launcher()
-        self.assertEqual(src.count('"free-background.svg"'), 1)
-        self.assertIn("win.Add(BuildWallpaper());", body(src, "void BuildChrome()"))
-        self.assertIn('"free-background.svg"', body(src, "View BuildWallpaper()"))
-        self.assertNotIn("BuildChrome()", body(src, "void BuildPage("))
-        # page content is the only thing disposed on a page change
-        self.assertIn("content.Remove(v);v.Dispose();", body(src, "void BuildPage("))
-
-    def test_dark_theme_background(self):
-        self.assertIn("Window.Default.BackgroundColor=new Color(0,0,0,1);", launcher())
-        self.assertIn('fill="#000"', (ASSETS / "free-background.svg").read_text())
 
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class S90dOverlayTests(unittest.TestCase):
-    """Home over the picture (Home.Overlay.cs): the viewer stays in front and playing; SilentGlass draws in its own
-    partial notification window and never touches the video plane."""
-
-    def setUp(self):
-        self.src = (SRC / "Home.Overlay.cs").read_text()
-        self.home = (SRC / "Home.cs").read_text()
-
-    def test_own_partial_notification_window_never_the_video_plane(self):
-        ensure = body(self.src, "bool EnsureOverlay()")
-        self.assertIn('ow=new Window("SilentGlass Overlay",new Rectangle(0,BandTop,1920,1080-BandTop),true);', ensure)
-        self.assertIn("ow.Type=WindowType.Notification;", ensure)
-        self.assertIn("ow.SetNotificationLevel(NotificationLevel.Top);", ensure)
-        self.assertIn('ow.AddAuxiliaryHint("wm.policy.win.user.geometry","1");', ensure)
-        for banned in ("VideoCanvasView", "ForceUpdateVideoGeometry", "wm.tvs.win.use.tvs", "MuteVideo", "connect_source"):
-            self.assertNotIn(banned, self.src)
-        # the privilege the notification level needs is the launcher's own (Samsung manifest), nothing added
-        self.assertIn("window.priority.set", self.src)
-
-    def test_full_screen_window_hidden_while_the_overlay_or_another_app_is_up(self):
-        show = body(self.src, "void ShowOverlay(")
-        self.assertLess(show.index("HideMain();"), show.index("ow.Show();"))
-        self.assertIn("if(!oShown)HideMain();", self.home)  # OnPause: never flashes over the picture on the next Home
-        self.assertIn("Launch(\"org.tizen.tv-viewer\");HideMain();", (SRC / "Home.Controls.cs").read_text())
-        self.assertIn('if(mainHidden){MarkState("resumed_overlay");return;}', self.home)
-
-    def test_only_over_the_viewer_with_a_picture_and_switchable(self):
-        self.assertIn("return prefs.Overlay&&style.Overlay&&lastOther==TvViewer&&CurrentHasSignal&&", self.src)
-        self.assertIn("void NoteForeground(string id){if(!string.IsNullOrEmpty(id)&&id!=Self)lastOther=id;}", self.src)
-        home = body(self.home, "void Home(")
-        self.assertIn('if(oShown){HideOverlay(activity+":close");return;}', home)  # Home again closes it
-        self.assertIn("if(OverlayWanted()){ShowOverlay(activity);return;}", home)
-        self.assertIn('case "overlay":prefs.Overlay=!prefs.Overlay;SavePrefs();if(!prefs.Overlay)HideOverlay(null);', (SRC / "Home.Prefs.cs").read_text())
-
-    def test_bar_items_and_apps_in_their_own_menu(self):
-        bar = body(self.src, "void OpenBar(")
-        self.assertIn('"Watch",InputName(watchPort),"hdmi:"+watchPort', bar)  # Watch / Play titles, device underneath
-        self.assertIn('"Play",InputName(playPort),"hdmi:"+playPort', bar)
-        self.assertIn('if(!prefs.HideApps&&library.Exists(a=>!a.Utility))items.Add(("apps","Apps",null,"apps"));', bar)
-        self.assertNotIn("NewArtwork", bar)  # no apps on the bar itself
-        self.assertIn("card.Add(NewArtwork(app,AppW,AppH,20));", body(self.src, "void OpenAppsMenu()"))
-
-    def test_inputs_menu_is_anchored_to_its_bar_item(self):
-        menu = body(self.src, "void OpenInputsMenu()")
-        self.assertIn('int x=Math.Clamp(BarItemCentre("inputs")-PopW/2,40,1880-PopW),y=BarTop-PopGap-h;', menu)
-
-    def test_controls_panel_adjusts_on_the_picture(self):
-        cc = body(self.src, "void OpenControls()")
-        for row in ('Row(0,"sun","Brightness","brightness")', 'Row(0,"contrast","Contrast","contrast")', 'Row(0,"speaker","Volume","volume")',
-                    'Row(1,"picture","Picture Mode","cycle:picturemode")', 'Row(1,"gamecontroller","Game Mode","cycle:game-mode-auto")'):
-            self.assertIn(row, cc)
-        self.assertIn("PlaceOverlay(wx,0,1920-wx,1080);", cc)  # right side only: the picture stays visible on the left
-        keys = body(self.src, "void ControlsKey(")
-        self.assertIn('case "brightness":case "contrast":if(!sel)ChangeLevel(r.Action,d);break;', keys)
-        self.assertIn("CycleSetting(r.Action.Substring(6),d);", keys)
-        # Game Mode is the TV's single three-way setting; the mirror switch is never offered
-        self.assertNotIn('"game-mode")', cc)
-        self.assertNotIn('SettingsTile("Game Mode","game-mode"', self.home)
-        self.assertIn('"Automatic"', (SRC / "Home.Controls.cs").read_text())
-        # what Watch and Play open is configurable right there, in both directions
-        self.assertIn('"Watch","heroport:watch"', cc)
-        self.assertIn('"Play","heroport:play"', cc)
-        self.assertIn('CycleHeroPort(r.Action=="heroport:watch",d);', keys)
-
-    def test_no_shader_glass_over_the_picture(self):
-        for banned in ("AddGlass(", "RimOverlay(", "SetRenderEffect"):
-            self.assertNotIn(banned, self.src)
-        for name in ("tv", "gamecontroller", "inputs", "controls", "apps", "info", "sun", "contrast", "speaker", "check", "chevron"):
-            self.assertTrue((ROOT / "launcher/assets" / f"sym-{name}.svg").is_file(), name)
-
-    def test_full_pages_from_the_bar_come_back_to_it(self):
-        self.assertIn("if(fromOverlay&&editing==\"\"&&(k==\"XF86Back\"", self.home)
-        self.assertIn("void ReturnToOverlay(){fromOverlay=false;HideMain();ShowOverlay(\"overlay_return\");}", self.src)

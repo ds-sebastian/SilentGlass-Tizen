@@ -101,16 +101,37 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
   `thread-off` marker and touches `thread-switch`, exactly like the Info switch.
 - Topics: `silentglass/s90d/...`; discovery under `homeassistant/<component>/silentglass_s90d/...`.
 
+## Set up from a phone
+
+On the TV: **Home > Info > Home Assistant**. A sheet shows a QR code and a 6-digit code; scan the code with a phone on
+the same network (or open the address shown and type the code). The page, served by the bridge on port 7680, has:
+
+- **Home Assistant**: MQTT server, port, username, password, with a **Test connection** button. The password is never
+  sent back to the phone; leave it empty to keep the current one.
+- **This TV**: the name it has in Home Assistant.
+- **Notifications**: on/off, and extra addresses allowed to send them (`notify_from`) if Home Assistant doesn't run
+  on the broker's host.
+- **Thread** (where the border router is installed): keep the current network, read Home Assistant's preferred
+  network once (address + a long-lived token; the token is used for that one request and not stored), or paste a
+  dataset. The dataset is applied as the owner user with `ot-ctl`, with Thread stopped first so nothing is pushed
+  to the rest of the mesh.
+- **Wallpaper**: latitude/longitude for the sunrise/sunset switch.
+
+Save writes the owner-only config, reconnects, and the sheet on the TV shows the result. The page only works while
+the sheet is open: Back on the TV, 10 minutes, or 8 wrong codes close it. It is plain HTTP on your LAN, like the TV's
+own setup flows; the code keeps others on the network out while it is open.
+
 ## Install
 
-1. On the TV, as root: feed `device/ha-bridge/ha-bridge-install.sh` to `/bin/sh` on stdin.
-2. Copy `/opt/usr/home/owner/.config/silentglass-ha.conf.example` to `silentglass-ha.conf` (owner, mode 600, same
-   SMACK label as the home directory) and fill in the broker. The unit starts once the file exists; input names come
-   from the TV.
+1. On the TV, as root: feed `device/ha-bridge/ha-bridge-install.sh` to `/bin/sh` on stdin. The bridge starts
+   unconfigured (Info shows *Set up*).
+2. Set it up from a phone (above). By hand instead: copy `/opt/usr/home/owner/.config/silentglass-ha.conf.example`
+   to `silentglass-ha.conf` (owner, mode 600, same SMACK label as the home directory), fill in the broker and
+   restart the unit.
 3. The device appears in Home Assistant under Settings > Devices (MQTT).
 
 The credentials live only in that file on the TV, never in the repo. A broker user limited to `silentglass/#` and
 `homeassistant/+/silentglass_s90d/#` is the tidy choice; a shared house user works too.
 
 Remove: `ha-bridge-restore.sh` (then delete the device in Home Assistant to clear the retained discovery topics).
-Log (events only): `/run/user/5001/silentglass-ha.log`.
+Log (events only): `/run/user/5001/silentglass-ha.log`; status for Info: the launcher's `data/bridge-status.txt`.

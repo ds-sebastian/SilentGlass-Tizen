@@ -1,65 +1,30 @@
 # Provenance and verification scope
 
-## Original device work
+## Device work
 
-The findings were compiled from local inspection, build/deployment records,
-registry snapshots, post-restart checks and owner feedback collected
-2026-10-19 through 2026-10-20. Private originals remain outside this repository.
-No serial, network address, account identity, original application binary,
-raw TV log or screen photo is needed to reproduce the findings.
+Everything was developed and checked on one owner-authorized QN65S90DAFXZA (firmware
+`T-PTMDAKUC-0090-REL-202605141701`) between 2026-10-21 and 2026-10-26, building on the Quiet Tizen work done on a
+U8000F (2026-10-19/20). Private originals - registry snapshots, logs, network addresses, credentials - stay outside
+this repository. [Tizen notes](samsung-tizen-notes.md) record what was observed and on which TV.
 
-[observations.json](../evidence/observations.json) contains a deliberately
-small sanitized record. It is an observation summary, not an independently
-reproducible benchmark dataset.
+Administrative access came from the external [s90c-tools](https://github.com/invaliddayta/s90c-tools) `tv-access`
+helper (not bundled); its scope and limits are summarized in [upstream notes](upstream-notes.md).
 
-## Access tooling
+## Launcher and bridge
 
-Source: [chris-ritsen/samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b),
-commit `4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b`, Unlicense.
-
-Only the archive-route support modules and two .NET component projects are
-vendored. The QN90B/QN90F kernel access methods, continuous host controller,
-firmware-key tooling and unrelated components are not bundled.
-`resources.py` retains upstream profile names, but this toolkit explicitly
-builds and selects only the two common .NET 6 runtime components.
-
-The one local change to the copied access code is in `archive_root.py`:
-if Samsung's host returns the exact `Unknown option --list-runtimes` error,
-resolve `/usr/share/dotnet.tizen/netcoreapp`, require `libcoreclr.so` and
-`System.Private.CoreLib.dll`, then derive the runtime version from that path.
-Other preflight errors still fail. This fallback was used on the actual TV.
-
-The new `tools/tv.py` wrapper adds explicit model/declared-firmware gating,
-private local storage, bounded checksum-verified file transfer and reviewed
-single-command execution. Those generalized conveniences were locally
-tested; they are not a claim of end-to-end testing on additional hardware.
-
-## Launcher and design
-
-The C# launcher, app catalog, native settings bridge and Probe were developed
-for the tested Tizen device. The public source retains the tested native
-architecture, with a streaming-app dock shortcut and redistributable
-placeholders in the public catalog.
-
-Visual reference: [simbasjungles/free-my-tv](https://github.com/simbasjungles/free-my-tv/tree/73409804e5085e720dccea9ab95078a515cae098),
-commit `73409804e5085e720dccea9ab95078a515cae098`, MIT. The port adapts layout,
-palette, font treatment and focus/dock proportions. It does not run Android
-code on Tizen. Inter and Material Symbols licenses are included separately.
-
-Publisher logos remain optional local downloads. High resolution was preferred
-over invented vectors for artwork such as the translucent Xbox mark. The
-download manifest is an attribution/source record, not a license grant.
+SilentGlass (the launcher), the QuickLaunch settings bridge, Probe and the Home Assistant bridge were written for the
+tested TV and compiled against assemblies from that TV. The UI was designed with Pi-rendered HTML mockups
+(`tools/overlay_mockup.py`) before each on-TV check.
 
 ## What local validation establishes
 
-- Native launcher, bridge, Probe and the administrative component source compile with the
-  matching locally held references/SDK.
-- Synthetic registry tests verify targeted apply/restore behavior, preservation
-  of unrelated fields and refusal of missing, duplicate or changed target rows.
-- Catalog tests exercise navigation across page boundaries and malformed input.
-- Shell recipes receive syntax checks; selected SQL blocks are tested against
-  synthetic tables.
-- Public files receive a review for accidental private/binary artifacts.
+- The launcher, bridge and Probe compile against the matching locally held references.
+- C# tests cover the NUI-free logic: preferences, Watch/Play cycling, banner geometry, sun times, QR encoding.
+  The QR encoder's output is also decoded with OpenCV on the Pi.
+- The Home Assistant bridge's notification parser is driven by Home Assistant's own client library, and its phone
+  setup page runs end to end against a fake MQTT broker (code gate, validation, saved config, reconnect).
+- Shell recipes and device scripts receive syntax and integrity checks; selected SQL is tested against synthetic
+  tables.
 
-These checks do not substitute for visual/controller verification, firmware
-compatibility testing or measurement of real input latency on each target.
+These checks do not substitute for on-TV visual and remote checks, reboot and standby acceptance, or compatibility
+testing on another model or firmware.

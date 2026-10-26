@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIR = ROOT / "devices/s90d/device/ha-bridge"
-SRC = (DIR / "src/Program.cs").read_text()
+SRC = "\n".join(p.read_text() for p in sorted((DIR / "src").glob("*.cs")))
 
 
 class HaBridgeTests(unittest.TestCase):
@@ -58,8 +58,8 @@ class HaBridgeTests(unittest.TestCase):
         self.assertIn("bixby-promotion/data/thread-switch", watched)
 
     def test_launcher_accepts_source_requests_only_for_listed_inputs(self):
-        home = (ROOT / "launcher/src/Home.cs").read_text()
-        self.assertIn('TryGet("quiet_source",out string req)&&int.TryParse(req,out int src)&&inputs.Exists(i=>i.Type==src)', home)
+        home = (ROOT / "launcher/src/SilentGlass.cs").read_text()
+        self.assertIn('if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }', home)
 
     def test_availability_uses_a_retained_last_will(self):
         self.assertIn('Base + "/availability", "offline"', SRC)
@@ -81,7 +81,7 @@ class HaBridgeTests(unittest.TestCase):
                 data = gzip.decompress(data)
             self.assertEqual(hashlib.sha256(data).hexdigest(), sha)
         unit = (DIR / "silentglass-ha.service").read_text()
-        self.assertIn("ConditionPathExists=/opt/usr/home/owner/.config/silentglass-ha.conf", unit)
+        self.assertNotIn("ConditionPathExists", unit)  # starts unconfigured: the phone setup page writes the config
         self.assertNotIn("User=", unit)  # owner session, never root
         example = (DIR / "silentglass-ha.conf.example").read_text()
         self.assertIn("password=change-me", example)

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Run via tools/tv.py exec --script recipes/snapshot.sh --arg UNIQUE_PHASE_NAME
+# Run as root: /bin/sh -s -- UNIQUE_PHASE_NAME < recipes/snapshot.sh
 set -eu
 test "$(id -u)" = 0
 name=${1:?Give this snapshot a unique phase name}

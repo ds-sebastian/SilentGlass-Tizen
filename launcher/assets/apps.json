@@ -108,16 +108,5 @@
     "Background": "#000000",
     "Width": 640,
     "Height": 360
-  },
-  {
-    "Name": "Get more apps",
-    "Id": "org.volt.apps",
-    "Asset": "glass-button.svg",
-    "Description": "Open Samsung Apps",
-    "Fit": "cover",
-    "Background": "#EEF0F8",
-    "Width": 100,
-    "Height": 112,
-    "Utility": true
   }
 ]

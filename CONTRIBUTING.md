@@ -8,8 +8,9 @@ steps were exercised, what was checked after full boot and standby/wake, and
 how restoration was verified. A successful preflight is not a successful
 root session; a root session is not a validated launcher install.
 
-Use a separate profile rather than widening the existing profile's model
-gate. Preserve the owner-selected features and take fresh rollback state.
+Record another model in its own `devices/<model>/` folder rather than editing
+the S90D record, and add what you learn about Samsung's services to
+[Tizen notes](docs/samsung-tizen-notes.md) with the firmware it was seen on. Preserve the owner-selected features and take fresh rollback state.
 Include sanitized observations and the corresponding tests.
 
 Do not attach serial numbers, MAC/IP addresses, device/account IDs, original
@@ -17,7 +18,7 @@ app assemblies, SDK binaries, database snapshots or raw session logs.
 Review screenshots for viewing history, profile names and other personal
 information before sharing them.
 
-For agent-led changes, follow [the walkthrough](docs/10-agent-workflow.md), cite
+For agent-led changes, follow [the walkthrough](docs/agent-workflow.md), cite
 pinned upstream sources when adding factual advice, and distinguish documentation
 review, offline checks, live observations and restart/standby acceptance. Use plain
 maintenance language without concealing required privileges or security limits.
@@ -26,7 +27,6 @@ For local checks:
 
 ```sh
 python3 -m unittest discover -s tests -v
-python3 tools/build.py payloads
 dotnet run --project tests/CatalogTests.csproj -- launcher/assets/apps.json
 ```
 

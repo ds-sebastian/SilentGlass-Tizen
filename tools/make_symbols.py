@@ -71,6 +71,15 @@ SYMBOLS = {
     "artframe": f'<path d="{rrect(5, 5, 38, 38, 4)}"/><path d="{rrect(12, 12, 24, 24, 2)}"/>',
     "gear": fill(gear(24, 24)),
     "slidersmore": '<path d="M8 24h.01M24 24h.01M40 24h.01" stroke-width="6"/>',
+    "pixelshift": fill(rrect(6, 6, 15, 15, 3.5) + rrect(27, 27, 15, 15, 3.5), "nonzero") + '<path d="M30 9h9v9M18 39H9v-9"/>',
+    "bluetooth": '<path d="M14 15l20 18-10 9V6l10 9-20 18"/>',
+    "network": '<path d="M5 18a27 27 0 0 1 38 0M11 25a18 18 0 0 1 26 0M17 32a9 9 0 0 1 14 0"/>' + fill(circle(24, 39, 3.2), "nonzero"),
+    "bell": fill("M24 5a3 3 0 0 1 3 3v1.4c6 1.4 10 6.6 10 13V30l4 5H7l4-5v-7.6c0-6.4 4-11.6 10-13V8a3 3 0 0 1 3-3z", "nonzero")
+            + fill("M19 38h10a5 5 0 0 1-10 0z", "nonzero"),
+    "homeassistant": '<path d="M5 24L24 6l19 18M10 20v22h28V20"/>' + fill(circle(24, 27, 3.4) + circle(17, 35, 2.6) + circle(31, 35, 2.6), "nonzero")
+                     + '<path d="M24 30v3M21.5 33.5l-2.6 1.2M26.5 33.5l2.6 1.2" stroke-width="2.6"/>',
+    "thread": fill(circle(24, 9, 4) + circle(9, 37, 4) + circle(39, 37, 4) + circle(24, 28, 3.4), "nonzero")
+              + '<path d="M24 13v12M12 35l9.5-5.5M36 35l-9.5-5.5M13 37h22M21 11l-10 23M27 11l10 23" stroke-width="2.8"/>',
     "check": '<path d="M10 25l9 9 19-20" stroke-width="4.4"/>',
     "chevron": '<path d="M19 12l12 12-12 12" stroke-width="4.4"/>',
 }

@@ -17,7 +17,16 @@ HARNESS = ROOT / ".local/notice-harness/NoticeHarness.dll"
 DOTNET = os.environ.get("DOTNET", "/home/dietpi/opt/samsung-tv-lab/dotnet6/dotnet")
 SAMPLE = ROOT / ".local/notice-mock/sample.jpg"
 SRC = ROOT / "launcher/src"
-BRIDGE = ROOT / "devices/s90d/device/ha-bridge/src/Program.cs"
+BRIDGE_DIR = ROOT / "devices/s90d/device/ha-bridge/src"
+
+
+class _Bridge:
+    @staticmethod
+    def read_text():
+        return "\n".join(p.read_text() for p in sorted(BRIDGE_DIR.glob("*.cs")))
+
+
+BRIDGE = _Bridge
 
 try:
     from notifications_android_tv.notifications import Notifications  # noqa: E402
@@ -60,15 +69,16 @@ class NoticeSourceTests(unittest.TestCase):
     """Static guarantees (always run)."""
 
     def test_banner_never_takes_focus_or_the_picture(self):
-        src = (SRC / "Home.Notice.cs").read_text()
+        src = (SRC / "Notice.cs").read_text()
         self.assertIn("nw.SetAcceptFocus(false);", src)
-        self.assertIn("nw.Type=WindowType.Notification;", src)
-        for banned in ("VideoCanvasView", "connect_source", "Window.Default.Show"):
+        self.assertIn("nw.Type = WindowType.Notification;", src)
+        for banned in ("VideoCanvasView", "connect_source", "Window.Default.Show", "ShowBackdrop"):
             self.assertNotIn(banned, src)
-        home = (SRC / "Home.cs").read_text()
-        self.assertIn("bool forNotice=NoticePending();if(forNotice){try{Window.Default.Hide();}catch{}mainHidden=true;}", home)
-        self.assertIn('if(e.ReceivedAppControl.ExtraData.TryGet("quiet_notice",out string _)){TakeNotice("launch");return;}', home)
-        self.assertIn("<Compile Include=\"Home.Notice.cs\" />", (SRC / "Home.csproj").read_text())
+        home = (SRC / "SilentGlass.cs").read_text()
+        # started only for a notification: the backdrop is built hidden and stays hidden
+        self.assertIn("BuildBackdrop();  // hidden until there is nothing to draw over", home)
+        self.assertIn('if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }', home)
+        self.assertIn('<Compile Include="Notice.cs" />', (SRC / "SilentGlass.csproj").read_text())
 
     def test_bridge_never_wakes_and_only_listens_to_home_assistant(self):
         src = BRIDGE.read_text()

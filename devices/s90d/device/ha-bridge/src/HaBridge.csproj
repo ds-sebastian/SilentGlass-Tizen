@@ -8,4 +8,7 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="setup.html" LogicalName="setup.html" />
+  </ItemGroup>
 </Project>

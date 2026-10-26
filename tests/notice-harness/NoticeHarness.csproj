@@ -9,5 +9,5 @@
     <StartupObject>NoticeHarness</StartupObject>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../devices/s90d/device/ha-bridge/src/Program.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../devices/s90d/device/ha-bridge/src/*.cs" /><EmbeddedResource Include="../../devices/s90d/device/ha-bridge/src/setup.html" LogicalName="setup.html" /></ItemGroup>
 </Project>

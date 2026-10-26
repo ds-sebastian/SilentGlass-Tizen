@@ -1,0 +1,141 @@
+"""The bridge's phone setup page, run off the TV: `silentglass-ha.dll --no-tv` with a temporary data directory and
+config, against a fake MQTT broker. Covers the code gate, the 10-minute page lifecycle files, validation, saving
+(the password is never echoed and blank keeps it), the reconnect with the new settings, and wrong credentials."""
+import json, os, shutil, socket, subprocess, tempfile, threading, time, unittest, urllib.request, urllib.error
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DLL = Path(os.environ.get("SG_BRIDGE_DLL", ROOT / ".local/ha-bridge-test/silentglass-ha.dll"))
+DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet") or str(Path.home() / "opt/samsung-tv-lab/dotnet6/dotnet")
+
+
+class FakeBroker:
+    """Accepts MQTT CONNECT; refuses with code 4 when the password is 'wrong'. Records client ids and credentials."""
+    def __init__(self):
+        self.sock = socket.socket(); self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("127.0.0.1", 0)); self.sock.listen(8); self.port = self.sock.getsockname()[1]
+        self.connects = []; threading.Thread(target=self.serve, daemon=True).start()
+
+    def serve(self):
+        while True:
+            try: c, _ = self.sock.accept()
+            except OSError: return
+            threading.Thread(target=self.client, args=(c,), daemon=True).start()
+
+    def client(self, c):
+        try:
+            head = c.recv(1)
+            mult, length = 1, 0
+            while True:
+                d = c.recv(1)[0]; length += (d & 127) * mult; mult *= 128
+                if not d & 128: break
+            body = b""
+            while len(body) < length: body += c.recv(length - len(body))
+            flags = body[7]; pos = 10
+            def s():
+                nonlocal pos
+                n = int.from_bytes(body[pos:pos + 2], "big"); v = body[pos + 2:pos + 2 + n].decode(); pos += 2 + n; return v
+            cid = s()
+            if flags & 4: s(); s()
+            user = s() if flags & 128 else None
+            pw = s() if flags & 64 else None
+            self.connects.append((cid, user, pw))
+            c.sendall(bytes([0x20, 2, 0, 4 if pw == "wrong" else 0]))
+            while c.recv(64): pass
+        except Exception: pass
+        finally: c.close()
+
+
+def free_port():
+    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
+
+
+@unittest.skipUnless(DLL.exists() and Path(DOTNET).exists(), "build the bridge into .local/ha-bridge-test first")
+class SetupPageTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); t = Path(self.tmp.name)
+        self.data = t / "data"; self.data.mkdir(); self.conf = t / "silentglass-ha.conf"
+        self.broker = FakeBroker(); self.port = free_port()
+        env = dict(os.environ, SG_DATA=str(self.data), SG_CONF=str(self.conf), SG_SETUP_PORT=str(self.port), DOTNET_CLI_TELEMETRY_OPTOUT="1")
+        self.proc = subprocess.Popen([DOTNET, str(DLL), "--no-tv"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+    def tearDown(self):
+        self.proc.kill(); self.proc.wait(); self.broker.sock.close(); self.tmp.cleanup()
+
+    def wait_for(self, check, seconds=15):
+        end = time.time() + seconds
+        while time.time() < end:
+            v = check()
+            if v: return v
+            time.sleep(0.1)
+        self.fail("timed out")
+
+    def status(self):
+        try: return json.loads((self.data / "setup.json").read_text())
+        except Exception: return None
+
+    def open_page(self):
+        (self.data / "setup-request").write_text("now\n")
+        s = self.wait_for(lambda: (st := self.status()) and st["state"] == "waiting" and st)
+        self.assertRegex(s["code"], r"^\d{6}$"); self.assertTrue(s["url"].endswith(":%d/" % self.port))
+        return s["code"]
+
+    def api(self, path, body=None, code=None):
+        req = urllib.request.Request("http://127.0.0.1:%d%s" % (self.port, path), data=None if body is None else json.dumps(body).encode(),
+                                     headers={"X-Code": code or "", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r: return r.status, r.read()
+        except urllib.error.HTTPError as e: return e.code, e.read()
+        except urllib.error.URLError: return 410, b""  # the page is closed: nothing listens any more
+
+    def test_unconfigured_then_setup_and_save(self):
+        self.wait_for(lambda: (self.data / "bridge-status.txt").exists())
+        self.assertIn("mqtt=unconfigured", (self.data / "bridge-status.txt").read_text())
+        code = self.open_page()
+        st, page = self.api("/")
+        self.assertEqual(st, 200); self.assertIn(b"Enter the code shown on the TV", page)
+        self.assertEqual(self.api("/api/state", code="000000" if code != "000000" else "111111")[0], 403)
+        st, body = self.api("/api/state", code=code); state = json.loads(body)
+        self.assertEqual((st, state["mqtt"], state["has_password"]), (200, "unconfigured", False))
+        self.assertEqual(self.status()["state"], "phone")
+        # validation
+        for bad in ({"host": "bad host!"}, {"host": "h", "port": "70000"}, {"host": "h", "name": "a\nb"}, {"host": "h", "thread": "tlv", "tlv": "zz"},
+                    {"host": "h", "lat": "100"}, {"host": "h", "notify_from": "x;rm"}):
+            ok = json.loads(self.api("/api/save", bad, code)[1])["ok"]
+            self.assertFalse(ok, bad)
+        self.assertFalse(self.conf.exists())
+        # test button: wrong password, then right
+        r = json.loads(self.api("/api/test", {"host": "127.0.0.1", "port": self.broker.port, "user": "tv", "password": "wrong"}, code)[1])
+        self.assertEqual((r["ok"], "wrong username or password" in r["message"]), (False, True))
+        r = json.loads(self.api("/api/test", {"host": "127.0.0.1", "port": self.broker.port, "user": "tv", "password": "secret"}, code)[1])
+        self.assertTrue(r["ok"], r)
+        # save: conf written owner-only, bridge connects with it
+        r = json.loads(self.api("/api/save", {"host": "127.0.0.1", "port": str(self.broker.port), "user": "tv", "password": "secret", "name": "Den TV",
+                                              "notifications": False, "notify_from": "192.0.2.5", "lat": "40.7", "lon": "-74.0", "thread": "keep"}, code)[1])
+        self.assertTrue(r["ok"], r); self.assertIn("Connected", r["message"])
+        self.assertEqual(oct(self.conf.stat().st_mode & 0o777), "0o600")
+        conf = self.conf.read_text()
+        for line in ("host=127.0.0.1", "user=tv", "password=secret", "name=Den TV", "notify_from=192.0.2.5"): self.assertIn(line, conf)
+        self.assertTrue((self.data / "notify-off").exists()); self.assertIn("lat=40.7", (self.data / "location.txt").read_text())
+        self.assertIn(("silentglass-s90d", "tv", "secret"), self.broker.connects)
+        self.assertEqual(self.status()["state"], "saved")
+        # the password is never sent back; blank keeps it
+        state = json.loads(self.api("/api/state", code=code)[1])
+        self.assertNotIn("secret", json.dumps(state)); self.assertTrue(state["has_password"]); self.assertEqual(state["mqtt"], "connected")
+        r = json.loads(self.api("/api/save", {"host": "127.0.0.1", "port": str(self.broker.port), "user": "tv", "password": "", "name": "Den TV", "notifications": True, "thread": "keep"}, code)[1])
+        self.assertTrue(r["ok"], r); self.assertIn("password=secret", self.conf.read_text()); self.assertFalse((self.data / "notify-off").exists())
+        # closing on the TV ends the page
+        (self.data / "setup-close").write_text("x")
+        self.wait_for(lambda: (st := self.status()) and st["state"] == "closed")
+        self.assertEqual(self.api("/api/state", code=code)[0], 410)
+
+    def test_wrong_codes_close_the_page(self):
+        code = self.open_page(); wrong = "%06d" % ((int(code) + 1) % 1000000)
+        for _ in range(7): self.assertEqual(self.api("/api/state", code=wrong)[0], 403)
+        self.assertEqual(self.api("/api/state", code=wrong)[0], 410)
+        self.assertEqual(self.api("/api/state", code=code)[0], 410)
+        self.assertEqual(self.status()["state"], "closed")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -11,19 +11,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("target", choices=["payloads", "launcher", "all"])
+    parser.add_argument("target", choices=["launcher"])
     parser.add_argument("--dotnet", default=os.environ.get("DOTNET", "dotnet"))
     parser.add_argument("--framework", type=Path, default=ROOT / ".local/tv-framework")
     args = parser.parse_args()
     jobs = []
-    if args.target in ("payloads", "all"):
-        for name in ("SamsungTvArchiveRoot", "SamsungTvRootAgent"):
-            jobs.append((ROOT / f"vendor/payload-source/{name}.csproj", "payloads", name, []))
-    if args.target in ("launcher", "all"):
+    if args.target == "launcher":
         for name in ("Tizen.NUI", "Tizen.Applications.Common", "Tizen.System", "Tizen"):
             if not (args.framework / f"{name}.dll").is_file():
-                parser.error(f"Missing {name}.dll. Read docs/04-launcher.md; these are not bundled.")
-        for name in ("Home", "QuickLaunch"):
+                parser.error(f"Missing {name}.dll. Read docs/install.md (step 1); these are not bundled.")
+        for name in ("SilentGlass", "QuickLaunch"):
             jobs.append((ROOT / f"launcher/src/{name}.csproj", name, name,
                          [f"-p:TV_FRAMEWORK_DIR={args.framework.resolve()}"]))
         jobs.append((ROOT / "launcher/probe/Probe.csproj", "Probe", "Probe", []))
@@ -35,10 +32,10 @@ def main():
             "-p:Deterministic=true",
             f"-p:PathMap={ROOT}=/_/quiet-tizen", *extra,
         ], check=True, env={**os.environ, "DOTNET_CLI_TELEMETRY_OPTOUT": "1"})
-    if args.target in ("launcher", "all"):
+    if args.target == "launcher":
         destination = ROOT / ".local/package"
         destination.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT / ".local/build/Home/BixbyPromotion.dll", destination / "BixbyPromotion.dll")
+        shutil.copyfile(ROOT / ".local/build/SilentGlass/BixbyPromotion.dll", destination / "BixbyPromotion.dll")
         shutil.copyfile(ROOT / ".local/build/QuickLaunch/QuickLaunch.dll", destination / "QuickLaunch.dll")
         shutil.copyfile(ROOT / ".local/build/Probe/Probe.dll", destination / "Probe.dll")
         assets = destination / "quiet-home"

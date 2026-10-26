@@ -19,14 +19,7 @@ class PackageTests(unittest.TestCase):
             asset = entry["Asset"]
             self.assertNotIn("..", asset)
             self.assertTrue((ROOT / "launcher/assets" / asset).is_file(), asset)
-        self.assertEqual(sum(bool(a.get("Utility")) for a in catalog), 1)
-
-    def test_profile_has_no_duplicate_app_ids_or_essential_containers(self):
-        profile = json.loads((ROOT / "profiles/un75u8000ffxza-1300.9.json").read_text())
-        ids = [app for group in profile["groups"].values() for app in group["app_ids"]]
-        self.assertEqual(len(ids), len(set(ids)))
-        for essential in ("com.samsung.tv.bixby-promotion", "org.tizen.menu", "com.samsung.tv.quicklaunch"):
-            self.assertNotIn(essential, ids)
+        self.assertFalse(any(a.get("Utility") for a in catalog))  # the Apps menu lists apps only
 
     def test_shell_syntax(self):
         for path in (ROOT / "recipes").glob("*.sh"):

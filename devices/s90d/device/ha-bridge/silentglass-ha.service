@@ -1,8 +1,8 @@
 [Unit]
-Description=SilentGlass: Home Assistant bridge (MQTT discovery; state + a fixed set of commands)
+Description=SilentGlass: Home Assistant bridge (MQTT discovery, notifications, phone setup page)
 StartLimitIntervalSec=0
-# configure first: copy silentglass-ha.conf.example to silentglass-ha.conf (mode 600) and fill in the broker
-ConditionPathExists=/opt/usr/home/owner/.config/silentglass-ha.conf
+# runs unconfigured too: set it up from a phone (TV: Home > Info > Home Assistant), which writes
+# /opt/usr/home/owner/.config/silentglass-ha.conf (mode 600)
 
 [Service]
 Type=simple

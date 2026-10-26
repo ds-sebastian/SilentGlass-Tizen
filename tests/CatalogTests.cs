@@ -100,46 +100,45 @@ static class CatalogTests
     }
     static void HomeLogicTests()
     {
-        // runtime conf: last value wins, junk lines ignored, values clamped / validated, missing file = defaults
-        var conf = HomeLogic.ParseConf("vsync=9\nwall=shader\nlat=40.5\nlon=abc\n=x\nnoequals\nscrim=0\nscrim=1\n");
-        True(HomeLogic.Int(conf, "vsync", 1, 1, 4) == 4, "conf int clamps");
-        True(HomeLogic.Pick(conf, "wall", "photo", "photo", "gradient") == "photo", "conf rejects removed modes");
-        True(HomeLogic.Num(conf, "lat", 0) == 40.5 && HomeLogic.Num(conf, "lon", -74.0) == -74.0, "conf numbers");
-        True(HomeLogic.Flag(conf, "scrim", false) && HomeLogic.Flag(conf, "enabled", true), "conf flags");
-        True(HomeLogic.ReadConf("/nonexistent/quiet-home.conf").Count == 0, "missing conf");
-        // Watch / Play inputs: only Automatic or HDMI 1-4 survive a round trip
-        var saved = new HomeLogic.Prefs { Watch = 15, HideApps = true, Live = false, Dim = false, Wall = "night" };
-        var back = HomeLogic.ParsePrefs(HomeLogic.FormatPrefs(saved));
-        True(back.Watch == 15 && back.Play == 0 && back.HideApps && !back.Live && !back.Dim && back.Wall == "night", "prefs round trip");
-        var junk = HomeLogic.ParsePrefs("watch=99\nplay=14\nwall=sepia\n");
-        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto", "prefs reject junk");
-        // a file from an older Quiet Home (or none) keeps every newer setting at its default
-        var old = HomeLogic.ParsePrefs("watch=0\nplay=0\nhideapps=1\n");
-        True(old.HideApps && old.Live && old.Dim && old.Wall == "auto", "older prefs files load with defaults");
-        True(HomeLogic.ParsePrefs(null).Live && !HomeLogic.ParsePrefs(null).HideApps, "no prefs file = defaults");
-        True(HomeLogic.NextWall("auto") == "day" && HomeLogic.NextWall("day") == "night" && HomeLogic.NextWall("night") == "auto", "wallpaper cycle");
-        // tab bar: a hidden Apps tab is skipped both ways; the ends stop
-        True(HomeLogic.NextTab(0, 1, true) == 2 && HomeLogic.NextTab(2, -1, true) == 0, "skip hidden Apps tab");
-        True(HomeLogic.NextTab(0, 1, false) == 1 && HomeLogic.NextTab(0, -1, true) == 0 && HomeLogic.NextTab(3, 1, false) == 3, "tab ends");
-        True(HomeLogic.NextPort(0, 15) == 13 && HomeLogic.NextPort(16, 15) == 0, "port cycle wraps through Automatic");
-        True(HomeLogic.NextPort(0, 13) == 14 && HomeLogic.NextPort(14, 15) == 16, "port cycle skips the other card's input");
-        True(HomeLogic.NextPort(0, 15, -1) == 16 && HomeLogic.NextPort(13, 15, -1) == 0 && HomeLogic.NextPort(16, 15, -1) == 14, "port cycle backwards (Left)");
-        for (int other = 13; other <= 16; other++)
-            for (int cur = 0; cur <= 16; cur = cur == 0 ? 13 : cur + 1)
-            {
-                int n = HomeLogic.NextPort(cur, other);
-                True(n != other && (n == 0 || HomeLogic.IsHdmi(n)), "port cycle never collides");
+        // preferences: round trip, junk rejected, older files load
+        var saved = new Logic.Prefs { Watch = 15, HideApps = true, Dim = false, Wall = "night", Lat = 51.5, Lon = -0.1 };
+        var back = Logic.ParsePrefs(Logic.FormatPrefs(saved));
+        True(back.Watch == 15 && back.Play == 0 && back.HideApps && !back.Dim && back.Wall == "night" && back.Lat == 51.5 && back.Lon == -0.1, "prefs round trip");
+        var junk = Logic.ParsePrefs("watch=99\nplay=14\nwall=sepia\nlat=400\nlon=abc\n");
+        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == -74.0, "prefs reject junk");
+        var old = Logic.ParsePrefs("watch=0\nplay=0\nhideapps=1\nlive=0\noverlay=1\n");
+        True(old.HideApps && old.Dim, "pre-v40 prefs load");
+        True(!Logic.ParsePrefs(null).HideApps && Logic.ParsePrefs(null).Dim, "no prefs file = defaults");
+        True(Logic.NextWall("auto") == "day" && Logic.NextWall("day") == "night" && Logic.NextWall("night") == "auto" && Logic.NextWall("auto", -1) == "night", "wallpaper cycle");
+        // Watch / Play inputs
+        True(Logic.NextPort(0, 15) == 13 && Logic.NextPort(16, 15) == 0, "port cycle wraps through Automatic");
+        True(Logic.NextPort(0, 13) == 14 && Logic.NextPort(14, 15) == 16, "port cycle skips the other one's input");
+        True(Logic.NextPort(0, 15, -1) == 16 && Logic.NextPort(13, 15, -1) == 0 && Logic.NextPort(16, 15, -1) == 14, "port cycle backwards (Left)");
+        for (int cur = 0; cur <= 16; cur = cur == 0 ? 13 : cur + 1)
+            for (int other = 13; other <= 16; other++) {
+                int n = Logic.NextPort(cur, other);
+                True(n != other && (n == 0 || Logic.IsHdmi(n)), "port cycle never collides");
             }
-        // live video: the wide card is exactly 16:9 (no crop); a narrow card is covered and centred; plus the bleed
-        True(HomeLogic.VideoRect(100, 170, 996, 560, 4) == (96, 166, 1004, 568), "wide card + bleed");
-        True(HomeLogic.VideoRect(100, 170, 684, 560, 0) == (-55, 170, 995, 560), "narrow card covered");
-        // sunrise / sunset for New York (EDT = UTC-4): 25 Oct 2026 about 07:29 / 18:28 local
-        var (rise, set) = HomeLogic.SunTimes(new DateTime(2026, 10, 25, 12, 0, 0, DateTimeKind.Utc), 40.7, -74.0);
+        True(Logic.GameName("Auto") == "Automatic" && Logic.GameName("On") == "Always" && Logic.GameName("Off") == "Never", "Game Mode words");
+        // notification banner geometry stays on screen
+        foreach (var size in new[] { "small", "medium", "large", "max", "?" })
+            foreach (var pos in new[] { "bottom-right", "bottom-left", "top-right", "top-left", "center", "?" }) {
+                int w = Logic.NoticeWidth(size), h = 600; var (x, y) = Logic.NoticeOrigin(pos, w, h);
+                True(x >= 0 && y >= 0 && x + w <= 1920 && y + h <= 1080, "banner on screen");
+            }
+        True(Logic.NoticeImageHeight(612, 896, 672) == 408 && Logic.NoticeImageHeight(612, 1920, 1080) == 344 && Logic.NoticeImageHeight(612, 0, 0) == 344, "banner image shape");
+        var j = new Logic.Json("{\"state\":\"waiting\",\"w\":896,\"at\":1792800000000}");
+        True(j["state"] == "waiting" && j.Int("w") == 896 && j.Long("at") == 1792800000000 && j["missing"] == "", "flat json");
+        // QR: shape only here (decoding is checked on the Pi with OpenCV)
+        var q = Qr.Encode("http://10.0.0.2:7680/?code=123456");
+        True(q.GetLength(0) == 29 && q[0, 0] && q[6, 6] && !q[7, 7], "QR version 3 with finders");
+        True(Qr.Svg(q).StartsWith("<svg") && Qr.Svg(q).Contains("h1v1h-1z"), "QR svg");
+        // sunrise / sunset
+        var (rise, set) = Logic.SunTimes(new DateTime(2026, 10, 25, 12, 0, 0, DateTimeKind.Utc), 40.7, -74.0);
         True(Math.Abs(rise - (11 * 60 + 18)) <= 5 && Math.Abs(set - (22 * 60 + 0)) <= 5, "sun times " + rise + " " + set);
-        True(!HomeLogic.IsNight(new DateTime(2026, 10, 25, 16, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "noon is day");
-        True(HomeLogic.IsNight(new DateTime(2026, 10, 26, 2, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "10 pm is night (after UTC midnight)");
-        True(HomeLogic.IsNight(new DateTime(2026, 10, 25, 9, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "5 am is night");
-        // a place whose day wraps past UTC midnight (Tokyo): local noon = 03:00 UTC
-        True(!HomeLogic.IsNight(new DateTime(2026, 6, 21, 3, 0, 0, DateTimeKind.Utc), 35.7, 139.7), "wrapped day");
+        True(!Logic.IsNight(new DateTime(2026, 10, 25, 16, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "noon is day");
+        True(Logic.IsNight(new DateTime(2026, 10, 26, 2, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "10 pm is night (after UTC midnight)");
+        True(Logic.IsNight(new DateTime(2026, 10, 25, 9, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "5 am is night");
+        True(!Logic.IsNight(new DateTime(2026, 6, 21, 3, 0, 0, DateTimeKind.Utc), 35.7, 139.7), "wrapped day");
     }
 }
