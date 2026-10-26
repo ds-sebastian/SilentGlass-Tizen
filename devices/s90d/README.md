@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v21b)
+## Quiet Home on the S90D (v21c)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -37,6 +37,11 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **v21c**: Home key while already on Home only refocuses (it used to rebuild the page: cards re-decoded and the
+  live video re-attached = a flash after Inputs -> Home). The video plane gets a 4 px bleed behind the card art and
+  its rectangle is re-asserted on signal events (a plane 1 px short of the see-through hole showed as a thin line).
+  Focused non-live hero grows 2% (was 4.5%). Preview gaps with no signal are the TV's own: Samsung's launcher
+  drops its preview the same way (SHIELD asleep -> mainscreen_signal_state 0).
 - **v21**: live hero card gets an eased bottom band (clear -> 82% black over 330 px) instead of a word box - the
   video plane is separate hardware and cannot be blurred, only darkened. Shadows follow Apple's restraint: none on
   hero cards at rest (soft one only on focus), faint on tiles, light on the floating sheet/toast. Controls page is

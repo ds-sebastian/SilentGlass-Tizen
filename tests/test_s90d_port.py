@@ -321,6 +321,17 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("else bg = texture2D(sFrost,vUV).rgb;", glass)
         self.assertIn("if(kind==0&&frostSet!=null)r.SetTextures(frostSet);", glass)
 
+    def test_home_key_on_home_does_not_rebuild(self):
+        src = launcher()
+        home = body(src, "void Home(")
+        # on Home already: refocus only (rebuilding flashed the cards and re-attached the video)
+        self.assertIn("if(page==0){", home)
+        self.assertIn("if(!RelayoutHeroes()){UpdateHeroBadges(false);UpdateFocus();ScheduleLive();}", home)
+        self.assertLess(home.index("return;"), home.index("BuildPage(false)"))
+        live = (SRC / "Home.Live.cs").read_text()
+        self.assertIn("var rect=(c.Item1-Bleed,c.Item2-Bleed,c.Item3+2*Bleed,c.Item4+2*Bleed);", live)
+        self.assertIn("if(liveView!=null&&liveSlot==hero){PushLiveGeometry(liveRect);", live)
+
     def test_live_band_and_light_shadows(self):
         src = launcher()
         # eased bottom band behind the words, only on the live card (no separate word box)
@@ -355,7 +366,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertLess(update.index("liveConf=ReadLiveConf();"), update.index("TVWindowControlAPI"))
         self.assertNotIn("ReadLiveConf", body(src, "void OnKey("))
         # the live card does not grow or lift on focus (the video plane does not follow those animations)
-        self.assertIn("bool still=IsLiveStill(s);scale=f&&!still?1.045f:1;lift=f&&!still?-6:0;", src)
+        self.assertIn("bool still=IsLiveStill(s);scale=f&&!still?1.02f:1;lift=f&&!still?-3:0;", src)
         # crop to fill (16:9 plane covering the card) instead of squashing into the card's shape
         self.assertIn("canvas.DisableAutoUpdateVideoGeometry=liveConf.Cover;", update)
         self.assertLess(update.index("DisableAutoUpdateVideoGeometry"), update.index("canvas.SetPlayer("))

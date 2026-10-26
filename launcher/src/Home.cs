@@ -78,10 +78,15 @@ public sealed partial class QuietHome : NUIApplication
  protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
  {
-  clockTimer?.Start();RefreshSource();
-  bool unchanged=page==0&&area==1&&editing==""&&selected==SourceIndex();
-  page=0;area=1;editing="";selected=SourceIndex();
-  if(unchanged)UpdateHeroBadges(false);else BuildPage(false);
+  clockTimer?.Start();RefreshSource();CloseInputs(false);
+  // already on Home: only move focus back. Rebuilding disposed every card and the live preview, so the
+  // artwork re-decoded and the video re-attached - that was the flash after Inputs -> Home.
+  if(page==0){
+   area=1;editing="";selected=SourceIndex();
+   if(!RelayoutHeroes()){UpdateHeroBadges(false);UpdateFocus();ScheduleLive();}
+   MarkState(activity);return;
+  }
+  page=0;area=1;editing="";selected=SourceIndex();BuildPage(false);
   MarkState(activity);
  }
  void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage(false);MarkState(activity);}
@@ -352,7 +357,7 @@ public sealed partial class QuietHome : NUIApplication
  void StyleSlot(Slot s,bool f,bool animate)
  {
   float scale=1,lift=0,opacity=1;
-  if(s.Kind==1){bool still=IsLiveStill(s);scale=f&&!still?1.045f:1;lift=f&&!still?-6:0;opacity=f||area==0||s==liveSlot?1:.7f;
+  if(s.Kind==1){bool still=IsLiveStill(s);scale=f&&!still?1.02f:1;lift=f&&!still?-3:0;opacity=f||area==0||s==liveSlot?1:.7f;
    if(Liquid)GlassFocus(s.Rim,f?1:0,0,animate);else{s.Card.BorderlineWidth=f?4:0;s.Card.BorderlineColor=heroLine;}}
   else if(s.Kind==2){
    scale=f?1.06f:1;

@@ -46,7 +46,7 @@ public sealed partial class QuietHome
    vconf_notify_key_changed(SignalKey,signalCallback,IntPtr.Zero);}catch{}
  }
  Tizen.NUI.Timer signalTimer;
- void ApplySignal(){int before=signal;ReadSignal();if(before==signal)return;UpdateHeroBadges();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("signal_changed");}
+ void ApplySignal(){int before=signal;ReadSignal();if(before==signal){if(liveView!=null)PushLiveGeometry(liveRect);return;}UpdateHeroBadges();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("signal_changed");}
  void ReadSignal(){try{signal=vconf_get_int(SignalKey,out int v)==0?v:-1;}catch{signal=-1;}}
  bool CurrentHasSignal=>signal==1;
 
@@ -58,7 +58,8 @@ public sealed partial class QuietHome
   Slot hero=null;
   if(liveConf.Enabled&&page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
   if(hero==null){HideLive();MarkState("live");return;}
-  if(liveView!=null&&liveSlot==hero)return;
+  // already live: re-assert the plane rectangle (the viewer can reset it when the source re-syncs or changes mode)
+  if(liveView!=null&&liveSlot==hero){PushLiveGeometry(liveRect);MarkState("live");return;}
   HideLive();
   try{
    // the window is told once that it shows TV video and stays so until Home is left (toggling it per preview made
@@ -99,7 +100,10 @@ public sealed partial class QuietHome
    int idx=slots.IndexOf(hero);StyleSlot(hero,idx==selected&&area==1,false); // settle any focus transform first
    // once layout has settled, push the final rectangle to the video plane explicitly
    liveGeometryTimer?.Stop();liveGeometryTimer=new Tizen.NUI.Timer(250);
-   var rect=liveConf.Cover?Cover(hero):(hero.X,hero.Y,hero.W,hero.H);
+   var c=liveConf.Cover?Cover(hero):(hero.X,hero.Y,hero.W,hero.H);
+   // 4 px bleed on every side: the see-through hole is exactly the card, so a plane even 1 px short showed as a thin
+   // dark line along the card edge; the bleed sits behind the card's own artwork
+   var rect=(c.Item1-Bleed,c.Item2-Bleed,c.Item3+2*Bleed,c.Item4+2*Bleed);liveRect=rect;
    PushLiveGeometry(rect);UnmuteLive();
    liveGeometryTimer.Tick+=(s,e)=>{PushLiveGeometry(rect);UnmuteLive();return false;};liveGeometryTimer.Start();
    liveState="on:"+hero.Name+(liveConf.Still?":still":"")+(liveConf.Sync?":sync":"")+":conf="+liveConf.Source;
@@ -125,6 +129,7 @@ public sealed partial class QuietHome
   catch(Exception ex){liveUnmute=-1;liveGeometry+=" unmute:"+ex.GetType().Name;}
  }
  string liveGeometry="";int liveUnmute=-99;
+ const int Bleed=4;(int,int,int,int) liveRect;
  bool IsLiveStill(Slot s)=>s==liveSlot&&liveView!=null&&liveConf.Still;
  void HideLive()
  {
