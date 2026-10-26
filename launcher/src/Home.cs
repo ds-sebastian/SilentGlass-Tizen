@@ -73,7 +73,7 @@ public sealed partial class QuietHome : NUIApplication
   clockTimer.Tick+=(s,e)=>{clock.Text=Clock();CheckWallpaper();IdleTick();return true;};clockTimer.Start();
   visible=true;MarkState("created");
  }
- protected override void OnResume(){base.OnResume();visible=true;BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
+ protected override void OnResume(){base.OnResume();visible=true;styledAll=false;UpdateFocus(false); /* restyle everything after a pause */ BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
  protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
@@ -102,7 +102,9 @@ public sealed partial class QuietHome : NUIApplication
  {return (TextLabel)Add(Label(text,x,y,w,h,size,color,face));}
  TextLabel Label(string text,int x,int y,int w,int h,float size,Color color,string face="Medium")
  {return new TextLabel{Text=text,Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),PixelSize=size,FontFamily="Quiet Inter "+face,TextColor=color,VerticalAlignment=VerticalAlignment.Center};}
- static void StopAnimation(ref Animation a){if(a==null)return;a.Stop();a.Dispose();a=null;}
+ // StopFinal: an interrupted animation lands on its end values. Plain Stop() froze it mid-way, so a tile that was
+ // fading out of focus (fast key presses, or Menu pausing the app) could stay highlighted.
+ static void StopAnimation(ref Animation a){if(a==null)return;a.EndAction=Animation.EndActions.StopFinal;a.Stop();a.Dispose();a=null;}
 
  // Created once: wallpaper, glows, tab bar and clock never re-decode or re-layout on page changes.
  void BuildChrome()

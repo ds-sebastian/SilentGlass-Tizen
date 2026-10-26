@@ -321,6 +321,11 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("else bg = texture2D(sFrost,vUV).rgb;", glass)
         self.assertIn("if(kind==0&&frostSet!=null)r.SetTextures(frostSet);", glass)
 
+    def test_interrupted_focus_animation_lands_on_final_state(self):
+        src = launcher()
+        self.assertIn("a.EndAction=Animation.EndActions.StopFinal;a.Stop();", src)
+        self.assertIn("styledAll=false;UpdateFocus(false);", body(src, "protected override void OnResume("))
+
     def test_home_key_on_home_does_not_rebuild(self):
         src = launcher()
         home = body(src, "void Home(")
