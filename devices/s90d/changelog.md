@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v31a**: Home over the picture rebuilt the way Vetro does it: a separate notification-level window above the TV
+  viewer, which stays in front and playing (v30's full-screen video backdrop was dropped - it re-routed the video and
+  was unreliable). New design: one glass bar (inputs, Inputs, Controls, Apps, Info), Inputs as a menu anchored above
+  its item, Apps as their own floating menu, Controls as a right-side panel with level rows; no shader rims over the
+  picture; new SF Symbols-style icon set. Designed with 1:1 Chromium mockups (`tools/overlay_mockup.py`) before the
+  TV. The full-screen window now hides whenever another app is in front.
 - **v30c**: **Home over the picture** (tvOS 26 direction). With a picture on screen, Home no longer covers it: a Liquid
   Glass dock (inputs, Inputs, Controls, Info, optional apps row), a Control Center column on the right (brightness,
   contrast and volume as level tiles - the effect is visible on the picture as it changes), and Info over the

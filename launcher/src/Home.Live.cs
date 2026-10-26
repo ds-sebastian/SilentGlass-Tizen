@@ -37,9 +37,7 @@ public sealed partial class QuietHome
    vconf_notify_key_changed(SignalKey,signalCallback,IntPtr.Zero);}catch{}
  }
  Tizen.NUI.Timer signalTimer;
- void ApplySignal(){int before=signal;ReadSignal();if(before==signal){if(liveView!=null)PushLiveGeometry(liveRect);if(over)PushBack();return;}
-  // the picture went away (or came back) while Home is shown: switch between over-the-picture and full screen
-  if(visible&&(over||page==0)&&over!=WantOverlay()){SetOverlay(WantOverlay());if(over){page=0;selected=DockFocus();}BuildPage(false);MarkState("signal_changed");return;}UpdateHeroBadges();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("signal_changed");}
+ void ApplySignal(){int before=signal;ReadSignal();if(before==signal){if(liveView!=null)PushLiveGeometry(liveRect);return;}UpdateHeroBadges();if(inputsLayer!=null)FillSheet();ScheduleLive();MarkState("signal_changed");}
  void ReadSignal(){try{signal=vconf_get_int(SignalKey,out int v)==0?v:-1;}catch{signal=-1;}}
  bool CurrentHasSignal=>signal==1;
 
@@ -49,7 +47,7 @@ public sealed partial class QuietHome
  {
   liveConf=ReadLiveConf();
   Slot hero=null;
-  if(liveConf.Enabled&&prefs.Live&&page==0&&!over&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
+  if(liveConf.Enabled&&prefs.Live&&page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
   if(hero==null){HideLive();MarkState("live");return;}
   // already live: re-assert the plane rectangle (the viewer can reset it when the source re-syncs or changes mode)
   if(liveView!=null&&liveSlot==hero){PushLiveGeometry(liveRect);MarkState("live");return;}
@@ -57,7 +55,11 @@ public sealed partial class QuietHome
   try{
    // the window is told once that it shows TV video and stays so until Home is left (toggling it per preview made
    // the TV re-sync the input, which flapped the signal flag, which rebuilt the preview...)
-   EnsureLiveWindow();
+   if(!liveWindow){
+    if(!tvsHintSet){tvsHint=Window.Default.AddAuxiliaryHint("wm.tvs.win.use.tvs","1");tvsHintSet=true;}
+    else Window.Default.SetAuxiliaryHintValue(tvsHint,"1");
+    Window.Default.SetTransparency(true);liveWindow=true;
+   }
    tvWindow??=new Tizen.TV.Broadcast.TVWindowControl.TVWindowControlAPI();
    var art=hero.Card.GetChildAt(0); // the card artwork; the video goes directly above it, words and dot above that
    var canvas=new Tizen.TV.FLUX.VideoCanvasView{Size2D=new Size2D(hero.W,hero.H),Position2D=new Position2D(0,0)};

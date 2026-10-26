@@ -87,7 +87,7 @@ public sealed partial class QuietHome
   StopAnimation(ref badgeAnimation);
   if(animate)badgeAnimation=new Animation(220){DefaultAlphaFunction=Ease()};
   foreach(var s in slots){
-   if((s.Kind!=1&&s.Kind!=3)||s.Badge==null||!s.Action.StartsWith("hdmi:"))continue;
+   if(s.Kind!=1||!s.Action.StartsWith("hdmi:"))continue;
    var d=DotFor(int.Parse(s.Action.Substring(5)));
    if(d!=Dot.None)PaintDot(s.BadgeDot,d,false);
    float target=d!=Dot.None?1:0;
@@ -132,9 +132,7 @@ public sealed partial class QuietHome
   // slide up 40 px while fading in
   int y=sheet.Position2D.Y;sheet.Position2D=new Position2D(SheetX,y+40);
   sheetAnimation=new Animation(180){DefaultAlphaFunction=Ease()};
-  sheetAnimation.AnimateTo(inputsLayer,"Opacity",1f);sheetAnimation.AnimateTo(sheet,"PositionY",(float)y);
-  if(over)sheetAnimation.AnimateTo(content,"Opacity",0f); // modal over the picture: the dock steps aside
-  sheetAnimation.Play();
+  sheetAnimation.AnimateTo(inputsLayer,"Opacity",1f);sheetAnimation.AnimateTo(sheet,"PositionY",(float)y);sheetAnimation.Play();
   MarkState("inputs_open");
  }
  // (re)builds the rows from the current input list; keeps the selection on the same input
@@ -144,7 +142,7 @@ public sealed partial class QuietHome
   while(sheet.ChildCount>0){var v=sheet.GetChildAt(0);sheet.Remove(v);v.Dispose();}
   sheetRim?.Dispose();sheetRim=RimOverlay(sheet,34,.22f,10,30,persistent:true,focusShadow:0); // edge light + shadow; the DALi blur is the body
   sheetRows.Clear();sheetInputs=inputs;
-  int h=96+sheetInputs.Count*RowH+20,y=Math.Max(60,(over?1016:SheetBottom)-h); // over the picture it takes the dock's place
+  int h=96+sheetInputs.Count*RowH+20,y=Math.Max(60,SheetBottom-h);
   sheet.Size2D=new Size2D(SheetW,h);if(sheetAnimation==null||sheetAnimation.State!=Animation.States.Playing)sheet.Position2D=new Position2D(SheetX,y);
   sheet.Add(Label("Inputs",36,22,SheetW-72,56,36,white,"Display"));
   for(int i=0;i<sheetInputs.Count;i++){
@@ -187,7 +185,7 @@ public sealed partial class QuietHome
  {
   if(inputsLayer==null)return;
   StopAnimation(ref sheetAnimation);
-  overlay.Remove(inputsLayer);inputsLayer.Dispose();inputsLayer=null;sheet=null;sheetRows.Clear();sheetRim?.Dispose();sheetRim=null;content.Opacity=1;
+  overlay.Remove(inputsLayer);inputsLayer.Dispose();inputsLayer=null;sheet=null;sheetRows.Clear();sheetRim?.Dispose();sheetRim=null;
   if(refocus)MarkState("inputs_closed");
  }
  // ---- Ambient's Home key: the Art app always opens Samsung Home (hard-coded); come back to Quiet Home instead ----
@@ -205,7 +203,7 @@ public sealed partial class QuietHome
  {
   string now=null;try{now=vconf_get_str(ForegroundKey);}catch{}
   if(string.IsNullOrEmpty(now))return;
-  string before=lastForeground;lastForeground=now;
+  string before=lastForeground;lastForeground=now;NoteForeground(now);
   if(now=="com.samsung.tv.csfs"&&IsAmbient(before)){ambientReturns++;Launch("com.samsung.tv.bixby-promotion");MarkState("ambient_home_redirect");}
  }
  string InputsState()=>string.Join(";",inputs.ConvertAll(i=>i.Type+","+i.Name+","+(i.Known?(i.Connected?"1":"0"):"?")+","+i.Power));

@@ -33,10 +33,11 @@ public sealed partial class QuietHome
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemMinMaxStepValue(string id,out double min,out double max,out double step);
 
  // Each settings read is an IPC round trip: Home only reads the two values its tiles show.
- void RefreshSettings()
+ void RefreshSettings(bool all=false)
  {
-  var ids=page==2?SettingIds:HomeSettingIds;
-  if(page==2){
+  all|=page==2||oShown&&oMode==3;
+  var ids=all?SettingIds:HomeSettingIds;
+  if(all){
    currentVolume=sound_manager_get_master_volume(out var v)==0?v:-1;
    currentMute=sound_manager_get_master_mute(out var m)==0?m:-1;
    foreach(var id in new[]{"brightness","contrast"})
@@ -48,15 +49,7 @@ public sealed partial class QuietHome
    }catch{settingValues.Remove(id);settingNames.Remove(id);settingEnabled[id]=false;}
   }
  }
- void RefreshTileValues()
- {
-  foreach(var s in slots){
-   if((s.Kind!=2&&s.Kind!=5)||s.Label==null)continue;
-   var v=TileValue(s.Action);if(over&&editing==s.Action)v="‹  "+v+"  ›"; // adjusting: Left / Right
-   if(s.Label.Text!=v)s.Label.Text=v;
-   if(s.Bar!=null){float l=TileLevel(s.Action);s.Bar.Size2D=new Size2D(l<0?0:(int)(s.BarW*Math.Clamp(l,0f,1f)),8);}
-  }
- }
+ void RefreshTileValues(){foreach(var s in slots)if(s.Kind==2&&s.Label!=null){var v=TileValue(s.Action);if(s.Label.Text!=v)s.Label.Text=v;}}
  static readonly string[] SettingIds={"brightness","contrast","game-mode","sleeptimer","external-sound-mode","soundoutput","picturemode","game-mode-auto","pixel-shift-menu"};
  static readonly string[] HomeSettingIds={"sleeptimer","soundoutput"};
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemDataList(string id,System.Text.StringBuilder list);
@@ -74,16 +67,15 @@ public sealed partial class QuietHome
   }
   return result;
  }
- void CycleSetting(string id){
+ void CycleSetting(string id,int dir=1){
   RefreshSettings();var options=AvailableOptions(id);
   if(options.Count<2){ShowError("No other options are available for the current input.");return;}
-  int i=options.IndexOf(SettingValue(id));SetSetting(id,options[(i+1)%options.Count]);
+  int i=options.IndexOf(SettingValue(id));SetSetting(id,options[((i<0?0:i)+dir+options.Count)%options.Count]);
  }
  string TileValue(string action){
   switch(action){
    case "volume":return currentVolume<0?"Unavailable":currentVolume.ToString();
    case "brightness":case "contrast":return SettingValue(action)!=""?SettingValue(action):"Unavailable";
-   case "full:2":return "All controls";
    case "mute":return currentMute<0?"Unavailable":currentMute==1?"Muted":"Sound on";
    case "output":return SettingValue("soundoutput")=="2"?"Soundbar":SettingValue("soundoutput")=="0"?"TV Speaker":SettingName("soundoutput");
    case "network":return "Connections";
@@ -111,7 +103,7 @@ public sealed partial class QuietHome
  void ChangeLevel(string id,int delta){var (mn,mx,st)=Range(id);if(double.TryParse(SettingValue(id),NumberStyles.Float,CultureInfo.InvariantCulture,out double n))SetSetting(id,Math.Max(mn,Math.Min(mx,n+delta*st)).ToString(CultureInfo.InvariantCulture));}
  void ChangeVolume(int delta){int n;int r=sound_manager_get_master_volume(out n);if(r==0)r=sound_manager_set_master_volume(Math.Max(0,Math.Min(100,n+delta)));if(r!=0)ShowError("Use the remote's volume buttons.");RefreshSettings();RefreshTileValues();MarkState("volume_changed");}
  // connect_source returns a C bool; the result is recorded, the viewer is opened either way (unchanged behaviour)
- void SelectSource(int source){bool ok=false;try{ok=connect_source(source);}catch{}lastSource=source;MarkState("source:"+source+":"+ok);Launch("org.tizen.tv-viewer");}
+ void SelectSource(int source){bool ok=false;try{ok=connect_source(source);}catch{}lastSource=source;MarkState("source:"+source+":"+ok);Launch("org.tizen.tv-viewer");HideMain();}
  void Launch(string id,string menuItem=null)
  {
   IntPtr c;int r=app_control_create(out c);if(r!=0){ShowError("Could not open the app.");return;}

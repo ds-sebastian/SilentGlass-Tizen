@@ -4,231 +4,378 @@ using System.Globalization;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
-// Home over the picture (tvOS 26 direction: "keep the focus on what's playing"). When Home is pressed while an input
-// has a picture, that input keeps playing full screen and SilentGlass draws only what is needed over it:
-//  dock      one glass tray at the bottom: the Watch/Play inputs, Inputs / Controls / Info, and - Apps tab on - a
-//            second, smaller row of apps in the same tray
-//  Controls  a Control Center column on the right; the picture stays in view, so brightness, contrast and picture
-//            mode can be judged while they change
-//  Info      the photo wallpaper at 92% over the picture: text-heavy, so nearly opaque (Apple's "regular" glass)
-// How: the window stays a normal app window, made transparent with the wm.tvs.win.use.tvs hint, and a full-screen
-// FLUX VideoCanvasView sits at the very back - the live-preview mechanism at 1920x1080 instead of card size.
-// The video plane is separate hardware: it cannot be blurred, so glass over it is a dark tint plus the rim shader,
-// and a soft dimming band keeps text legible (Apple: dim bright content behind clear glass, ~35%).
-// Off switches: Info "Home over video", or overlay=0 in /tmp/quiet-home-live.conf. Any failure falls back to the
-// full-screen Home.
+// Home over the picture (tvOS 26: "keep the focus on what's playing"). When Home is pressed while the TV viewer shows
+// an input with a picture, nothing about the picture changes: the viewer stays in front and keeps playing, and
+// SilentGlass shows a second, partial, transparent window above it - a notification-level window (the app holds
+// http://tizen.org/privilege/window.priority.set), the kind of window Vetro's dock uses. The full-screen window is
+// hidden meanwhile, so the viewer is never covered, paused or re-synced, and nothing touches the video plane.
+//  bar       one glass capsule at the bottom: the Watch / Play inputs, Inputs, Controls, Apps (unless hidden), Info
+//  Inputs    a menu anchored above its bar item
+//  Apps      the TV's apps floating above the bar (their own menu, so the bar stays short)
+//  Controls  a Control Center panel on the right; the picture stays visible on the left while it changes
+//  Info, All Controls  the full-screen pages; Back returns to the bar
+// The video plane cannot be blurred, so the glass over it is a dark translucent material with a hairline edge and a
+// soft dimming gradient behind it (Apple's guidance for clear glass over bright media). No shader rims.
+// Layout numbers mirror tools/overlay_mockup.py, which renders the same screens on the Pi.
+// Off: Info "Home over video", or overlay=0 in /tmp/quiet-home-live.conf.
 public sealed partial class QuietHome
 {
- bool over;
- View wallLayer,veil;
- VideoCanvasViewHolder backView;
- Tizen.NUI.Timer backTimer;
- long resumedAt;
- int veilKind=-2;
- string overState="off";
- bool WantOverlay()=>prefs.Overlay&&style.Overlay&&CurrentHasSignal&&page!=1;
+ Window ow;View oRoot,oDim,oLayer,oHighlight;
+ bool oShown,mainHidden,fromOverlay,freshStart=true; // freshStart: the first Home after launch may find the viewer in front
+ int oMode,oSel=-1,oSub; // mode: 0 bar, 1 inputs, 2 apps, 3 controls
+ string oState="off",lastOther="";
+ Animation oAnimation;Tizen.NUI.Timer oIdle;
+ const int BandTop=240,BarH=104,BarR=52,BarBottom=52,ItemH=80,ItemPad=30,GlyphS=40,GlyphGap=14,LabelPx=30;
+ const int PopGap=18,MenuRowH=88,PopW=560,PopR=36,CcX=1236,CcW=624,CcR=44,SliderH=96,ValueH=72;
+ const int AppW=256,AppH=144,AppGap=24,AppCols=4,MaxApps=12,IdleOverlayMs=45000;
+ const string TvViewer="org.tizen.tv-viewer",Self="com.samsung.tv.bixby-promotion";
+ readonly Color glassTop=new Color(.15f,.15f,.17f,.70f),glassBottom=new Color(.115f,.115f,.13f,.66f),edge=new Color(1,1,1,.16f);
+ readonly Color focusFill=new Color(1,1,1,.95f),focusInk=new Color(.11f,.11f,.12f,1),live=new Color(.19f,.82f,.35f,1),clearColor=new Color(0,0,0,0);
 
- static void Vis(View v,bool on){if(on)v.Show();else v.Hide();}
- void EnsureLiveWindow()
+ sealed class OItem { public View Box,Dot,Track,Fill,Switch,Knob; public ImageView Glyph,Check; public TextLabel Label,Value; public string Action; public int X,Y,W,H,Kind; }
+ readonly List<OItem> bar=new List<OItem>(),rows=new List<OItem>();
+
+ // ---- when ----
+ // the viewer is the app in front (the last non-SilentGlass foreground), it has a picture, and the full-screen Home
+ // is not what is on screen right now
+ bool OverlayWanted(){ReadSignal();return prefs.Overlay&&style.Overlay&&lastOther==TvViewer&&CurrentHasSignal&&(mainHidden||!visible||freshStart);}
+ void NoteForeground(string id){if(!string.IsNullOrEmpty(id)&&id!=Self)lastOther=id;}
+
+ // ---- the two windows ----
+ void HideMain(){if(mainHidden)return;HideLive();try{Window.Default.Hide();}catch{}mainHidden=true;visible=false;}
+ void ShowMain(){if(!mainHidden)return;mainHidden=false;try{Window.Default.Show();Window.Default.Raise();}catch{}}
+ bool EnsureOverlay()
  {
-  if(liveWindow)return;
-  if(!tvsHintSet){tvsHint=Window.Default.AddAuxiliaryHint("wm.tvs.win.use.tvs","1");tvsHintSet=true;}
-  else Window.Default.SetAuxiliaryHintValue(tvsHint,"1");
-  Window.Default.SetTransparency(true);liveWindow=true;
- }
- // full-screen picture behind everything; re-asserted later because the viewer can reset the plane after a re-sync
- void ShowVideoBack()
- {
-  if(backView!=null){PushBack();return;}
-  HideLive();
+  if(ow!=null)return true;
   try{
-   EnsureLiveWindow();
-   tvWindow??=new Tizen.TV.Broadcast.TVWindowControl.TVWindowControlAPI();
-   var canvas=new Tizen.TV.FLUX.VideoCanvasView{Size2D=new Size2D(1920,1080),Position2D=new Position2D(0,0)};
-   Window.Default.Add(canvas);canvas.LowerToBottom();
-   canvas.DisableAutoUpdateVideoGeometry=true;
-   canvas.SetPlayer(tvWindow,Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.None);
-   backView=new VideoCanvasViewHolder{View=canvas};
-   PushBack();UnmuteLive();
-   backTimer?.Stop();backTimer=new Tizen.NUI.Timer(250);backTimer.Tick+=(s,e)=>{PushBack();UnmuteLive();return false;};backTimer.Start();
-   overState="on";
-  }catch(Exception ex){overState="failed:"+ex.GetType().Name+":"+ex.Message;DropVideoBack();}
+   ow=new Window("SilentGlass Overlay",new Rectangle(0,BandTop,1920,1080-BandTop),true);
+   ow.Hide();
+   ow.Type=WindowType.Notification;
+   bool level=ow.SetNotificationLevel(NotificationLevel.Top);
+   ow.AddAuxiliaryHint("wm.policy.win.user.geometry","1"); // keep our geometry (not full screen)
+   ow.AddAuxiliaryHint("wm.comp.win.effect.enable","0");
+   ow.BackgroundColor=clearColor;
+   ow.SetAcceptFocus(true);
+   ow.KeyEvent+=OnOverlayKey;
+   oRoot=new View{Size2D=new Size2D(1920,1080)};ow.Add(oRoot);
+   oState="ready:level="+level;return true;
+  }catch(Exception ex){oState="failed:"+ex.GetType().Name+":"+ex.Message;ow=null;return false;}
  }
- void PushBack()
+ // the window covers only what is drawn; content is laid out in screen coordinates, shifted by the window origin
+ void PlaceOverlay(int x,int y,int w,int h){try{ow.WindowPositionSize=new Rectangle(x,y,w,h);}catch{}oRoot.Position2D=new Position2D(-x,-y);}
+
+ void ShowOverlay(string activity)
  {
-  try{(backView?.View as Tizen.TV.FLUX.VideoCanvasView)?.ForceUpdateVideoGeometry(0,0,1920,1080);}
-  catch(Exception ex){overState="geometry:"+ex.GetType().Name;}
+  freshStart=false;
+  if(!EnsureOverlay()){FullHome(activity);return;}
+  HideMain();CloseInputs(false);editing="";
+  oSel=-1;OpenBar(true);
+  ow.Show();ow.Raise();try{ow.Activate();}catch{}
+  oShown=true;OverlayActivity();MarkState(activity+":overlay");
  }
- void DropVideoBack()
+ void HideOverlay(string activity)
  {
-  backTimer?.Stop();
-  if(backView==null)return;
-  try{Window.Default.Remove(backView.View);backView.View.Dispose();}catch{}
-  backView=null;
+  if(!oShown)return;
+  oShown=false;oIdle?.Stop();StopAnimation(ref oAnimation);
+  try{ow.Hide();}catch{}
+  ClearLayer();
+  if(activity!=null)MarkState(activity);
  }
- // full screen <-> over the picture; true when the presentation changed (the caller rebuilds the page)
- bool SetOverlay(bool on)
+ // Info / All Controls from the bar: the full-screen page; Back comes back to the bar
+ void OpenFull(int p)
  {
-  if(on)ShowVideoBack();          // also re-attaches after a pause dropped it
-  if(on&&backView==null)on=false; // no picture could be attached: full screen instead
-  if(on==over)return false;
-  over=on;Vis(tabBar,!on);
-  if(!on){DropVideoBack();SetVeil(-1);Vis(wallLayer,true);wallLayer.Opacity=1;}
-  MarkState(on?"overlay_on":"overlay_off");
-  return true;
+  HideOverlay(null);fromOverlay=true;
+  page=p;area=1;selected=0;editing="";ShowMain();BuildPage(false);MarkState("overlay_full:"+p);
  }
- void PresentOverlayPage()
+ void ReturnToOverlay(){fromOverlay=false;HideMain();ShowOverlay("overlay_return");}
+ void OverlayActivity()
  {
-  bool info=page==3;
-  Vis(wallLayer,info);wallLayer.Opacity=info?.92f:1;
-  SetVeil(page==0?0:page==2?1:-1);
+  if(oIdle==null){oIdle=new Tizen.NUI.Timer(5000);oIdle.Tick+=(s,e)=>{if(oShown&&Environment.TickCount64-lastActivity>=IdleOverlayMs){HideOverlay("overlay_idle");return false;}return oShown;};}
+  lastActivity=Environment.TickCount64;if(!oIdle.IsRunning())oIdle.Start();
  }
- // dimming behind the glass: bottom band for the dock (plus a little at the top for the clock), right edge for Controls
- void SetVeil(int kind)
+
+ // ---- building blocks ----
+ void ClearLayer()
  {
-  if(kind==veilKind)return;veilKind=kind;
-  if(veil!=null){Window.Default.Remove(veil);veil.Dispose();veil=null;}
-  if(kind<0)return;
-  veil=new View{Size2D=new Size2D(1920,1080)};
-  var stops=new PropertyArray();var offsets=new PropertyArray();
-  var pts=kind==0?new[]{(0f,.30f),(.14f,0f),(.48f,0f),(.70f,.36f),(1f,.70f)}:new[]{(0f,0f),(.42f,0f),(.64f,.42f),(1f,.68f)};
-  foreach(var (o,a) in pts){offsets.PushBack(new PropertyValue(o));stops.PushBack(new PropertyValue(new Vector4(0,0,0,a)));}
+  bar.Clear();rows.Clear();oHighlight=null;
+  if(oLayer!=null){oRoot.Remove(oLayer);oLayer.Dispose();oLayer=null;}
+  if(oDim!=null){oRoot.Remove(oDim);oDim.Dispose();oDim=null;}
+ }
+ View OAdd(View v){oLayer.Add(v);return v;}
+ static PropertyMap Gradient(bool horizontal,float r,params (float at,Color c)[] stops)
+ {
+  var s=new PropertyArray();var o=new PropertyArray();
+  foreach(var (at,c) in stops){o.PushBack(new PropertyValue(at));s.PushBack(new PropertyValue(new Vector4(c.R,c.G,c.B,c.A)));}
   var m=new PropertyMap();
   m.Add(Visual.Property.Type,new PropertyValue((int)Visual.Type.Gradient));
-  m.Add(GradientVisualProperty.StartPosition,new PropertyValue(kind==0?new Vector2(0,-.5f):new Vector2(-.5f,0)));
-  m.Add(GradientVisualProperty.EndPosition,new PropertyValue(kind==0?new Vector2(0,.5f):new Vector2(.5f,0)));
-  m.Add(GradientVisualProperty.StopOffset,new PropertyValue(offsets));
-  m.Add(GradientVisualProperty.StopColor,new PropertyValue(stops));
-  veil.Background=m;
-  Window.Default.Add(veil);veil.LowerToBottom();
-  backView?.View.LowerToBottom();
+  m.Add(GradientVisualProperty.StartPosition,new PropertyValue(horizontal?new Vector2(-.5f,0):new Vector2(0,-.5f)));
+  m.Add(GradientVisualProperty.EndPosition,new PropertyValue(horizontal?new Vector2(.5f,0):new Vector2(0,.5f)));
+  m.Add(GradientVisualProperty.StopOffset,new PropertyValue(o));
+  m.Add(GradientVisualProperty.StopColor,new PropertyValue(s));
+  if(r>0)m.Add(Visual.Property.CornerRadius,new PropertyValue(new Vector4(r,r,r,r)));
+  return m;
  }
- // back from an app or the viewer: re-attach the picture (pausing dropped it), or go full screen if it is gone
- void ResumeOverlay(){if(over||page==0&&WantOverlay()){if(SetOverlay(WantOverlay())){if(over){page=0;selected=DockFocus();}BuildPage(false);}}}
- // Home or Back on the dock: hand the screen straight back to the picture (same source: no re-sync)
- void Dismiss(){MarkState("overlay_dismiss");Launch("org.tizen.tv-viewer");}
- int DockFocus(){int i=slots.FindIndex(s=>s.Action=="hdmi:"+lastSource);return i<0?0:i;}
-
- // ---- clear glass over video: a dark tint (the plane can't be blurred) + the rim shader; bright glass on focus ----
- (View fill,Renderer rim) VideoGlass(View card,int w,int h,int radius,float tint=.40f)
+ // dark translucent glass with a hairline edge and a faint top light: one view, no shader
+ View Glass(int x,int y,int w,int h,int r)
  {
-  card.BackgroundColor=new Color(.10f,.10f,.12f,tint);
-  var fill=new View{WidthResizePolicy=ResizePolicyType.FillToParent,HeightResizePolicy=ResizePolicyType.FillToParent,
-   BackgroundColor=new Color(.965f,.97f,.98f,1),CornerRadius=new Vector4(radius,radius,radius,radius),Opacity=0};
-  Corners(fill,radius,w,h);card.Add(fill);
-  return (fill,RimOverlay(card,radius,.10f,6,18,focusShadow:.24f));
+  var v=new View{Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),CornerRadius=new Vector4(r,r,r,r),BorderlineWidth=1.5f,BorderlineColor=edge,BorderlineOffset=-1};
+  v.Background=Gradient(false,r,(0f,glassTop),(.4f,glassBottom),(1f,glassBottom));Corners(v,r,w,h);
+  return OAdd(v);
  }
-
- // ---- dock ----
- const int TileW=288,TileH=162,Btn=112,AppW=216,AppH=122,DockPad=36,DockBottom=64,DockGap=40,MaxDockApps=7;
- void BuildDock()
+ // soft dimming behind the glass: vertical for the bar, horizontal for the Controls panel
+ void Dim(bool horizontal,int x,int y,int w,int h,float max)
  {
-  var apps=prefs.HideApps?new List<LibraryApp>():library.FindAll(a=>!a.Utility);
-  int nApps=Math.Min(apps.Count,MaxDockApps);
-  int row0=2*TileW+DockGap+56+3*Btn+2*DockGap,row1=nApps>0?nApps*AppW+(nApps-1)*24:0;
-  int trayW=Math.Max(row0,row1)+2*DockPad,trayH=DockPad+TileH+(nApps>0?28+AppH:0)+DockPad;
-  int tx=(1920-trayW)/2,ty=1080-DockBottom-trayH;
-  var tray=Panel(tx,ty,trayW,trayH,new Color(.09f,.09f,.11f,.34f),44);
-  RimOverlay(tray,44,.16f,10,30,focusShadow:0);
-  int x=(1920-row0)/2,y=ty+DockPad;
-  DockInput(watchPort,"feature-watch-wide.svg",x,y);x+=TileW+DockGap;
-  DockInput(playPort,"feature-play-wide.svg",x,y);x+=TileW+56;
-  int by=y+(TileH-(Btn+8+30))/2;
-  RoundButton("Inputs","inputs","inputs",x,by,0);x+=Btn+DockGap;
-  RoundButton("Controls","page:2","settings",x,by,0);x+=Btn+DockGap;
-  RoundButton("Info","page:3","info",x,by,0);
-  if(nApps>0){int ax=(1920-row1)/2,ay=y+TileH+28;for(int i=0;i<nApps;i++)DockApp(apps[i],ax+i*(AppW+24),ay);}
-  UpdateHeroBadges(false);
+  oDim=new View{Position2D=new Position2D(x,y),Size2D=new Size2D(w,h)};
+  oDim.Background=Gradient(horizontal,0,(0f,clearColor),(1f,new Color(0,0,0,max)));
+  oRoot.Add(oDim);oDim.LowerToBottom();
  }
- void DockInput(int port,string art,int x,int y)
+ ImageView Sym(string name,int x,int y,int s){return new ImageView{ResourceUrl=Root+"sym-"+name+".svg",Position2D=new Position2D(x,y),Size2D=new Size2D(s,s),DesiredWidth=s*2,DesiredHeight=s*2};}
+ static int TextWidth(TextLabel l){try{return (int)Math.Ceiling(l.NaturalSize.Width);}catch{return l.Text.Length*16;}}
+ View LiveDot(int x,int y,int s){return new View{Position2D=new Position2D(x,y),Size2D=new Size2D(s,s),CornerRadius=new Vector4(s/2f,s/2f,s/2f,s/2f),BackgroundColor=live};}
+ void Fade(View v,int fromY)
  {
-  var card=Card(x,y,TileW,TileH,new Color(0,0,0,1),24);
-  card.Add(new ImageView{ResourceUrl=Root+art,Size2D=new Size2D(TileW,TileH),CornerRadius=new Vector4(24,24,24,24)});
-  var name=Label(InputName(port),22,TileH-58,TileW-44,44,28,white,"Semibold");name.Ellipsis=false;card.Add(name);
-  // status dot, no words (same meaning as on the full-screen cards)
-  var badge=new View{Position2D=new Position2D(14,14),Size2D=new Size2D(30,30),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(15,15,15,15),Opacity=0};
-  var dot=new View{Position2D=new Position2D(8,8),Size2D=new Size2D(14,14),CornerRadius=new Vector4(7,7,7,7)};badge.Add(dot);card.Add(badge);
-  var rim=RimOverlay(card,24,0,10,22,focusShadow:.3f);
-  slots.Add(new Slot{Card=card,Rim=rim,Title=name,Name=InputName(port),Action="hdmi:"+port,Row=0,X=x,Y=y,W=TileW,H=TileH,Kind=3,Badge=badge,BadgeDot=dot});
- }
- // round glass button with its name underneath (always shown: no guessing what a glyph means)
- void RoundButton(string name,string action,string glyph,int x,int y,int row)
- {
-  var card=Card(x,y,Btn,Btn,clear,Btn/2);
-  var (fill,rim)=VideoGlass(card,Btn,Btn,Btn/2);
-  var g=new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(28,28),Size2D=new Size2D(56,56)};card.Add(g);
-  var label=Text(name,x-40,y+Btn+8,Btn+80,30,22,muted,"Semibold");label.HorizontalAlignment=HorizontalAlignment.Center;
-  slots.Add(new Slot{Card=card,Rim=rim,Fill=fill,Glyph=g,Title=label,Name=name,Action=action,Row=row,X=x,Y=y,W=Btn,H=Btn,Kind=4});
- }
- void DockApp(LibraryApp app,int x,int y)
- {
-  var card=Card(x,y,AppW,AppH,HexColor(app.Background),18);
-  AddAppArtwork(card,app,AppW,AppH);
-  var rim=RimOverlay(card,18,0,8,18,focusShadow:.3f);
-  slots.Add(new Slot{Card=card,Rim=rim,Name=app.Name,Action="app:"+app.Id,Row=1,X=x,Y=y,W=AppW,H=AppH,Kind=3});
+  StopAnimation(ref oAnimation);
+  int y=v.Position2D.Y;v.Opacity=0;v.Position2D=new Position2D(v.Position2D.X,y+fromY);
+  oAnimation=new Animation(170){DefaultAlphaFunction=Ease()};
+  oAnimation.AnimateTo(v,"Opacity",1f);oAnimation.AnimateTo(v,"PositionY",(float)y);oAnimation.Play();
  }
 
- // ---- Control Center: a column on the right, the picture stays in view ----
- const int CcX=1180,CcW=680,CcH=104,CcGap=18; // half tiles 331 wide: "Movie (Calibrated)" fits without clipping
- void BuildCenter()
+ // ---- bar ----
+ int BarTop=>1080-BarBottom-BarH;
+ static string PortGlyph(int type,int watch,int play)=>type==watch?"tv":type==play?"gamecontroller":type==0?"antenna":"hdmi";
+ View capsule;
+ void OpenBar(bool animate)
  {
-  RefreshSettings();
-  int y=128,half=(CcW-CcGap)/2,x2=CcX+half+CcGap,row=0;
-  CcTile("Brightness","brightness","brightness",CcX,y,CcW,row++,true);y+=CcH+CcGap;
-  CcTile("Contrast","contrast","contrast",CcX,y,CcW,row++,true);y+=CcH+CcGap;
-  CcTile("Picture Mode","cycle:picturemode","picture",CcX,y,half,row,false);CcTile("Game Mode","game-mode","game",x2,y,half,row++,false);y+=CcH+CcGap;
-  CcTile("Volume","volume","volume",CcX,y,CcW,row++,true);y+=CcH+CcGap;
-  CcTile("Sound","output","output",CcX,y,half,row,false);CcTile("Sound Mode","cycle:external-sound-mode","soundmode",x2,y,half,row++,false);y+=CcH+CcGap;
-  CcTile("Sleep Timer","sleeptimer","sleep",CcX,y,half,row,false);CcTile("Mute","mute","mute",x2,y,half,row++,false);y+=CcH+CcGap+4;
-  int step=(CcW-4*Btn)/3;
-  RoundButton("Ambient","ambient","ambient",CcX,y,row);
-  RoundButton("Inputs","inputs","inputs",CcX+Btn+step,y,row);
-  RoundButton("All Controls","full:2","more",CcX+2*(Btn+step),y,row);
-  RoundButton("TV Settings","app:org.tizen.menu","settings",CcX+3*(Btn+step),y,row);
-  RefreshTileValues();
- }
- // capsule tile: glyph disc, name, value; level tiles (full width) add a bar that Left/Right moves while editing
- void CcTile(string name,string action,string glyph,int x,int y,int w,int row,bool level)
- {
-  var card=Card(x,y,w,CcH,clear,CcH/2);
-  var (fill,rim)=VideoGlass(card,w,CcH,CcH/2);
-  var disc=new View{Position2D=new Position2D(18,18),Size2D=new Size2D(68,68),BackgroundColor=discFill,CornerRadius=new Vector4(34,34,34,34)};
-  var g=new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(12,12),Size2D=new Size2D(44,44)};disc.Add(g);card.Add(disc);
-  var title=Label(name,102,level?14:16,w-(level?320:130),38,24,white,"Semibold");title.Ellipsis=false;card.Add(title);
-  TextLabel value;View bar=null;int barW=0;
-  if(level){
-   value=Label("",w-230,14,194,38,26,white,"Display");value.HorizontalAlignment=HorizontalAlignment.End;
-   barW=w-102-36;
-   var track=new View{Position2D=new Position2D(102,68),Size2D=new Size2D(barW,8),CornerRadius=new Vector4(4,4,4,4),BackgroundColor=new Color(1,1,1,.22f)};
-   bar=new View{Size2D=new Size2D(0,8),CornerRadius=new Vector4(4,4,4,4),BackgroundColor=white};track.Add(bar);card.Add(track);
+  ClearLayer();oMode=0;PlaceOverlay(0,BandTop,1920,1080-BandTop);
+  RefreshSource();RefreshInputs();ResolveHeroPorts();ReadSignal();
+  oLayer=new View{Size2D=new Size2D(1920,1080)};oRoot.Add(oLayer);
+  Dim(false,0,BandTop+180,1920,1080-BandTop-180,.5f);
+  var items=new List<(string glyph,string label,string action)>{(PortGlyph(watchPort,watchPort,playPort),InputName(watchPort),"hdmi:"+watchPort),(PortGlyph(playPort,watchPort,playPort),InputName(playPort),"hdmi:"+playPort),
+   (null,null,null),("inputs","Inputs","inputs"),("controls","Controls","controls")};
+  if(!prefs.HideApps&&library.Exists(a=>!a.Utility))items.Add(("apps","Apps","apps"));
+  items.Add(("info","Info","info"));
+  // measure the labels, then centre the capsule
+  var labels=new List<TextLabel>();int total=24;
+  foreach(var it in items){
+   if(it.glyph==null){labels.Add(null);total+=22;continue;}
+   var l=Label(it.label,0,0,10,ItemH,LabelPx,white,"Semibold");l.Ellipsis=false;labels.Add(l);
+   total+=2*ItemPad+GlyphS+GlyphGap+TextWidth(l)+(HasPicture(it.action)?24:0);
   }
-  else value=Label("",102,52,w-122,34,21,muted);
-  value.Ellipsis=false;card.Add(value);
-  slots.Add(new Slot{Card=card,Rim=rim,Fill=fill,Glyph=g,Disc=disc,Title=title,Label=value,Bar=bar,BarW=barW,Name=name,Action=action,Row=row,X=x,Y=y,W=w,H=CcH,Kind=5});
+  int x=960-total/2;
+  capsule=Glass(x,BarTop,total,BarH,BarR);
+  oHighlight=new View{Size2D=new Size2D(10,ItemH),BackgroundColor=focusFill,CornerRadius=new Vector4(ItemH/2f,ItemH/2f,ItemH/2f,ItemH/2f)};capsule.Add(oHighlight);
+  int ix=12;
+  for(int i=0;i<items.Count;i++){
+   var it=items[i];
+   if(it.glyph==null){capsule.Add(new View{Position2D=new Position2D(ix+10,(BarH-40)/2),Size2D=new Size2D(2,40),BackgroundColor=new Color(1,1,1,.22f)});ix+=22;continue;}
+   var l=labels[i];int lw=TextWidth(l);bool dot=HasPicture(it.action);
+   int w=2*ItemPad+GlyphS+GlyphGap+lw+(dot?24:0);
+   var g=Sym(it.glyph,ix+ItemPad,(BarH-GlyphS)/2,GlyphS);capsule.Add(g);
+   l.Position2D=new Position2D(ix+ItemPad+GlyphS+GlyphGap,(BarH-ItemH)/2);l.Size2D=new Size2D(lw+4,ItemH);capsule.Add(l);
+   View d=null;if(dot){d=LiveDot(ix+ItemPad+GlyphS+GlyphGap+lw+12,(BarH-12)/2,12);capsule.Add(d);}
+   bar.Add(new OItem{Glyph=g,Label=l,Dot=d,Action=it.action,X=ix,Y=(BarH-ItemH)/2,W=w,H=ItemH});
+   ix+=w;
+  }
+  if(oSel<0||oSel>=bar.Count)oSel=Math.Max(0,bar.FindIndex(b=>b.Action=="hdmi:"+lastSource));
+  FocusBar(false);
+  if(animate)Fade(capsule,24);
  }
- // 0..1 for the level bars; -1 = unknown
+ bool HasPicture(string action)=>action=="hdmi:"+lastSource&&CurrentHasSignal;
+ // the focused item is a white capsule; while one of its menus is open the item stays marked in faint white
+ void FocusBar(bool animate)
+ {
+  for(int i=0;i<bar.Count;i++){bool f=i==oSel&&oMode==0;bar[i].Label.TextColor=f?focusInk:white;bar[i].Glyph.Color=f?focusInk:white;}
+  if(oHighlight==null||oSel<0||oSel>=bar.Count)return;
+  var b=bar[oSel];oHighlight.BackgroundColor=oMode==0?focusFill:new Color(1,1,1,.18f);
+  if(animate){var a=new Animation(150){DefaultAlphaFunction=Ease()};a.AnimateTo(oHighlight,"PositionX",(float)b.X);a.AnimateTo(oHighlight,"SizeWidth",(float)b.W);a.Finished+=(s,e)=>a.Dispose();a.Play();}
+  else{oHighlight.Position2D=new Position2D(b.X,b.Y);oHighlight.Size2D=new Size2D(b.W,b.H);}
+ }
+ int BarItemCentre(string action){var b=bar.Find(i=>i.Action==action);return b==null?960:capsule.Position2D.X+b.X+b.W/2;}
+ void ActivateBar()
+ {
+  var a=bar[oSel].Action;
+  if(a.StartsWith("hdmi:")){int src=int.Parse(a.Substring(5));HideOverlay("overlay_input:"+src);if(src!=lastSource)SelectSource(src);return;}
+  if(a=="inputs"){OpenInputsMenu();return;}
+  if(a=="apps"){OpenAppsMenu();return;}
+  if(a=="controls"){OpenControls();return;}
+  if(a=="info")OpenFull(3);
+ }
+
+ // ---- Inputs menu, anchored above its bar item ----
+ List<InfoStats.InputSource> menuInputs=new List<InfoStats.InputSource>();
+ void OpenInputsMenu()
+ {
+  oMode=1;FocusBar(false);rows.Clear();
+  menuInputs=inputs;int h=24+menuInputs.Count*MenuRowH;
+  int x=Math.Clamp(BarItemCentre("inputs")-PopW/2,40,1880-PopW),y=BarTop-PopGap-h;
+  var pop=Glass(x,y,PopW,h,PopR);
+  for(int i=0;i<menuInputs.Count;i++){
+   var s=menuInputs[i];bool cur=s.Type==lastSource,off=s.Known&&!s.Connected&&!cur;
+   var r=new View{Position2D=new Position2D(12,12+i*MenuRowH),Size2D=new Size2D(PopW-24,MenuRowH),CornerRadius=new Vector4(26,26,26,26),Opacity=off?.45f:1};
+   var g=Sym(PortGlyph(s.Type,watchPort,playPort),22,(MenuRowH-GlyphS)/2,GlyphS);r.Add(g);
+   bool sub=s.Name!=s.Port;
+   var name=Label(s.Name,80,sub?10:0,PopW-24-80-110,sub?44:MenuRowH,30,white,"Semibold");name.Ellipsis=false;r.Add(name);
+   TextLabel port=null;if(sub){port=Label(s.Port,80,50,300,30,22,new Color(1,1,1,.6f));r.Add(port);}
+   View dot=null;if(cur&&CurrentHasSignal){dot=LiveDot(PopW-24-92,(MenuRowH-12)/2,12);r.Add(dot);}
+   ImageView check=null;if(cur){check=Sym("check",PopW-24-62,(MenuRowH-34)/2,34);r.Add(check);}
+   pop.Add(r);rows.Add(new OItem{Box=r,Glyph=g,Label=name,Value=port,Dot=dot,Check=check,Action="src:"+s.Type});
+  }
+  oSub=Math.Max(0,menuInputs.FindIndex(i=>i.Type==lastSource));FocusRows();Fade(pop,16);MarkState("overlay_inputs");
+ }
+ void FocusRows()
+ {
+  for(int i=0;i<rows.Count;i++){
+   var r=rows[i];bool f=i==oSub;
+   r.Box.BackgroundColor=f?focusFill:clearColor;
+   var ink=f?focusInk:white;r.Label.TextColor=ink;r.Glyph.Color=ink;
+   if(r.Check!=null)r.Check.Color=ink;
+   if(r.Value!=null)r.Value.TextColor=r.Kind==0&&r.Track!=null?ink:f?new Color(.11f,.11f,.12f,.62f):new Color(1,1,1,.62f);
+   if(r.Track!=null){r.Track.BackgroundColor=f?new Color(0,0,0,.14f):new Color(1,1,1,.22f);r.Fill.BackgroundColor=ink;}
+  }
+ }
+
+ // ---- Apps: their own menu; artwork floats above the bar (no panel behind it) ----
+ List<LibraryApp> menuApps=new List<LibraryApp>();
+ void OpenAppsMenu()
+ {
+  oMode=2;FocusBar(false);rows.Clear();
+  menuApps=library.FindAll(a=>!a.Utility);if(menuApps.Count>MaxApps)menuApps.RemoveRange(MaxApps,menuApps.Count-MaxApps);
+  int n=menuApps.Count,lines=(n+AppCols-1)/AppCols,cols=Math.Min(AppCols,n);
+  int w=cols*AppW+(cols-1)*AppGap,h=lines*(AppH+50)+(lines-1)*18;
+  int x0=960-w/2,y0=BarTop-PopGap-20-h;
+  oDim.Position2D=new Position2D(0,BandTop);oDim.Size2D=new Size2D(1920,1080-BandTop); // dim further up for the names
+  var grid=OAdd(new View{Size2D=new Size2D(1920,1080)});
+  for(int i=0;i<n;i++){
+   var app=menuApps[i];int x=x0+(i%AppCols)*(AppW+AppGap),y=y0+(i/AppCols)*(AppH+50+18);
+   var card=new View{Position2D=new Position2D(x+AppW/2,y+AppH/2),Size2D=new Size2D(AppW,AppH),PivotPoint=new Position(.5f,.5f,.5f),PositionUsesPivotPoint=true,
+    BackgroundColor=HexColor(app.Background),CornerRadius=new Vector4(20,20,20,20),BorderlineColor=white};
+   Corners(card,20,AppW,AppH);card.Add(NewArtwork(app,AppW,AppH,20));
+   var name=Label(app.Name,x-20,y+AppH+10,AppW+40,34,22,new Color(1,1,1,.86f),"Semibold");name.HorizontalAlignment=HorizontalAlignment.Center;name.Ellipsis=false;
+   grid.Add(card);grid.Add(name);
+   rows.Add(new OItem{Box=card,Label=name,Action="app:"+app.Id});
+  }
+  oSub=0;FocusApps(false);Fade(grid,16);MarkState("overlay_apps");
+ }
+ void FocusApps(bool animate)
+ {
+  for(int i=0;i<rows.Count;i++){
+   var r=rows[i];bool f=i==oSub;
+   r.Box.BorderlineWidth=f?4:0;r.Label.TextColor=f?white:new Color(1,1,1,.8f);
+   var sc=f?new Vector3(1.07f,1.07f,1):new Vector3(1,1,1);
+   if(animate){var a=new Animation(150){DefaultAlphaFunction=Ease()};a.AnimateTo(r.Box,"Scale",sc);a.Finished+=(s,e)=>a.Dispose();a.Play();}else r.Box.Scale=sc;
+   if(f)r.Box.RaiseToTop();
+  }
+ }
+
+ // ---- Controls: a Control Center panel on the right ----
+ void OpenControls()
+ {
+  ClearLayer();oMode=3;int wx=CcX-60;PlaceOverlay(wx,0,1920-wx,1080);
+  RefreshSettings(true);
+  oLayer=new View{Size2D=new Size2D(1920,1080)};oRoot.Add(oLayer);
+  Dim(true,wx,0,1920-wx,1080,.45f);
+  int h=32+3*SliderH+6*ValueH+2*25+2*ValueH,ry=16;
+  var panel=Glass(CcX,(1080-h)/2,CcW,h,CcR);
+  // kind: 0 level (Left/Right), 1 value (Left/Right/Select cycle), 2 switch, 3 opens something
+  void Row(int kind,string glyph,string name,string action)
+  {
+   int rh=kind==0?SliderH:ValueH,top=kind==0?16:(rh-38)/2;
+   var r=new View{Position2D=new Position2D(16,ry),Size2D=new Size2D(CcW-32,rh),CornerRadius=new Vector4(28,28,28,28)};
+   var g=Sym(glyph,24,kind==0?18:(rh-38)/2,38);r.Add(g);
+   var l=Label(name,82,top-2,300,42,28,white,"Semibold");l.Ellipsis=false;r.Add(l);
+   var v=Label("",CcW-32-24-280-(kind==3?34:0),top-2,280,42,kind==0?30:26,white,kind==0?"Display":"Medium");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=false;r.Add(v);
+   var item=new OItem{Box=r,Glyph=g,Label=l,Value=v,Action=action,Kind=kind};
+   if(kind==0){item.Track=new View{Position2D=new Position2D(82,rh-26),Size2D=new Size2D(CcW-32-82-24,8),CornerRadius=new Vector4(4,4,4,4)};item.Fill=new View{Size2D=new Size2D(0,8),CornerRadius=new Vector4(4,4,4,4)};item.Track.Add(item.Fill);r.Add(item.Track);}
+   if(kind==2){item.Switch=new View{Position2D=new Position2D(CcW-32-24-64,(rh-36)/2),Size2D=new Size2D(64,36),CornerRadius=new Vector4(18,18,18,18)};item.Knob=new View{Size2D=new Size2D(30,30),CornerRadius=new Vector4(15,15,15,15),BackgroundColor=white};item.Switch.Add(item.Knob);r.Add(item.Switch);v.Hide();}
+   if(kind==3){var c=Sym("chevron",CcW-32-24-26,(rh-26)/2,26);c.Opacity=.5f;r.Add(c);}
+   panel.Add(r);rows.Add(item);ry+=rh;
+  }
+  void Rule(){panel.Add(new View{Position2D=new Position2D(24,ry+12),Size2D=new Size2D(CcW-48,1),BackgroundColor=new Color(1,1,1,.14f)});ry+=25;}
+  Row(0,"sun","Brightness","brightness");Row(0,"contrast","Contrast","contrast");Row(0,"speaker","Volume","volume");Rule();
+  Row(1,"picture","Picture Mode","cycle:picturemode");Row(1,"waveform","Sound Mode","cycle:external-sound-mode");Row(1,"soundbar","Sound Output","output");
+  Row(2,"gamecontroller","Game Mode","game-mode");Row(1,"moon","Sleep Timer","sleeptimer");Rule();
+  Row(3,"artframe","Ambient","ambient");Row(3,"controls","All Controls","full:2");Row(3,"gear","TV Settings","app:org.tizen.menu");
+  oSub=0;UpdateControls();FocusRows();Fade(panel,0);MarkState("overlay_controls");
+ }
+ void UpdateControls()
+ {
+  foreach(var r in rows){
+   switch(r.Action){
+    case "volume":r.Value.Text=currentMute==1?"Muted":currentVolume<0?"–":currentVolume.ToString();break;
+    case "game-mode":{bool on=SettingValue("game-mode")=="1";r.Switch.BackgroundColor=on?live:new Color(.47f,.47f,.5f,.5f);r.Knob.Position2D=new Position2D(on?31:3,3);break;}
+    case "ambient":case "full:2":case "app:org.tizen.menu":break;
+    default:r.Value.Text=r.Kind==0?(SettingValue(r.Action)!=""?SettingValue(r.Action):"–"):TileValue(r.Action);break;
+   }
+   if(r.Track!=null){float l=TileLevel(r.Action);r.Fill.Size2D=new Size2D(l<0?0:(int)(r.Track.Size2D.Width*Math.Clamp(l,0f,1f)),8);}
+  }
+ }
  float TileLevel(string a)
  {
   if(a=="volume")return currentVolume<0?-1:currentVolume/100f;
-  if(a=="brightness"||a=="contrast"){
-   var (mn,mx,_)=Range(a);
-   if(mx>mn&&double.TryParse(SettingValue(a),NumberStyles.Float,CultureInfo.InvariantCulture,out var n))return (float)((n-mn)/(mx-mn));
-  }
+  if(a=="brightness"||a=="contrast"){var (mn,mx,_)=Range(a);if(mx>mn&&double.TryParse(SettingValue(a),NumberStyles.Float,CultureInfo.InvariantCulture,out var n))return (float)((n-mn)/(mx-mn));}
   return -1;
  }
- // focus look for the overlay kinds: 3 artwork tile, 4 round button, 5 capsule tile
- void StyleOverlaySlot(Slot s,bool f,bool animate,ref float scale,ref float lift)
+ // Left/Right adjust or cycle in place; Select steps forward, toggles or opens
+ void ControlsKey(string k)
  {
-  scale=f?(s.Kind==5?1.035f:1.08f):1;lift=f&&s.Kind==3?-4:0;
-  GlassFocus(s.Rim,f?1:0,0,animate);
-  if(s.Fill!=null)FadeTo(s.Fill,f?.94f:0,animate);
-  if(s.Glyph!=null)s.Glyph.Color=f?dark:white;
-  if(s.Disc!=null)s.Disc.BackgroundColor=f?discFocus:discFill;
-  if(s.Kind==4)s.Title.TextColor=f?white:muted;
-  if(s.Kind==5){
-   s.Title.TextColor=f?dark:white;
-   s.Label.TextColor=s.Bar!=null?(f?dark:white):(f?valueFocus:muted);
-   if(s.Bar!=null){s.Bar.BackgroundColor=f?dark:white;if(s.Bar.GetParent() is View track)track.BackgroundColor=f?new Color(0,0,0,.14f):new Color(1,1,1,.22f);}
+  var r=rows[oSub];int d=k=="Left"?-1:1;bool sel=k=="Return"||k=="KP_Enter";
+  RefreshSettings(true);
+  switch(r.Action){
+   case "brightness":case "contrast":if(!sel)ChangeLevel(r.Action,d);break;
+   case "volume":if(sel){if(sound_manager_get_master_mute(out int m)==0)sound_manager_set_master_mute(m==1?0:1);RefreshSettings(true);}else ChangeVolume(d);break;
+   case "output":SetSetting("soundoutput",SettingValue("soundoutput")=="0"?"2":"0");break;
+   case "game-mode":SetSetting("game-mode",SettingValue("game-mode")=="1"?"0":"1");break;
+   case "sleeptimer":if(int.TryParse(SettingValue("sleeptimer"),out int n))SetSetting("sleeptimer",(((n+d)%5+5)%5).ToString());break;
+   case "ambient":if(sel){HideOverlay("overlay_ambient");Launch("org.tizen.art-app");}return;
+   case "full:2":if(sel)OpenFull(2);return;
+   case "app:org.tizen.menu":if(sel){HideOverlay("overlay_settings");Launch("org.tizen.menu");}return;
+   default:if(r.Action.StartsWith("cycle:"))CycleSetting(r.Action.Substring(6),d);break;
+  }
+  UpdateControls();MarkState("overlay_control:"+r.Action);
+ }
+
+ // ---- keys (the overlay window has focus while shown) ----
+ void OnOverlayKey(object sender,Window.KeyEventArgs e)
+ {
+  if(e.Key==null||e.Key.State!=Key.StateType.Down||!oShown)return;string k=e.Key.KeyPressedName;
+  long now=Environment.TickCount64;bool arrow=k=="Up"||k=="Down"||k=="Left"||k=="Right";
+  if(k==lastKey&&now-lastKeyAt<(arrow?90:300))return;
+  lastKey=k;lastKeyAt=now;OverlayActivity();
+  long t0=System.Diagnostics.Stopwatch.GetTimestamp();
+  try{OverlayKey(k,arrow);}catch(Exception ex){oState="key-error:"+ex.GetType().Name;}
+  RecordKeyTime(System.Diagnostics.Stopwatch.GetTimestamp()-t0);
+ }
+ void OverlayKey(string k,bool arrow)
+ {
+  bool back=k=="XF86Back"||k=="Back"||k=="Escape"||k=="XF86Exit",sel=k=="Return"||k=="KP_Enter";
+  if(k=="XF86Home")return; // Home arrives as a launch request: Home() closes the overlay
+  switch(oMode){
+   case 0:
+    if(back){HideOverlay("overlay_back");return;}
+    if(k=="Left"||k=="Right"){int n=Math.Clamp(oSel+(k=="Left"?-1:1),0,bar.Count-1);if(n!=oSel){oSel=n;FocusBar(true);}}
+    else if(sel||k=="Up"&&!bar[oSel].Action.StartsWith("hdmi:"))ActivateBar();
+    return;
+   case 1:
+    if(back||k=="Down"&&oSub==rows.Count-1){OpenBar(false);return;}
+    if(k=="Up"||k=="Down"){oSub=Math.Clamp(oSub+(k=="Up"?-1:1),0,rows.Count-1);FocusRows();}
+    else if(sel){var s=menuInputs[oSub];HideOverlay("overlay_input:"+s.Type);if(s.Type!=lastSource)SelectSource(s.Type);}
+    return;
+   case 2:
+    if(back){OpenBar(false);return;}
+    if(arrow){
+     int lines=(rows.Count+AppCols-1)/AppCols;
+     if(k=="Down"&&oSub/AppCols==lines-1){OpenBar(false);return;}
+     int n=oSub+(k=="Left"?-1:k=="Right"?1:k=="Up"?-AppCols:AppCols);
+     if(n>=0&&n<rows.Count){oSub=n;FocusApps(true);}
+    }
+    else if(sel){var a=rows[oSub].Action.Substring(4);HideOverlay("overlay_app");Launch(a);}
+    return;
+   case 3:
+    if(back){OpenBar(false);return;}
+    if(k=="Up"||k=="Down"){oSub=Math.Clamp(oSub+(k=="Up"?-1:1),0,rows.Count-1);FocusRows();}
+    else if(k=="Left"||k=="Right"||sel)ControlsKey(k);
+    return;
   }
  }
+ string OverlayState()=>(oShown?"on":"off")+":mode"+oMode+":"+oState+":main-"+(mainHidden?"hidden":"shown")+":fg="+lastOther;
 }

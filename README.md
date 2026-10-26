@@ -17,11 +17,12 @@ plane cannot be captured, so it shows black in screenshots).*
 
 ### SilentGlass Home - the launcher
 
-- **Home over the picture** (tvOS 26 style): press Home while something is playing and it keeps playing, full screen.
-  A Liquid Glass dock rises at the bottom - the Watch and Play inputs, Inputs, Controls, Info, and (Apps tab on) a
-  second row of apps. Controls is a Control Center column on the right, so brightness, contrast and picture mode can
-  be judged on the picture as they change. Info is nearly opaque for reading. Back or Home returns to the picture
-  without re-syncing the input. With no picture (nothing on, or no signal) Home is the full-screen launcher below.
+- **Home over the picture** (tvOS 26 style): press Home while something is playing and the picture is left alone -
+  the TV's viewer stays in front and keeps playing. SilentGlass opens its own small window above it (a Samsung
+  notification window, the way Vetro's dock works): a glass bar with the Watch and Play inputs, Inputs, Controls,
+  Apps and Info. Inputs and Apps open as menus above the bar; Controls is a panel on the right, so brightness,
+  contrast and picture mode can be judged on the picture while they change. Back or Home closes it. With nothing
+  playing, Home is the full-screen launcher below.
 - **Two big cards, no clutter**: *Watch* (e.g. an NVIDIA SHIELD) and *Play* (e.g. a Nintendo Switch). The input on
   screen gets the wide 16:9 card with its **live picture**; status dots instead of words. Made to be obvious at a
   glance for anyone in the house.
@@ -34,14 +35,16 @@ plane cannot be captured, so it shows black in screenshots).*
   live preview, dim when idle (OLED care), wallpaper mode and the Thread border router. Saved on the TV; they survive
   reboots.
 
-![Home over the picture](docs/screenshots/s90d-overlay-dock.jpg)
+![Home over the picture](docs/screenshots/s90d-overlay-bar.jpg)
 
-*Home over the picture: the dock (here with the Apps tab on). The black is where the SHIELD's picture keeps playing -
-the video plane cannot be captured.*
+*Home over the picture: the bar, captured from the TV's overlay window and composited over a stand-in photo (the video
+plane itself cannot be captured).*
+
+![Inputs over the picture](docs/screenshots/s90d-overlay-inputs.jpg)
 
 ![Controls over the picture](docs/screenshots/s90d-overlay-controls.jpg)
 
-*Controls over the picture: the left of the screen stays clear, so picture changes are visible as they are made.*
+*Inputs opens above its bar item; Controls is a panel on the right, so the picture stays in view while it changes.*
 
 ![Info page](docs/screenshots/s90d-info.jpg)
 

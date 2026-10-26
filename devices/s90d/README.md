@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## SilentGlass Home (v30c)
+## SilentGlass Home (v31a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -44,25 +44,32 @@ LAN address blurred.*
 
 ### Pages
 
-**Over the picture** (v30c, default): when Home is pressed while an input has a picture, the picture keeps playing full
-screen and only the following is drawn over it ([`Home.Overlay.cs`](../../launcher/src/Home.Overlay.cs)):
+**Over the picture** (v31a, default): when Home is pressed while the TV viewer shows an input with a picture, the
+viewer stays in front and keeps playing; SilentGlass shows its own partial, transparent window above it
+([`Home.Overlay.cs`](../../launcher/src/Home.Overlay.cs)) and hides its full-screen window.
 
-- **Dock**: one glass tray at the bottom - Watch and Play (the TV's input names, status dot), Inputs, Controls, Info;
-  with the Apps tab on, a second smaller row of the TV's apps and Samsung Home in the same tray.
-- **Controls**: a Control Center column on the right: Brightness, Contrast and Volume as level tiles (Select, then
-  Left/Right; the bar and value follow), Picture Mode, Game Mode, Sound output and mode, Sleep Timer, Mute, then
-  Ambient, Inputs, All Controls (the full-screen page) and Samsung's settings.
-- **Info**: the full Info page over the photo wallpaper at 92% - text-heavy, so nearly opaque.
-- Keys: Back closes Controls/Info to the dock and the dock to the picture; Home on the dock also returns to the
-  picture; choosing the input already on screen just closes the dock (no re-sync). The dock steps aside after two idle
-  minutes; nothing is ever dimmed over the picture.
-- How: the window stays an ordinary app window, transparent with the `wm.tvs.win.use.tvs` hint, with a full-screen
-  FLUX `VideoCanvasView` at the very back (the live-preview mechanism at 1920x1080). Checked on the TV: the video plane
-  stays at 1920x1080 and the source and signal never change while the dock, Controls and Info open and close. The plane
-  cannot be blurred, so glass over it is a dark tint plus the rim shader, with a soft dimming band behind text (Apple's
-  guidance for clear glass over bright media).
-- Off: the Info tile *Home over video*, or `overlay=0` in `/tmp/quiet-home-live.conf`. Without a picture, or if the
-  video cannot be attached, Home is the full-screen launcher.
+- **Bar**: one glass capsule at the bottom - Watch and Play (the TV's input names; a green dot on the one with a
+  picture), Inputs, Controls, Apps (unless the Apps tab is hidden) and Info. Left/Right move, Select opens.
+- **Inputs**: a menu above its bar item - every input by the TV's name, a checkmark on the current one.
+- **Apps**: the TV's apps and Samsung Home floating above the bar (their own menu; the bar stays short).
+- **Controls**: a panel on the right - Brightness, Contrast, Volume (Left/Right adjust; Select on Volume mutes),
+  Picture Mode, Sound Mode, Sound Output, Game Mode, Sleep Timer (Left/Right or Select cycle), then Ambient, All
+  Controls (the full-screen page) and TV Settings. The left of the screen stays clear to judge the picture.
+- **Info** and **All Controls** open the full-screen pages; Back returns to the bar.
+- Back closes a menu, then the bar; Home closes the bar. It also closes after 45 idle seconds.
+- How: a second NUI `Window` of type Notification at level Top (the app's Samsung manifest already holds
+  `window.priority.set`), with the `wm.policy.win.user.geometry` hint so it keeps its own size: 1920x840 at the
+  bottom for the bar and menus, 744x1080 on the right for Controls. Nothing touches the video plane: no
+  `VideoCanvasView`, no TVS hint, no `connect_source` unless another input is chosen. The full-screen window is hidden
+  whenever another app or the viewer is in front, so a Home press never flashes it over the picture. Checked on the
+  TV: the viewer stays visible, keeps focus after the bar closes, the video plane stays 1920x1080 and the signal
+  never drops.
+- Look: dark translucent glass with a hairline edge (the video plane cannot be blurred), a soft dimming gradient
+  behind it, white capsule focus, and SF Symbols-style icons (`tools/make_symbols.py` -> `launcher/assets/sym-*.svg`).
+  `tools/overlay_mockup.py OUTDIR` renders the same screens at 1:1 on the Pi with headless Chromium before anything
+  goes to the TV.
+- Off: the Info tile *Home over video*, or `overlay=0` in `/tmp/quiet-home-live.conf`. With no picture, or if the
+  window cannot be created, Home is the full-screen launcher.
 
 **Full screen** (no picture, or *Home over video* off):
 
@@ -84,7 +91,7 @@ from an older version loads with the defaults for anything new):
 | Tile | Default | Does |
 |---|---|---|
 | Apps tab | on | hidden = the tab bar shows Home, Controls, Info and Left/Right skip the Apps spot; over the picture, the dock's apps row |
-| Home over video | on | Home, Controls and Info open over the playing picture instead of full screen |
+| Home over video | on | Home opens the bar over the playing picture instead of the full-screen launcher |
 | Live preview | on | video of the current input inside its hero card |
 | Dim when idle | on | OLED care: fade to black with a drifting dim clock after 5 idle minutes |
 | Wallpaper | Auto | Auto (switch at local sunrise/sunset) / Day / Night; only with the photo wallpaper installed |

@@ -18,8 +18,8 @@ public sealed partial class QuietHome : NUIApplication
 {
  const string Root="/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
  const int TB=9; // toolbar focus area; 1..3 are content rows
- // Kind: 0 plain (Info panels), 1 hero, 2 control tile; over the picture (Home.Overlay.cs): 3 artwork tile, 4 round button, 5 capsule tile
- sealed class Slot { public Renderer Glass,Rim; public View Card,Disc,Badge,BadgeDot,Fill,Bar; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind,BarW; }
+ // Kind: 0 plain (Info panels), 1 hero, 2 control tile
+ sealed class Slot { public Renderer Glass,Rim; public View Card,Disc,Badge,BadgeDot; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
  readonly Dictionary<string,CachedArtwork> artworkCache=new Dictionary<string,CachedArtwork>();
@@ -66,26 +66,31 @@ public sealed partial class QuietHome : NUIApplication
   PreloadArtwork();
   RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();
   selected=SourceIndex();BuildPage(false);
+  try{NoteForeground(vconf_get_str(ForegroundKey));}catch{}
   clockTimer=new Tizen.NUI.Timer(30000);
   clockTimer.Tick+=(s,e)=>{clock.Text=Clock();CheckWallpaper();IdleTick();if(visible&&page==0&&inputsLayer==null)OnInputsChanged(false);return true;};clockTimer.Start();
-  visible=true;resumedAt=Environment.TickCount64;MarkState("created");
+  visible=true;MarkState("created");
  }
- protected override void OnResume(){base.OnResume();visible=true;styledAll=false;UpdateFocus(false); /* restyle everything after a pause */ BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();resumedAt=Environment.TickCount64;ResumeOverlay();MarkState("resumed");}
+ protected override void OnResume(){base.OnResume();if(mainHidden){MarkState("resumed_overlay");return;} /* only the overlay window is up */ visible=true;styledAll=false;UpdateFocus(false); /* restyle everything after a pause */ BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested;
   // Home Assistant bridge: switch input the same way the cards do (only to an input the TV lists)
   if(e.ReceivedAppControl.ExtraData.TryGet("quiet_source",out string req)&&int.TryParse(req,out int src)&&inputs.Exists(i=>i.Type==src)){SelectSource(src);MarkState("ha_source:"+src);return;}
-  if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
- protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);DropVideoBack();ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
+  if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){HideOverlay(null);ShowMain();page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){HideOverlay(null);ShowMain();page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
+ protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();
+  // hidden while another app is in front, so the next Home press never flashes it over the picture
+  if(!oShown)HideMain();WriteState("paused");}
  void Home(string activity)
  {
-  clockTimer?.Start();CloseInputs(false);
-  // over the picture, Home toggles like the TV button on tvOS: a second press goes back to the picture
-  bool showing=visible&&Environment.TickCount64-resumedAt>700;
-  if(over&&page==0&&showing){Dismiss();return;}
-  OnInputsChanged(false);ReadSignal();
-  int was=page;page=0;bool want=WantOverlay();page=was;
-  if(want){SetOverlay(true);if(over){page=0;area=1;editing="";BuildPage(false);selected=DockFocus();UpdateFocus(false);MarkState(activity+":over");return;}}
-  else if(over){SetOverlay(false);page=0;area=1;editing="";selected=SourceIndex();BuildPage(false);MarkState(activity);return;}
+  // over the picture, Home toggles like the TV button on tvOS
+  if(oShown){HideOverlay(activity+":close");return;}
+  if(OverlayWanted()){ShowOverlay(activity);return;}
+  FullHome(activity);
+ }
+ void FullHome(string activity)
+ {
+  fromOverlay=false;freshStart=false;bool wasHidden=mainHidden;ShowMain();
+  if(wasHidden){visible=true;page=0;area=1;editing="";selected=SourceIndex();BuildPage(false);clockTimer?.Start();MarkState(activity);return;}
+  clockTimer?.Start();CloseInputs(false);OnInputsChanged(false);
   // already on Home: only move focus back. Rebuilding disposed every card and the live preview, so the
   // artwork re-decoded and the video re-attached - that was the flash after Inputs -> Home.
   if(page==0){
@@ -96,7 +101,7 @@ public sealed partial class QuietHome : NUIApplication
   page=0;area=1;editing="";selected=SourceIndex();BuildPage(false);
   MarkState(activity);
  }
- void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage(false);MarkState(activity);}
+ void OpenSettings(string activity){HideOverlay(null);ShowMain();clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage(false);MarkState(activity);}
  static string Clock()=>DateTime.Now.ToString("h:mm tt");
  int SourceIndex(){return lastSource==playPort?1:0;}
 
@@ -117,7 +122,7 @@ public sealed partial class QuietHome : NUIApplication
  void BuildChrome()
  {
   var win=Window.Default;
-  wallLayer=BuildWallpaper();win.Add(wallLayer);
+  win.Add(BuildWallpaper());
   // colour glows belong to the gradient wallpaper; over a photo they would just wash it out (and cost two
   // full-screen blended layers on every Home frame)
   if(wallpaper==null){glowWatch=Glow("watch");glowPlay=Glow("play");}
@@ -162,8 +167,7 @@ public sealed partial class QuietHome : NUIApplication
   infoTimer?.Stop();CloseInputs(false);HideLive();
   while(content.ChildCount>0){var v=content.GetChildAt(0);content.Remove(v);v.Dispose();}
   slots.Clear();styledAll=false;styledSelected=-1;notice.Text="";
-  if(over){PresentOverlayPage();if(page==0)BuildDock();else if(page==2)BuildCenter();else BuildInfo();}
-  else if(page==0)BuildHome();
+  if(page==0)BuildHome();
   else if(page==1)BuildLibrary();
   else if(page==3)BuildInfo();
   else BuildControls();
@@ -173,7 +177,7 @@ public sealed partial class QuietHome : NUIApplication
   if(fade){content.Opacity=0;pageAnimation=new Animation(140){DefaultAlphaFunction=Ease()};pageAnimation.AnimateTo(content,"Opacity",1f);pageAnimation.Play();}
   else content.Opacity=1;
   buildMilliseconds=stopwatch.ElapsedMilliseconds;buildMsByPage[page]=Math.Max(buildMsByPage.TryGetValue(page,out long was)?was:0,buildMilliseconds);MarkState("page_ready");
-  if(page==0&&!over)ScheduleLive();
+  if(page==0)ScheduleLive();
  }
  const int HeroWide=996,HeroNarrow=684,HeroGap=40; // 996x560 = 16:9; 996+40+684 = the 1720 content width
  bool playWide;
@@ -265,6 +269,16 @@ public sealed partial class QuietHome : NUIApplication
  {
   string key=app.Id+"@"+w+"x"+h;
   if(artworkCache.TryGetValue(key,out var cached))return cached;
+  var image=NewArtwork(app,w,h,18);
+  cached=new CachedArtwork{Image=image,Parent=artworkPreloadRoot};
+  artworkCache.Add(key,cached);artworkViewsCreated++;
+  image.ResourceReady+=(s,e)=>MarkState("artwork_ready");
+  artworkPreloadRoot.Add(image);image.ResourceUrl=Root+app.Asset;
+  return cached;
+ }
+ // the app's art at w x h (cover, contain or crop as the catalog says); the URL is set by the caller or here
+ ImageView NewArtwork(LibraryApp app,int w,int h,int radius,bool load=false)
+ {
   bool cover=app.Fit=="cover",full=cover||app.Fit=="contain-full";
   int iw=full?w:w-54,ih=full?h:h-40;var crop=app.Crop;
   float cropWidth=crop==null?1:crop[2],cropHeight=crop==null?1:crop[3];
@@ -273,13 +287,10 @@ public sealed partial class QuietHome : NUIApplication
    FittingMode=cover?FittingModeType.ScaleToFill:FittingModeType.ShrinkToFit,
    SamplingMode=SamplingModeType.BoxThenLanczos,
    DesiredWidth=(int)Math.Ceiling(iw*2/cropWidth),DesiredHeight=(int)Math.Ceiling(ih*2/cropHeight),
-   ReleasePolicy=ReleasePolicyType.Destroyed,CornerRadius=new Vector4(18,18,18,18)};
+   ReleasePolicy=ReleasePolicyType.Destroyed,CornerRadius=new Vector4(radius,radius,radius,radius)};
   if(crop!=null)image.PixelArea=new RelativeVector4(crop[0],crop[1],crop[2],crop[3]);
-  cached=new CachedArtwork{Image=image,Parent=artworkPreloadRoot};
-  artworkCache.Add(key,cached);artworkViewsCreated++;
-  image.ResourceReady+=(s,e)=>MarkState("artwork_ready");
-  artworkPreloadRoot.Add(image);image.ResourceUrl=Root+app.Asset;
-  return cached;
+  if(load)image.ResourceUrl=Root+app.Asset;
+  return image;
  }
  void ParkArtwork()
  {
@@ -352,13 +363,13 @@ public sealed partial class QuietHome : NUIApplication
   for(int i=0;i<slots.Count;i++)
    if(!styledAll||i==styledSelected||i==focus||(areaChanged&&slots[i].Kind==1))StyleSlot(slots[i],i==focus,animate&&styledAll);
   styledAll=true;styledSelected=focus;styledArea=area;
-  if(page==0&&!over){
+  if(page==0){
    string fn=focus>=0&&slots[focus].Kind==1?slots[focus].Name:"";
    if(glowWatch!=null){FadeTo(glowWatch,fn=="Watch"?1:0,animate);FadeTo(glowPlay,fn=="Play"?1:0,animate);}
    GlowTo(fn=="Watch"?1:0,fn=="Play"?1:0,animate);
   }
   focusAnimation?.Play();
-  detail.Text=editing!=""&&!over?"Left / Right to adjust · Select to finish":"";
+  detail.Text=editing!=""?"Left / Right to adjust · Select to finish":"";
   MarkState("focus");
  }
  void FadeTo(View v,float target,bool animate){if(Math.Abs(v.Opacity-target)<.01f)return;if(animate)FocusAnimation().AnimateTo(v,"Opacity",target);else v.Opacity=target;}
@@ -377,8 +388,7 @@ public sealed partial class QuietHome : NUIApplication
  {
   float scale=1,lift=0,opacity=1;
   // the live card never grows or lifts: the video plane does not follow view animations
-  if(s.Kind>=3)StyleOverlaySlot(s,f,animate,ref scale,ref lift);
-  else if(s.Kind==1){bool live=IsLive(s);scale=f&&!live?1.02f:1;lift=f&&!live?-3:0;opacity=f||area==0||live?1:.7f;GlassFocus(s.Rim,f?1:0,0,animate);}
+  if(s.Kind==1){bool live=IsLive(s);scale=f&&!live?1.02f:1;lift=f&&!live?-3:0;opacity=f||area==0||live?1:.7f;GlassFocus(s.Rim,f?1:0,0,animate);}
   else if(s.Kind==2){
    scale=f?page==3?1.03f:1.06f:1; // Info tiles are wide: 6% would almost touch the neighbours
    GlassFocus(s.Glass,f?1:0,0,animate);
@@ -418,10 +428,10 @@ public sealed partial class QuietHome : NUIApplication
   if(k=="XF86Home"){Home("home_key");return;}
   if(k=="XF86SysMenu"||k=="XF86More"){OpenSettings("settings_key");return;}
   if(page==1&&HandleLibraryKey(k))return;
-  if(editing!=""){if(k=="Left"||k=="Right"){int d=k=="Left"?-1:1;if(editing=="volume")ChangeVolume(d);else ChangeLevel(editing,d);}else if(k=="Return"||k=="KP_Enter"||k=="XF86Back"||k=="Back"||k=="Escape"){editing="";UpdateFocus();RefreshTileValues();}return;}
-  // over the picture: Back closes Controls / Info to the dock, and the dock to the picture
-  if(over&&(k=="XF86Back"||k=="Back"||k=="Escape"||k=="XF86Exit")){if(page==0)Dismiss();else{page=0;area=1;BuildPage();selected=DockFocus();UpdateFocus(false);}return;}
-  if(k=="Up"){if(area>=2&&area!=TB){area--;selected=Nearest(Row(area-1));}else if(area==1&&!over)area=0;UpdateFocus();}
+  // a full page opened from the bar (Info, All Controls): Back returns to the bar over the picture
+  if(fromOverlay&&editing==""&&(k=="XF86Back"||k=="Back"||k=="Escape"||k=="XF86Exit")){ReturnToOverlay();return;}
+  if(editing!=""){if(k=="Left"||k=="Right"){int d=k=="Left"?-1:1;if(editing=="volume")ChangeVolume(d);else ChangeLevel(editing,d);}else if(k=="Return"||k=="KP_Enter"||k=="XF86Back"||k=="Back"||k=="Escape"){editing="";UpdateFocus();}return;}
+  if(k=="Up"){if(area>=2&&area!=TB){area--;selected=Nearest(Row(area-1));}else if(area==1)area=0;UpdateFocus();}
   else if(k=="Down"){if(area==0||area==TB){area=1;selected=page==0?SourceIndex():Row(0)[0];}else if(Row(area).Count>0){area++;selected=Nearest(Row(area-1));}UpdateFocus();}
   else if(k=="Left"||k=="Right"){
    int d=k=="Left"?-1:1;
@@ -453,15 +463,14 @@ public sealed partial class QuietHome : NUIApplication
   if(a=="info"){BuildPage(false);return;} // refresh in place: no fade (it read as a flash)
   if(a=="inputs"){OpenInputs();return;}
   if(a=="ambient"){Launch("org.tizen.art-app");return;}
-  if(a.StartsWith("hdmi:")){int src=int.Parse(a.Substring(5));if(over&&src==lastSource){Dismiss();return;}SelectSource(src);return;}
-  if(a.StartsWith("full:")){SetOverlay(false);page=int.Parse(a.Substring(5));selected=0;area=1;BuildPage();return;}
+  if(a.StartsWith("hdmi:")){SelectSource(int.Parse(a.Substring(5)));return;}
   if(a.StartsWith("page:")){page=int.Parse(a.Substring(5));selected=page==0?SourceIndex():0;area=1;BuildPage();return;}
   if(a.StartsWith("app:")){Launch(a.Substring(4));return;}
   if(a=="controllers"){Launch("org.tizen.menu","add-bluetooth-keyboard");return;}
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
   if(a.StartsWith("heroport:")){CycleHeroPort(a.Substring(9)=="watch");return;}
   if(a.StartsWith("toggle:")){ToggleSetting(a.Substring(7));return;}
-  if(a=="volume"||a=="brightness"||a=="contrast"){RefreshSettings();RefreshTileValues();if(a!="volume"&&!CanEdit(a)){ShowError(slots[selected].Name+" is unavailable for the current input.");return;}editing=a;UpdateFocus();RefreshTileValues();return;}
+  if(a=="volume"||a=="brightness"){RefreshSettings();RefreshTileValues();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a.StartsWith("cycle:")){CycleSetting(a.Substring(6));return;}
   if(a=="output"){RefreshSettings();SetSetting("soundoutput",SettingValue("soundoutput")=="0"?"2":"0");return;}

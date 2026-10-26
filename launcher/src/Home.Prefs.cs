@@ -44,7 +44,7 @@ public sealed partial class QuietHome
   switch(id){
    case "apps":prefs.HideApps=!prefs.HideApps;SavePrefs();BuildTabs();break;
    case "live":prefs.Live=!prefs.Live;SavePrefs();if(!prefs.Live)HideLive();break; // Home re-attaches on return
-   case "overlay":prefs.Overlay=!prefs.Overlay;SavePrefs();if(!prefs.Overlay)SetOverlay(false);break;
+   case "overlay":prefs.Overlay=!prefs.Overlay;SavePrefs();if(!prefs.Overlay)HideOverlay(null);break;
    case "dim":prefs.Dim=!prefs.Dim;SavePrefs();lastActivity=Environment.TickCount64;break;
    case "wall":prefs.Wall=HomeLogic.NextWall(prefs.Wall);SavePrefs();CheckWallpaper();break;
    case "thread":ToggleThread();return;
