@@ -39,7 +39,8 @@ Measured, targeted and reversible, never a blanket "remove everything" list:
 - **Voice assistants** - Bixby, Alexa, far-field and on-device voice, wake-word engines - disabled.
 - **Advertising and recommendations** - targeted ads, TV Plus, voice "suggestions", AI companion, Samsung Home media
   rows - disabled; apps your streaming box replaces (Prime Video, Apple TV, the web browser) uninstalled.
-- 26 apps disabled and 10 vendor services blocked in total; the Info page checks every one of them, every time.
+- 39 apps disabled and 10 vendor services blocked in total; the Info page checks every one of them, every time.
+- Samsung Home is closed while it sits unused in the background (~100 MB), and Multi View no longer preloads.
 - Each phase ships with a first-run backup, a guarded inverse script and hash checks.
 
 What still works: every HDMI input, eARC/soundbar, Ambient/Art mode, AirPlay, "power on with mobile", IP remote
@@ -54,6 +55,7 @@ Assistant, Apple Home, Google Home or any OTBR - or forms a new one if you have 
 one more router in the living room, with the SmartThings hub left off.
 
 - One script to join (`otbr-join.sh`); a helper pulls Home Assistant's preferred network into a private file.
+- Keeps running in standby (Samsung cuts the radio's power otherwise).
 - On/off switch on the Info page; the choice holds across reboots.
 - Uses whichever connection the TV is online through (tested wired); no Samsung system files changed; full uninstall.
 

@@ -5,5 +5,5 @@ Description=Quiet Home: start or stop the Thread border router to match the Info
 Type=oneshot
 Environment=XDG_RUNTIME_DIR=/run/user/5001 DBUS_SESSION_BUS_ADDRESS=kernel:path=/sys/fs/kdbus/5001-user/bus
 # off: stop in reverse order (agent before the radio daemon: it hangs once CPC is gone); on: the units' own waits apply
-ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; if [ -e /opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data/thread-off ]; then echo "$$(date +%%T) switch: off"; systemctl --user stop quiet-otbr-forward.service quiet-otbr-agent.service quiet-otbr-cpcd.service; else echo "$$(date +%%T) switch: on"; systemctl --user start --no-block quiet-otbr-cpcd.service quiet-otbr-agent.service quiet-otbr-forward.service; fi'
+ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; if [ -e /opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data/thread-off ]; then echo "$$(date +%%T) switch: off"; systemctl --user stop quiet-otbr-forward.service quiet-otbr-agent.service quiet-otbr-cpcd.service quiet-otbr-usbpower.service; else echo "$$(date +%%T) switch: on"; systemctl --user start --no-block quiet-otbr-usbpower.service quiet-otbr-cpcd.service quiet-otbr-agent.service quiet-otbr-forward.service; fi'
 TimeoutStartSec=60

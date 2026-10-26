@@ -21,7 +21,12 @@ public static class InfoStats
         "com.samsung.tv.voiceassistant-music", "com.samsung.tv.vif", "com.samsung.tv.alexa-client", "com.samsung.tv.alexa-fullscreen-app",
         "com.samsung.tv.wakeup-engine-alexa", "AQKO41xyKP.AmazonAlexa", "HEPsqFNie0.tvplusstandalone",
         "com.samsung.tv.targeted-ad-service", "com.samsung.tv.utterance-recommender-core", "com.samsung.tv.AICompanionAgent", "com.samsung.tv.aov-dashboard",
-        "com.samsung.tv.home.media", "com.samsung.tv.cobalt-yt" };
+        "com.samsung.tv.home.media", "com.samsung.tv.cobalt-yt",
+        // batch E (2026-10-26)
+        "com.samsung.tv.cis-api-service-app", "com.samsung.tv.cis", "com.samsung.tizen.samsung-analytics", "org.tizen.multi-assistant-service",
+        "com.samsung.tv.aov-service", "com.samsung.tv.voice-instant-app", "org.tizen.voice-onboarding", "com.samsung.tv.mybixby",
+        "com.samsung.tv.bixby-context-client", "com.samsung.tv.bixbycapsuleviewer", "adplatform.ADPlayer", "com.samsung.tv.adplayer",
+        "com.samsung.tv.ad-web-framework" };
 
     static string Read(string path) { try { return File.ReadAllText(path); } catch { return null; } }
 
@@ -203,6 +208,8 @@ public static class InfoStats
         return (rows.Count > 0, rloc, leader, omr, rows.Count);
     }
     public static (bool present, int rloc16, bool leader, bool homeRoute, int addresses) Thread() => ParseThread(Read("/proc/net/if_inet6"), "wpan0");
+    public static int? ParseTemperature(string text) => int.TryParse(text?.Trim(), out int c) && c > 0 && c < 150 ? c : null;
+    public static int? ChipTemperature() => ParseTemperature(Read("/sys/devices/platform/soc/thermal/temperature"));
     public static bool Ipv6Forwarding() => Read("/proc/sys/net/ipv6/conf/all/forwarding")?.Trim() == "1";
     // ---- TV inputs: Samsung's own source list (libsource-api get_source_list JSON) ----
     public sealed class InputSource { public int Type; public string Name, Port; public bool Connected, Known; public int Power; }  // Known: the TV answered

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>quiet-otbr-usbpower</AssemblyName>
+    <Nullable>disable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

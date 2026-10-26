@@ -23,7 +23,8 @@ def embedded_units(install):
 
 class ThreadBorderRouterRecipe(unittest.TestCase):
     def test_scripts_parse(self):
-        for name in ("otbr-install.sh", "otbr-restore.sh", "otbr-switch-update.sh", "otbr-switch-restore.sh", "otbr-join.sh"):
+        for name in ("otbr-install.sh", "otbr-restore.sh", "otbr-switch-update.sh", "otbr-switch-restore.sh", "otbr-join.sh",
+                     "otbr-standby-update.sh", "otbr-standby-restore.sh"):
             subprocess.run(["sh", "-n", str(DIR / name)], check=True, capture_output=True)
 
     def test_installer_embeds_the_published_units(self):
@@ -45,7 +46,7 @@ class ThreadBorderRouterRecipe(unittest.TestCase):
 
     def test_switch_update_ships_the_same_units_and_restore_ships_the_merged_ones(self):
         update = embedded_units((DIR / "otbr-switch-update.sh").read_text())
-        self.assertEqual(sorted(update), UNITS)
+        self.assertEqual(sorted(update), [u for u in UNITS if u != "quiet-otbr-usbpower.service"])
         for name, (data, sha) in update.items():
             self.assertEqual(data, (DIR / name).read_bytes(), name)
         back = embedded_units((DIR / "otbr-switch-restore.sh").read_text())
@@ -56,7 +57,7 @@ class ThreadBorderRouterRecipe(unittest.TestCase):
 
     def test_info_switch_gates_every_daemon_and_survives_reboots(self):
         # boot and manual starts both skip while the marker exists; conditions never trigger Restart=
-        for name in ("quiet-otbr-cpcd.service", "quiet-otbr-agent.service", "quiet-otbr-forward.service"):
+        for name in ("quiet-otbr-cpcd.service", "quiet-otbr-agent.service", "quiet-otbr-forward.service", "quiet-otbr-usbpower.service"):
             self.assertIn(f"ConditionPathExists=!{DATA}/thread-off", (DIR / name).read_text(), name)
         path = (DIR / "quiet-otbr-switch.path").read_text()
         self.assertIn(f"PathChanged={DATA}/thread-switch", path)
@@ -64,7 +65,32 @@ class ThreadBorderRouterRecipe(unittest.TestCase):
         switch = (DIR / "quiet-otbr-switch.service").read_text()
         self.assertIn("Type=oneshot", switch)
         # off: agent stops before the radio daemon (it hangs once CPC is gone)
-        self.assertIn("stop quiet-otbr-forward.service quiet-otbr-agent.service quiet-otbr-cpcd.service", switch)
+        self.assertIn("stop quiet-otbr-forward.service quiet-otbr-agent.service quiet-otbr-cpcd.service quiet-otbr-usbpower.service", switch)
+        self.assertIn("start --no-block quiet-otbr-usbpower.service", switch)
+
+    def test_standby_blocks_iot_hub_control_and_restore_unblocks_it(self):
+        # Samsung's iot-hub-control switches the radio module off at standby while the SmartThings hub is off
+        for script in ("otbr-install.sh", "otbr-standby-update.sh"):
+            text = (DIR / script).read_text()
+            self.assertIn("SET app_disable='true' WHERE app_id='com.samsung.tv.iot-hub-control'", text, script)
+            self.assertIn('touch "$B/ihc-disabled-by-quiet-otbr"', text, script)
+        for script in ("otbr-restore.sh", "otbr-standby-restore.sh"):
+            text = (DIR / script).read_text()
+            self.assertIn("SET app_disable='false' WHERE app_id='com.samsung.tv.iot-hub-control'", text, script)
+            self.assertIn('if [ -e "$B/ihc-disabled-by-quiet-otbr" ]', text, script)  # only undo what we did
+
+    def test_usb_power_keeper_ships_the_built_keeper(self):
+        # without it storaged powers the radio's USB port down ~20 min into standby
+        unit = (DIR / "quiet-otbr-usbpower.service").read_text()
+        self.assertIn("/usr/bin/dotnet /opt/usr/share/quiet-otbr/quiet-otbr-usbpower.dll on", unit)
+        self.assertIn("Restart=always", unit)
+        src = (DIR / "usb-power-keeper/Program.cs").read_text()
+        self.assertIn('"UsbDeviceChangePortPower"', src)
+        self.assertIn("dbus_bus_get_private(1", src)  # system bus
+        for script in ("otbr-install.sh", "otbr-standby-update.sh"):
+            text = (DIR / script).read_text()
+            self.assertIn('"$Q/quiet-otbr-usbpower.dll.new"', text, script)
+            self.assertIn('"$UD/default.target.wants/quiet-otbr-usbpower.service"', text, script)
         install = (DIR / "otbr-install.sh").read_text()
         self.assertIn('"$UD/default.target.wants/quiet-otbr-switch.path"', install)
         self.assertNotIn('"$UD/default.target.wants/quiet-otbr-switch.service"', install)  # only the path unit starts it

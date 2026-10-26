@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## SilentGlass Home (v26a)
+## SilentGlass Home (v27a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -128,12 +128,21 @@ verifies every file) and `restore-v(N-1).sh`. Build with `python3 tools/build.py
 | cleanup/prime* | Prime Video boot metadata removed, companion disabled, `disable.appbooting` (ineffective, kept) | prime-restore.sh, prime-noboot-restore.sh |
 | boot-units/quiet-recog-off | owner user-systemd watcher stopping content recognition (later boot targets restart it) | recog-boot-restore.sh |
 | cleanup/batchd | SHIELD does everything: Prime Video, Apple TV, web browser **uninstalled**; TV YouTube and Samsung Home media rows disabled (cast to SHIELD's Chromecast; AirPlay unaffected); janitor unit removed | batchd-restore.sh (store apps: reinstall from Samsung Apps) |
+| cleanup/batche | content-info feed for ACR (`cis`, `cis-api-service-app`), usage analytics (`samsung-analytics`), voice leftovers (`multi-assistant-service`, always-on `aov-service`, voice instant/onboarding, three Bixby apps), ad players (`adplatform.ADPlayer`, `adplayer`, `ad-web-framework`); chosen from Vetro's catalog and checked on this TV. Not included: `coba.adagent` (Samsung Home loads it), `content-grab-service` / `nvision-analysis-dbmgr` (may feed picture processing / Ambient) | batche-restore.sh |
+| cleanup/multiview | Multi View no longer preloads at boot (marker that Samsung's own unit checks: `ConditionPathExists=!.../disable_preloading`); opens on demand, cold | multiview-restore.sh |
+| boot-units/quiet-csfs-off | owner watcher: while SilentGlass Home is the Home app, closes Samsung Home (`csfs`, ~100 MB) after it has sat in the background for two one-minute checks; never while it is on screen. Identity by SMACK label | csfs-off-restore.sh |
 | boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background | batchd-restore.sh |
 | thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; SilentGlass Home Info switch ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
 
 Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
 `DBUS_SESSION_BUS_ADDRESS=kernel:path=/sys/fs/kdbus/5001-user/bus XDG_RUNTIME_DIR=/run/user/5001 systemctl --user`.
+
+Measured after a reboot with batch E, Multi View and the csfs watcher: MemAvailable ~780-835 MB (TV on), against
+~600-630 MB before. Two Samsung diagnostic-log hosts still resolve (`fc.samsungcloud.tv`, `www.samsungrm.net`, used by
+`emergencyLogTransmitter`, a root system service that cannot be stopped from the owner session): block them in your DNS.
+Already off on this TV and worth checking on others: firmware auto-update (`db/menu/support/softwareupdate/autoupdate`)
+and Smart Hub autostart (`db/menu/smart_hub/ontvsetting/auto_start`).
 
 Not done on purpose: TV YouTube (`cobalt-yt`) is relaunched by litewebappservice within seconds when closed;
 Samsung Home (`csfs`, ~100-120 MB) and its media rows (`home.media`, ~70-150 MB) are relaunched within ~1 min (measured), so closing them only burns CPU;

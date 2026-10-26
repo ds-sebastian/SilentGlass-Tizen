@@ -43,6 +43,7 @@ static class CatalogTests
         finally { File.Delete(tmp); }
         InfoTests();
         HomeLogicTests();
+        True(InfoStats.ParseTemperature("36\n") == 36 && InfoStats.ParseTemperature("") == null && InfoStats.ParseTemperature("900") == null, "chip temperature");
         Console.WriteLine("Catalog, info parser and Home logic checks passed.");
         return 0;
     }

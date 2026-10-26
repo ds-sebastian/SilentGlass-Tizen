@@ -1,0 +1,16 @@
+[Unit]
+Description=SilentGlass Home: close Samsung Home (csfs, ~100 MB) while it sits in the background
+
+[Service]
+Type=simple
+# Only while SilentGlass Home is the Home app (db/appfw/home_appid). Checks once a minute and closes csfs only after it
+# has been running out of view for two checks in a row, so Samsung Home opened from the Apps tab is never touched.
+# Samsung reopens it now and then (e.g. the Art app always returns to it); it is simply closed again.
+# Identity: a process counts as Samsung Home only with its SMACK label (this script's own command line contains the
+# search text, and an earlier version found and killed itself). Log (events only): /run/user/5001/quiet-csfs-off.log
+ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-csfs-off.log 2>&1; echo "$$(date +%%T) start"; seen=0; while sleep 60; do home=$$(buxton2ctl get system db/appfw/home_appid 2>/dev/null | sed "s/.*: //"); p=; for q in $$(pgrep -f "[/]com.samsung.tv.csfs/"); do [ "$$(cat /proc/$$q/attr/current 2>/dev/null)" = User::Pkg::com.samsung.tv.csfs ] && { p=$$q; break; }; done; fg=$$(buxton2ctl get memory memory/appfw/current_fullscreen_appid 2>/dev/null | sed "s/.*: //"); if [ "$$home" = com.samsung.tv.bixby-promotion ] && [ -n "$$p" ] && [ "$$fg" != com.samsung.tv.csfs ]; then seen=$$((seen+1)); if [ $$seen -ge 2 ]; then kill $$p 2>/dev/null && echo "$$(date +%%T) closed csfs pid=$$p fg=$$fg avail_kb=$$(awk "/MemAvailable/{print \$$2}" /proc/meminfo)"; seen=0; fi; else seen=0; fi; done'
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

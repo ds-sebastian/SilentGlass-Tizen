@@ -223,7 +223,7 @@ class S90dPortTests(unittest.TestCase):
 
     def test_info_page_lists_match_applied_privacy_state(self):
         info = (SRC / "InfoStats.cs").read_text()
-        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 36)
+        self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 47)
         self.assertNotIn("File.Delete", info)
         self.assertNotIn("File.Write", info)  # Info is read-only
         # SMACK: marker files are unreadable to the app and other apps' /proc is hidden; never infer from those.
@@ -468,6 +468,27 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("if(prefs.Dim&&editing==", (SRC / "Home.Idle.cs").read_text())
         self.assertIn('string WallMode=>prefs.Wall!="auto"?prefs.Wall:style.WallMode;', (SRC / "Home.Wallpaper.cs").read_text())
         self.assertIn("CheckWallpaper();", toggle)
+
+    def test_info_privacy_list_covers_every_registry_batch(self):
+        info = (SRC / "InfoStats.cs").read_text()
+        listed = set(re.findall(r'"([A-Za-z0-9._-]+)"', info.split("DisabledApps = {")[1].split("};")[0]))
+        for batch in ("batchc-apply.sh", "batche-apply.sh"):
+            text = (ROOT / "devices/s90d/device/cleanup" / batch).read_text()
+            apps = set(re.findall(r"'([A-Za-z0-9._-]+)'", text.split("app_id IN (")[1].split(")")[0]))
+            self.assertTrue(apps and apps <= listed, (batch, apps - listed))
+        # never anything the Thread border router or Samsung Home depends on
+        for keep in ("smartthings", "iot-hub", "matter", "coba.adagent", "csfs"):
+            self.assertNotIn(keep, (ROOT / "devices/s90d/device/cleanup/batche-apply.sh").read_text().split("set -eu")[1])
+
+    def test_chip_temperature_on_info(self):
+        self.assertIn('Read("/sys/devices/platform/soc/thermal/temperature")', (SRC / "InfoStats.cs").read_text())
+        self.assertIn("InfoStats.ChipTemperature()", body(launcher(), "void InfoTick()"))
+
+    def test_csfs_watcher_only_closes_unused_samsung_home(self):
+        unit = (ROOT / "devices/s90d/device/boot-units/quiet-csfs-off.service").read_text()
+        self.assertIn('[ "$$home" = com.samsung.tv.bixby-promotion ]', unit)
+        self.assertIn('[ "$$fg" != com.samsung.tv.csfs ]', unit)
+        self.assertIn("seen -ge 2", unit)
 
     def test_tab_bar_select_enters_at_the_current_input(self):
         key = body(launcher(), "void HandleKey(")

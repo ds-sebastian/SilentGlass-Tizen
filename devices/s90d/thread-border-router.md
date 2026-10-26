@@ -12,8 +12,8 @@ or let the TV form a new one if you have none. Samsung's own SmartThings hub can
 
 Status on the tested TV (firmware in [README.md](README.md)): router in the home partition beside an
 upstream OTBR, LAN -> Thread forwarding proven with a real packet, survives reboots (verified across
-several owner reboots). Standby/wake is not yet confirmed: a 45-minute watch saw it keep routing and the kernel
-never suspend, but whether the TV was switched off during it was not recorded. Thread status
+several owner reboots) and **through standby** since the standby fix in section 6 (before it, the radio lost power
+whenever the TV was switched off, so the TV only routed while it was on). Thread status
 is on SilentGlass Home's **Info** tab ("Home network: Connected / Forwarding off"), with a switch to stop and start it
 (section 5).
 
@@ -130,6 +130,28 @@ SilentGlass Home's Info page shows **Thread border router** with a switch, only 
 
 Upgrading an older install of this recipe: `otbr-switch-update.sh` (keeps the previous units in the backup folder;
 running daemons are not restarted); inverse `otbr-switch-restore.sh` (always-on units, border router running).
+
+## 6. Standby (keep the radio powered)
+
+With the SmartThings hub off, the TV cuts the radio's power when it goes to standby, and the border router stops
+until the TV is switched on again. Two separate things do it, both found on the tested TV:
+
+- **Samsung's `iot-hub-control`** (started on demand through its `IHubControl` RPC port by SmartThings clients)
+  switches the radio module off at standby (`/dev/ioten`, kernel `cp210x ... disconnected` at the moment of
+  standby). It only keeps the module on while the hub is on (`db/iot/thing/iot_mode` = 1, which would start
+  Samsung's own hub stack instead). The recipe blocks the app in the registry (`app_disable`, like the privacy
+  batches); a marker in the backup folder records that, and the inverse re-enables it only then.
+- **storaged** powers the USB ports down during standby unless a live process has asked it not to
+  (`org.tizen.system.storage.BlockManager.UsbDeviceChangePortPower`, int32 1; it records the caller's pid and drops
+  the request when that process exits - kernel log: `[STORAGED] usb port power on:(1) by /usr/bin/dotnet(<pid>)`).
+  `quiet-otbr-usbpower` is a 7 KB .NET program (`usb-power-keeper/`, run by the TV's own `dotnet`, ~16 MB RSS) that
+  makes the request, stays alive and repeats it every 5 minutes. It is part of the Info switch like the other units.
+
+Install on an existing border router: `otbr-standby-update.sh`; inverse `otbr-standby-restore.sh`. New installs
+(`otbr-install.sh`) include both; `otbr-restore.sh` undoes both.
+
+Side effects: SmartThings can no longer set up Samsung's own hub on this TV (it is off by design here); the
+SmartThings app and Matter/Thread devices on your own controller are unaffected.
 
 ## Pitfalls
 

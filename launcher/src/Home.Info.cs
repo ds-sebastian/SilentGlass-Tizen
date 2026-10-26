@@ -110,7 +110,7 @@ public sealed partial class QuietHome
   var up=InfoStats.Uptime();int cores=InfoStats.Cores();
   Show(tvCard,up.HasValue?"Up "+InfoStats.Duration(up.Value):"Running",good,
    InfoStats.SystemInfo("http://tizen.org/system/model_name"),(ver!=null?"Tizen "+ver:"Tizen")+(build!=null?" · "+build.Substring(0,7):""),
-   MemText(InfoStats.Memory()),lastCpuText!=null&&!fresh?lastCpuText:"Measuring…");
+   MemText(InfoStats.Memory()),lastCpuText!=null&&!fresh?lastCpuText:InfoStats.ChipTemperature() is int c0?"Measuring… · "+c0+" °C":"Measuring…");
 
   // Quiet Home's own settings (saved in the app's data directory: they survive reboots)
   Text("SilentGlass Home",108,SetY-50,600,40,26,muted,"Semibold");
@@ -166,7 +166,8 @@ public sealed partial class QuietHome
    var cpu=InfoStats.Cpu();
    if(tvCard!=null&&cpu.HasValue&&lastCpu.HasValue&&cpu.Value.total>lastCpu.Value.total){
     double busy=100.0*(1-(double)(cpu.Value.idle-lastCpu.Value.idle)/(cpu.Value.total-lastCpu.Value.total));
-    lastCpuText=tvCard.Rows[3].Text=Math.Round(Math.Clamp(busy,0,100))+"% · "+InfoStats.Cores()+" cores";
+    int? t=InfoStats.ChipTemperature();
+    lastCpuText=tvCard.Rows[3].Text=Math.Round(Math.Clamp(busy,0,100))+"% busy"+(t.HasValue?" · "+t+" °C":"");
    }
    lastCpu=cpu;
    if(tvCard!=null)tvCard.Rows[2].Text=MemText(InfoStats.Memory())??"—";

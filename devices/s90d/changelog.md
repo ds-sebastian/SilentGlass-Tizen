@@ -6,6 +6,8 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v27a**: chip temperature in This TV (`/sys/devices/platform/soc/thermal/temperature`, Samsung's driver file; these
+  TVs have no Linux thermal zones); Privacy card counts the 13 batch E apps (39 in total).
 - **v26a (SilentGlass-Tizen)**: the fork is renamed SilentGlass-Tizen and the launcher SilentGlass Home (window
   title, Info heading and About tile; on-TV file names unchanged). Network card shows a wired glyph on Ethernet.
 - **v25b (Info overhaul)**: four status cards (Privacy / Network / Thread / This TV: coloured glyph disc + one word,
