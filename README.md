@@ -47,6 +47,13 @@ What still works: every HDMI input, eARC/soundbar, Ambient/Art mode, AirPlay, "p
 control, network and Bluetooth settings. See [devices/s90d/README.md](devices/s90d/README.md) for the full list and
 what was deliberately left alone.
 
+### Home Assistant
+
+The TV shows up in Home Assistant by itself (MQTT discovery): screen on/standby, the input on screen as a selector
+that switches inputs, the foreground app, the Thread router's role and on/off switch, Home and Ambient buttons, and
+chip temperature. A small owner service with a fixed set of commands; your broker credentials stay on the TV.
+Guide: [devices/s90d/ha-bridge.md](devices/s90d/ha-bridge.md).
+
 ### Thread border router
 
 The S90D has a Thread/Zigbee radio for Samsung's SmartThings hub, which can only create its *own* Thread network.

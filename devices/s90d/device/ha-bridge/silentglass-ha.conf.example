@@ -1,0 +1,9 @@
+# SilentGlass Home Assistant bridge. Copy to silentglass-ha.conf, chmod 600, fill in your MQTT broker.
+host=192.168.1.10
+port=1883
+user=mqtt-user
+password=change-me
+name=Living Room TV
+# optional input labels (HDMI1=13, HDMI2=14, HDMI3=15, HDMI4=16); default: the TV's own input names
+#input_15=SHIELD
+#input_13=Switch

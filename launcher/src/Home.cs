@@ -71,7 +71,10 @@ public sealed partial class QuietHome : NUIApplication
   visible=true;MarkState("created");
  }
  protected override void OnResume(){base.OnResume();visible=true;styledAll=false;UpdateFocus(false); /* restyle everything after a pause */ BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
- protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
+ protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested;
+  // Home Assistant bridge: switch input the same way the cards do (only to an input the TV lists)
+  if(e.ReceivedAppControl.ExtraData.TryGet("quiet_source",out string req)&&int.TryParse(req,out int src)&&inputs.Exists(i=>i.Type==src)){SelectSource(src);MarkState("ha_source:"+src);return;}
+  if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
  protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
  {

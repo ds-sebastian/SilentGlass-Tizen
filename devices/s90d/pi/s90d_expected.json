@@ -54,6 +54,7 @@
     "quiet-otbr-forward.service",
     "quiet-otbr-switch.path",
     "quiet-otbr-usbpower.service",
-    "quiet-csfs-off.service"
+    "quiet-csfs-off.service",
+    "silentglass-ha.service"
   ]
 }

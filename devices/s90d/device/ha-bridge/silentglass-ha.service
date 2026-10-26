@@ -1,0 +1,14 @@
+[Unit]
+Description=SilentGlass: Home Assistant bridge (MQTT discovery; state + a fixed set of commands)
+StartLimitIntervalSec=0
+# configure first: copy silentglass-ha.conf.example to silentglass-ha.conf (mode 600) and fill in the broker
+ConditionPathExists=/opt/usr/home/owner/.config/silentglass-ha.conf
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/dotnet /opt/usr/share/silentglass-ha/silentglass-ha.dll
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=default.target
