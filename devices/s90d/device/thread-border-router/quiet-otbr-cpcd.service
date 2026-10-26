@@ -1,0 +1,16 @@
+[Unit]
+Description=Quiet Home: Thread radio daemon (CPC) for the standalone border router
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Waits inside ExecStart (not ExecStartPre) so the owner default.target is never held.
+# Waits for Samsung's boot-time radio factory test to finish, then leaves the
+# factory-data marker so later Samsung setup re-runs skip that test.
+ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; i=0; while [ $$i -lt 900 ]; do i=$$((i+1)); s=$$(systemctl show iot-hub-control-setup.service -p ActiveState --value 2>/dev/null); t=$$(systemctl show iot-hub-control-setup.service -p ExecMainStartTimestampMonotonic --value 2>/dev/null); up=$$(cut -d. -f1 /proc/uptime); if [ "$$s" != activating ] && { [ -n "$$t" ] && [ "$$t" != 0 ] || [ $$up -gt 300 ]; }; then break; fi; sleep 1; done; [ -e /tmp/iot_factory_data ] || cp /opt/usr/share/quiet-otbr/iot_factory_data /tmp/iot_factory_data; echo "$$(date +%%T) cpcd start up=$$(cut -d. -f1 /proc/uptime) setup=$$s"; exec /opt/usr/apps/com.samsung.tizen.smartthings-hub/bin/cpcd -c /opt/usr/apps/com.samsung.tv.iot-hub-control/bin/cpcd_921600.conf'
+Restart=always
+RestartSec=15
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

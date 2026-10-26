@@ -1,0 +1,15 @@
+[Unit]
+Description=Quiet Home: enable LAN<->Thread IPv6 forwarding through Samsung matter-setup
+After=quiet-otbr-agent.service
+
+[Service]
+Type=simple
+# Samsung's matter-setup.path (PathModified=/tmp/matter_setup) only starts ~40 s into boot and
+# does not fire for a file created before it started. Wait for the watcher, then touch the
+# trigger every 10 s (only while Samsung's setup service is idle) until IPv6 forwarding is on.
+ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; i=0; until ip link show wpan0 >/dev/null 2>&1; do i=$$((i+1)); [ $$i -gt 1500 ] && exit 1; sleep 1; done; i=0; until [ "$$(systemctl show matter-setup.path -p ActiveState --value 2>/dev/null)" = active ]; do i=$$((i+1)); [ $$i -gt 600 ] && { echo "$$(date +%%T) forward: matter-setup.path never active"; exit 1; }; sleep 1; done; [ -e /tmp/iot_factory_data ] || cp /opt/usr/share/quiet-otbr/iot_factory_data /tmp/iot_factory_data; n=0; while [ "$$(cat /proc/sys/net/ipv6/conf/all/forwarding)" != 1 ]; do n=$$((n+1)); [ $$n -gt 60 ] && { echo "$$(date +%%T) forward: FAILED"; exit 1; }; if [ "$$(systemctl show iot-hub-control-setup.service -p ActiveState --value 2>/dev/null)" != activating ]; then echo "$$(date +%%T) forward: trigger matter-setup (try $$n)"; touch /tmp/matter_setup; fi; sleep 10; done; echo "$$(date +%%T) forward: ipv6 forwarding=1 up=$$(cut -d. -f1 /proc/uptime)"'
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

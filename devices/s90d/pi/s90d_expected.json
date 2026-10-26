@@ -48,6 +48,9 @@
     "61d543c16817d1229190efc51c049297bb6cee5fd62d6d682555c675a8e306ad"
   ],
   "user_units": [
-    "quiet-recog-off.service"
+    "quiet-recog-off.service",
+    "quiet-otbr-cpcd.service",
+    "quiet-otbr-agent.service",
+    "quiet-otbr-forward.service"
   ]
 }
