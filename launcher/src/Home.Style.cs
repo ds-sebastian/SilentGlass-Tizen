@@ -16,7 +16,7 @@ using Tizen.NUI.BaseComponents;
 // Read once at start from /tmp/quiet-home-live.conf (same file as the live-preview tunables), never on the key path.
 public sealed partial class QuietHome
 {
- sealed class StyleConf { public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,WallShader=false; public string Source="default"; }
+ sealed class StyleConf { public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true; public string Wall="photo",WallMode="auto"; public double Lat=40.7,Lon=-74.0; public string Source="default"; }
  StyleConf style=new StyleConf();
  static StyleConf ReadStyleConf()
  {
@@ -30,14 +30,17 @@ public sealed partial class QuietHome
     else if(k=="shadow")c.Shadow=v=="1";
     else if(k=="squircle")c.Squircle=v=="1";
     else if(k=="liquid")c.Liquid=v=="1";
-    else if(k=="wall")c.WallShader=v=="shader";
+    else if(k=="wall"&&(v=="photo"||v=="gradient"||v=="shader"))c.Wall=v;
+    else if(k=="wallmode"&&(v=="auto"||v=="day"||v=="night"))c.WallMode=v;
+    else if(k=="lat"&&double.TryParse(v,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double la))c.Lat=la;
+    else if(k=="lon"&&double.TryParse(v,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double lo))c.Lon=lo;
     else if(k=="vsync"&&int.TryParse(v,out int vs))c.Vsync=Math.Max(1,Math.Min(4,vs));
     else if(k=="bench"&&int.TryParse(v,out int sec))c.Bench=Math.Max(0,Math.Min(120,sec));
    }
   }catch(Exception ex){c.Source="error:"+ex.GetType().Name;}
   return c;
  }
- string StyleName=>(style.Liquid?"liquid+":"")+(style.WallShader?"wallshader+":"")+"vsync"+style.Vsync+"+glass"+style.Glass+(style.Shadow?"+shadow":"")+(style.Squircle?"+squircle":"");
+ string StyleName=>(style.Liquid?"liquid+":"")+"wall-"+WallName+"+"+"vsync"+style.Vsync+"+glass"+style.Glass+(style.Shadow?"+shadow":"")+(style.Squircle?"+squircle":"");
 
  // ---- corners: squircle where the corner is a corner (never on circles or capsules) ----
  static readonly Vector4 Squareness=new Vector4(.6f,.6f,.6f,.6f);
@@ -47,7 +50,7 @@ public sealed partial class QuietHome
  PropertyMap GlassMap(int radius,bool dark)
  {
   var stops=new PropertyArray();
-  if(dark){stops.PushBack(new PropertyValue(new Vector4(.22f,.22f,.26f,.80f)));stops.PushBack(new PropertyValue(new Vector4(.11f,.11f,.13f,.88f)));}
+  if(dark){stops.PushBack(new PropertyValue(new Vector4(.24f,.24f,.28f,.56f)));stops.PushBack(new PropertyValue(new Vector4(.10f,.10f,.12f,.70f)));}
   else{stops.PushBack(new PropertyValue(new Vector4(1,1,1,.17f)));stops.PushBack(new PropertyValue(new Vector4(1,1,1,.06f)));}
   var offsets=new PropertyArray();offsets.PushBack(new PropertyValue(0f));offsets.PushBack(new PropertyValue(1f));
   var m=new PropertyMap();
@@ -67,7 +70,7 @@ public sealed partial class QuietHome
  {
   if(style.Glass==0){v.BackgroundColor=flat;return;}
   GlassFill(v,radius,dark);
-  if(movingBackdrop||style.Glass==2){try{v.SetRenderEffect(RenderEffect.CreateBackgroundBlurEffect(movingBackdrop?60:40));blurSurfaces++;}catch{}}
+  if(movingBackdrop||style.Glass==2){try{v.SetRenderEffect(RenderEffect.CreateBackgroundBlurEffect(movingBackdrop?40:30));blurSurfaces++;}catch{}}
   Corners(v,radius,w,h);
  }
  // restyle (focus moved away): cached map, no new effect

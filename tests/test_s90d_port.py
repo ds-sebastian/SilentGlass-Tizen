@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs", "Home.Glass.cs")
+PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs", "Home.Glass.cs", "Home.Wallpaper.cs")
 
 
 def launcher():
@@ -267,7 +267,7 @@ class S90dPortTests(unittest.TestCase):
     def test_apple_style_defaults_and_costs(self):
         style = (SRC / "Home.Style.cs").read_text()
         # glass + squircle on, shadows off by default (measured: shadows were the only real GPU cost)
-        self.assertIn("public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,WallShader=false;", style)
+        self.assertIn('public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true; public string Wall="photo",WallMode="auto";', style)
         # real backdrop blur only where the backdrop moves, unless glass=2
         self.assertIn("if(movingBackdrop||style.Glass==2)", style)
         src = launcher()
@@ -300,6 +300,34 @@ class S90dPortTests(unittest.TestCase):
         # one shared quad geometry and one shared shader
         self.assertIn("if(glassQuad!=null)return glassQuad;", glass)
         self.assertIn("if(glassShader!=null)return glassShader;", glass)
+
+    def test_photo_wallpaper_day_night_and_fallback(self):
+        wall = (SRC / "Home.Wallpaper.cs").read_text()
+        # missing images (they are not in git) fall back to the gradient wallpaper
+        self.assertIn('File.Exists(Root+"wallpapers/wall-day.jpg")', wall)
+        self.assertIn('ResourceUrl=Root+"free-background.svg",Size2D=new Size2D(1920,1080),DesiredWidth=960,DesiredHeight=540', wall)
+        # sunrise/sunset from UTC, so the TV time zone cannot break it; wraps past UTC midnight
+        self.assertIn("DateTime.UtcNow", wall)
+        self.assertIn("rise<set?now>=rise&&now<set:now>=rise||now<set", wall)
+        # one shared texture set: every glass surface switches at once
+        self.assertIn("frostSet.SetTexture(0,tex);", wall)
+        src = launcher()
+        self.assertIn("CheckWallpaper();", body(src, "protected override void OnResume("))
+        # no glow layers over the photo
+        self.assertIn('if(wallpaper==null&&!(Liquid&&style.Wall=="shader")){glowWatch=Glow("watch");', src)
+        glass = (SRC / "Home.Glass.cs").read_text()
+        self.assertIn("else bg = texture2D(sFrost,vUV).rgb;", glass)
+        self.assertIn("if(kind==0&&frostSet!=null)r.SetTextures(frostSet);", glass)
+
+    def test_live_word_plate(self):
+        src = launcher()
+        # smoked plate behind the hero words, hidden until live video plays under them
+        self.assertIn('var plate=new View{Name="word-plate"', src)
+        self.assertIn("Opacity=0};", src[src.index('Name="word-plate"'):][:400])
+        self.assertIn('pa.AnimateTo(hero.Plate,"Opacity",1f);', src)
+        self.assertIn("if(was?.Plate!=null)was.Plate.Opacity=0;", body(src, "void HideLive("))
+        # words above the plate
+        self.assertIn("card.Add(plate);card.Add(big);card.Add(subLabel);", src)
 
     def test_live_preview_is_deferred_and_released(self):
         src = launcher()
@@ -345,7 +373,8 @@ class S90dPortTests(unittest.TestCase):
     def test_chrome_is_built_once(self):
         src = launcher()
         self.assertEqual(src.count('"free-background.svg"'), 1)
-        self.assertIn('"free-background.svg"', body(src, "void BuildChrome()"))
+        self.assertIn("win.Add(BuildWallpaper());", body(src, "void BuildChrome()"))
+        self.assertIn('"free-background.svg"', body(src, "View BuildWallpaper()"))
         self.assertNotIn("BuildChrome()", body(src, "void BuildPage("))
         # page content is the only thing disposed on a page change
         self.assertIn("content.Remove(v);v.Dispose();", body(src, "void BuildPage("))

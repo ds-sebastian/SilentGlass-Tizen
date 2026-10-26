@@ -19,7 +19,7 @@ public sealed partial class QuietHome : NUIApplication
  const string Root="/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
  const int TB=9; // toolbar focus area; 1..3 are content rows
  // Kind: 0 plain (Info panels), 1 hero, 2 control tile
- sealed class Slot { public Renderer Glass,Rim; public View Card,FocusRing,Disc,Badge,BadgeDot; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
+ sealed class Slot { public Renderer Glass,Rim; public View Card,FocusRing,Disc,Badge,BadgeDot,Plate; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
  readonly Dictionary<string,CachedArtwork> artworkCache=new Dictionary<string,CachedArtwork>();
@@ -42,6 +42,7 @@ public sealed partial class QuietHome : NUIApplication
  long lastKeyAt;
  readonly Color ink=new Color(0.95f,0.95f,0.97f,1);
  readonly Color muted=new Color(0.62f,0.63f,0.68f,1);
+ readonly Color chromeText=new Color(0.80f,0.81f,0.85f,1); // tabs and clock sit on the photo: a little brighter
  readonly Color white=new Color(1,1,1,1);
  readonly Color dark=new Color(0.07f,0.07f,0.09f,1);
  readonly Color clear=new Color(0,0,0,0);
@@ -69,10 +70,10 @@ public sealed partial class QuietHome : NUIApplication
   RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();
   selected=SourceIndex();BuildPage(false);
   clockTimer=new Tizen.NUI.Timer(30000);
-  clockTimer.Tick+=(s,e)=>{clock.Text=Clock();IdleTick();return true;};clockTimer.Start();
+  clockTimer.Tick+=(s,e)=>{clock.Text=Clock();CheckWallpaper();IdleTick();return true;};clockTimer.Start();
   visible=true;MarkState("created");
  }
- protected override void OnResume(){base.OnResume();visible=true;BenchRender();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
+ protected override void OnResume(){base.OnResume();visible=true;BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}
  protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
@@ -102,8 +103,10 @@ public sealed partial class QuietHome : NUIApplication
  void BuildChrome()
  {
   var win=Window.Default;
-  if(Liquid&&style.WallShader)win.Add(ProceduralWallpaper());
-  else{win.Add(new ImageView{ResourceUrl=Root+"free-background.svg",Size2D=new Size2D(1920,1080)});glowWatch=Glow("watch");glowPlay=Glow("play");}
+  win.Add(BuildWallpaper());
+  // colour glows belong to the gradient wallpaper; over a photo they would just wash it out (and cost two
+  // full-screen blended layers on every Home frame)
+  if(wallpaper==null&&!(Liquid&&style.Wall=="shader")){glowWatch=Glow("watch");glowPlay=Glow("play");}
   content=new View{Size2D=new Size2D(1920,1080)};win.Add(content);
   // tvOS-style centred tab bar; the selected tab stays lit, and turns white while it has focus
   string[] nav={"Home","Apps","Controls","Info"};int[] tw={132,122,178,110};int total=12;foreach(var w in tw)total+=w;
@@ -116,11 +119,13 @@ public sealed partial class QuietHome : NUIApplication
    tabBg[i]=new View{Position2D=new Position2D(tabX,42),Size2D=new Size2D(tw[i],56),BackgroundColor=clear,CornerRadius=new Vector4(28,28,28,28)};win.Add(tabBg[i]);
    tabs[i]=Label(nav[i],tabX,42,tw[i],56,28,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;win.Add(tabs[i]);tabX+=tw[i];
   }
-  clock=Label(Clock(),1520,40,300,60,30,muted);clock.HorizontalAlignment=HorizontalAlignment.End;win.Add(clock);
+  clock=Label(Clock(),1520,40,300,60,30,chromeText);clock.HorizontalAlignment=HorizontalAlignment.End;win.Add(clock);
   detail=Label("",100,952,1720,40,24,muted);detail.HorizontalAlignment=HorizontalAlignment.Center;win.Add(detail);
   notice=Label("",100,1000,1720,40,24,new Color(1f,.76f,.46f,1));notice.HorizontalAlignment=HorizontalAlignment.Center;win.Add(notice);
   overlay=new View{Size2D=new Size2D(1920,1080)};win.Add(overlay); // inputs sheet, toast and OLED dim: always on top
  }
+ // text width estimate for the plate (Inter Display/Semibold average advance ~0.56 em; capitals wider)
+ static int PlateWidth(string s,float px){double w=0;foreach(char c in s)w+=char.IsUpper(c)?.68:c==' '?.28:c=='i'||c=='l'||c=='t'?.3:.56;return (int)Math.Ceiling(w*px);}
  ImageView Glow(string name)
  {
   // tiny gradient art scaled to full screen; follows focus on Home (green = Watch, red/blue = Play)
@@ -287,12 +292,18 @@ public sealed partial class QuietHome : NUIApplication
   var card=Card(x,y,w,h,clear,40);
   card.Add(new ImageView{ResourceUrl=Root+asset,Size2D=new Size2D(w,h)});
   // 150 tall around the same centre line: at 116 the 100px word did not fit its line height and the TV drew "..."
-  var big=Label(word,50,h-223,w-100,150,100,white,"Display");big.Ellipsis=false;card.Add(big);
-  card.Add(Label(sub,56,h-96,w-112,46,30,subColor,"Semibold"));
+  var big=Label(word,50,h-223,w-100,150,100,white,"Display");big.Ellipsis=false;
+  var subLabel=Label(sub,56,h-96,w-112,46,30,subColor,"Semibold");
+  // smoked-glass plate behind the words, shown only while live video plays under them (any picture stays readable)
+  int pw=Math.Min(w-40,Math.Max(PlateWidth(word,100),PlateWidth(sub,30))+64);
+  var plate=new View{Name="word-plate",Position2D=new Position2D(24,h-206),Size2D=new Size2D(pw,182),BackgroundColor=new Color(0,0,0,.46f),CornerRadius=new Vector4(32,32,32,32),Opacity=0};
+  Corners(plate,32,pw,182);
+  if(Liquid)RimOverlay(plate,32,0,0,0);else{plate.BorderlineWidth=1.5f;plate.BorderlineColor=Rim;}
+  card.Add(plate);card.Add(big);card.Add(subLabel);
   // status dot, no words: set by UpdateHeroBadges whenever the input or signal changes
   var badge=new View{Position2D=new Position2D(36,36),Size2D=new Size2D(44,44),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(22,22,22,22),Opacity=0};
   var dot=new View{Position2D=new Position2D(11,11),Size2D=new Size2D(22,22),CornerRadius=new Vector4(11,11,11,11)};badge.Add(dot);card.Add(badge);
-  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot};
+  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot,Plate=plate};
   if(Liquid)slot.Rim=RimOverlay(card,40,.55f,20,40); // one ring: shadow outside, lit edge inside, above the video
   slots.Add(slot);return slot;
  }
@@ -337,7 +348,7 @@ public sealed partial class QuietHome : NUIApplication
   int key=page*2+(area==0?1:0);if(key==styledTabs)return;styledTabs=key;
   for(int i=0;i<tabs.Length;i++){
    bool cur=i==page;
-   tabs[i].TextColor=cur&&area==0?dark:cur?white:muted;
+   tabs[i].TextColor=cur&&area==0?dark:cur?white:chromeText;
    string face="Quiet Inter "+(cur?"Semibold":"Medium");if(tabs[i].FontFamily!=face)tabs[i].FontFamily=face;
    tabBg[i].BackgroundColor=cur?(area==0?white:new Color(1,1,1,.20f)):clear;
   }
@@ -362,8 +373,10 @@ public sealed partial class QuietHome : NUIApplication
   if(s.Kind==1||s.Kind==2)ApplyShadow(s,f);
   if(s.FocusRing!=null)s.FocusRing.Opacity=f?1:0;
   var pos=new Position(s.X+s.W/2f,s.Y+s.H/2f+lift,0);var sc=new Vector3(scale,scale,1);
-  if(animate){var a=FocusAnimation();a.AnimateTo(s.Card,"Scale",sc);a.AnimateTo(s.Card,"Position",pos);a.AnimateTo(s.Card,"Opacity",opacity);}
-  else{s.Card.Scale=sc;s.Card.Position=pos;s.Card.Opacity=opacity;}
+  // heroes dim by darkening, not fading: a faded card would show the photo wallpaper through its artwork
+  bool hero=s.Kind==1;var tint=new Color(opacity,opacity,opacity,1);
+  if(animate){var a=FocusAnimation();a.AnimateTo(s.Card,"Scale",sc);a.AnimateTo(s.Card,"Position",pos);if(hero)a.AnimateTo(s.Card,"Color",tint);else a.AnimateTo(s.Card,"Opacity",opacity);}
+  else{s.Card.Scale=sc;s.Card.Position=pos;if(hero)s.Card.Color=tint;else s.Card.Opacity=opacity;}
   if(f)s.Card.RaiseToTop();
  }
 

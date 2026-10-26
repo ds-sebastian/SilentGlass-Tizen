@@ -1,0 +1,104 @@
+{
+ "note": "60 fps redraw-every-frame windows (GPU busy %, fps [min,avg,n]); liquidD = v19c baseline. Memory after a fresh start on Home.",
+ "windows": [
+  {
+   "name": "liquidD-vsync1",
+   "gpu_busy": [
+    54.4,
+    54.6,
+    54.6,
+    54.5
+   ],
+   "fps": [
+    [
+     57.8,
+     59.6,
+     9
+    ],
+    [
+     59.8,
+     59.9,
+     9
+    ],
+    [
+     57.9,
+     59.7,
+     9
+    ],
+    [
+     59.4,
+     60.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "v20-photo-day",
+   "gpu_busy": [
+    47.7,
+    47.0,
+    48.1
+   ],
+   "fps": [
+    [
+     59.3,
+     60.0,
+     9
+    ],
+    [
+     59.8,
+     59.9,
+     9
+    ],
+    [
+     59.8,
+     60.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "v20-gradient",
+   "gpu_busy": [
+    52.4,
+    52.7,
+    52.5
+   ],
+   "fps": [
+    [
+     59.6,
+     59.9,
+     9
+    ],
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     59.0,
+     60.0,
+     9
+    ]
+   ]
+  }
+ ],
+ "memory": [
+  {
+   "name": "v20-photo",
+   "style_conf": "liquid+wall-day+vsync1+glass1+squircle(file)",
+   "build_ms_by_page": "0:88",
+   "rss_kb": "72436",
+   "pss_kb": "32380",
+   "gpu_kb": "15876"
+  },
+  {
+   "name": "v20-grad",
+   "style_conf": "liquid+wall-gradient+vsync1+glass1+squircle(file)",
+   "build_ms_by_page": "0:86",
+   "rss_kb": "72156",
+   "pss_kb": "29635",
+   "gpu_kb": "15472"
+  }
+ ]
+}

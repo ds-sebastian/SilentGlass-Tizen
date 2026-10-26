@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v19c)
+## Quiet Home on the S90D (v20d)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -21,6 +21,14 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **Photo wallpaper, day/night (v20)**: macOS Catalina Day/Night (not in git - Apple artwork; build them with
+  `tools/make_wallpapers.py DAY.jpg NIGHT.jpg`, Quiet Home falls back to the gradient wallpaper without them). Switches
+  at local sunrise/sunset computed from UTC (time zone independent). The glass samples a pre-blurred 480x270 copy
+  (frost texture) instead of evaluating the gradient formula: 47.6% GPU @60 fps vs 54.5% in v19c, GPU memory
+  ~30 MB -> 15.9 MB (JPEG decodes to YUV planes; gradient SVG now rasterised at half size; no full-screen glow
+  layers over the photo). Live hero card: smoked-glass plate behind the words, only while video plays. Unfocused
+  heroes dim by colour, not opacity (a faded card shows the photo through). Inputs sheet lighter (less dim, thinner
+  tint, softer blur). Conf: `wall=photo|gradient|shader`, `wallmode=auto|day|night`, `lat=`/`lon=`.
 - **Liquid Glass + 60 fps (v19)**: one GLSL ES 1.0 shader (`Home.Glass.cs`, same dialect as Samsung FLUX) draws every
   glass surface: lensing of the backdrop near the rim with a colour split, a specular edge lit from the top left plus a
   glint on the opposite corner, thick-glass edge darkening, a top-lit body, an analytic soft shadow and dithering. The

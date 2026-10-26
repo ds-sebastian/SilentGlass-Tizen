@@ -10,6 +10,7 @@ using Tizen.NUI.BaseComponents;
 // a crisp specular edge lit from the top left plus a fainter glint on the opposite corner, a top-lit body, an
 // analytic soft shadow (no blur buffer), and dithering against OLED banding.
 // Kinds: 0 clear glass panel, 1 rim + shadow overlay (over artwork, video or a DALi-blurred sheet), 2 shadow only.
+// With the photo wallpaper the backdrop comes from a pre-blurred texture (Home.Wallpaper.cs) instead of the formula.
 // liquid=0 in /tmp/quiet-home-live.conf falls back to the v18 tint. wall=shader also draws the wallpaper itself -
 // measured too expensive (GPU saturated, 48 fps), kept only for comparison.
 public sealed partial class QuietHome
@@ -122,6 +123,7 @@ void main()
     bg = vec3(wall(s+off*1.3).r,wall(s+off).g,wall(s+off*0.7).b);
   } else if(e>0.004) bg = wall(s-n*e*e*uPlace.z);
   else bg = vWall;
+  bg *= 1.0-0.35*smoothstep(0.25,0.7,dot(bg,vec3(0.299,0.587,0.114)));
   highp float top = 1.0-clamp((vLocal.y+b.y)/uSize.y,0.0,1.0);
   highp vec3 col = mix(bg*1.2,vec3(1.0),uPlace.w*(0.7+0.6*top));
   col += spec;
@@ -132,6 +134,17 @@ void main()
   col += dither(gl_FragCoord.xy);
   gl_FragColor = vec4(col*cover/max(cover+shadow*(1.0-cover),0.0001),(cover+shadow*(1.0-cover))*uColor.a);
 }";
+
+ // photo wallpaper: the backdrop is the pre-blurred frost texture (one fetch; the flat inside is not even dependent)
+ const string FrostGlsl = @"
+uniform sampler2D sFrost;
+highp vec3 wall(highp vec2 s){ return texture2D(sFrost,s*vec2(1.0/1920.0,1.0/1080.0)).rgb; }
+highp float dither(highp vec2 p){ return (fract(52.9829189*fract(dot(p,vec2(0.06711056,0.00583715))))-0.5)/255.0; }
+";
+ static string FrostVertex=>GlassVertex.Replace(WallGlsl,"").Replace("varying mediump vec3 vWall;","varying highp vec2 vUV;")
+  .Replace("vWall = wall(uPlace.xy+uSize.xy*0.5+vLocal);","vUV = (uPlace.xy+uSize.xy*0.5+vLocal)*vec2(1.0/1920.0,1.0/1080.0);");
+ static string FrostFragment=>GlassFragment.Replace(WallGlsl,FrostGlsl).Replace("varying mediump vec3 vWall;","varying highp vec2 vUV;")
+  .Replace("else bg = vWall;","else bg = texture2D(sFrost,vUV).rgb;");
 
  const string WallFragment = @"
 precision highp float;
@@ -173,7 +186,7 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
  Shader GlassShader()
  {
   if(glassShader!=null)return glassShader;
-  glassShader=new Shader(GlassVertex,GlassFragment);
+  glassShader=frostSet!=null?new Shader(FrostVertex,FrostFragment):new Shader(GlassVertex,GlassFragment);
   glassShader.RegisterProperty("uGlowW",new PropertyValue(0f));glassShader.RegisterProperty("uGlowP",new PropertyValue(0f));
   return glassShader;
  }
@@ -183,6 +196,7 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
  {
   // rims and shadow-only passes use the ring mesh; glass panels need their inside too
   var r=new Renderer(kind==0?Quad():Ring(),GlassShader()){BlendMode=2};
+  if(kind==0&&frostSet!=null)r.SetTextures(frostSet);
   float ext=shadow>0?blur*1.4f+shadowY*1.6f+4:2;
   r.RegisterProperty("uExtent",new PropertyValue(ext));
   r.RegisterProperty("uInset",new PropertyValue((float)Math.Max(radius,bevel)+4));
