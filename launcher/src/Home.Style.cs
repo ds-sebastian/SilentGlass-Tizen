@@ -16,7 +16,7 @@ using Tizen.NUI.BaseComponents;
 // Read once at start from /tmp/quiet-home-live.conf (same file as the live-preview tunables), never on the key path.
 public sealed partial class QuietHome
 {
- sealed class StyleConf { public int Glass=1,Bench=0; public bool Shadow=false,Squircle=true; public string Source="default"; }
+ sealed class StyleConf { public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,WallShader=false; public string Source="default"; }
  StyleConf style=new StyleConf();
  static StyleConf ReadStyleConf()
  {
@@ -29,12 +29,15 @@ public sealed partial class QuietHome
     if(k=="glass"&&int.TryParse(v,out int g))c.Glass=Math.Max(0,Math.Min(2,g));
     else if(k=="shadow")c.Shadow=v=="1";
     else if(k=="squircle")c.Squircle=v=="1";
+    else if(k=="liquid")c.Liquid=v=="1";
+    else if(k=="wall")c.WallShader=v=="shader";
+    else if(k=="vsync"&&int.TryParse(v,out int vs))c.Vsync=Math.Max(1,Math.Min(4,vs));
     else if(k=="bench"&&int.TryParse(v,out int sec))c.Bench=Math.Max(0,Math.Min(120,sec));
    }
   }catch(Exception ex){c.Source="error:"+ex.GetType().Name;}
   return c;
  }
- string StyleName=>"glass"+style.Glass+(style.Shadow?"+shadow":"")+(style.Squircle?"+squircle":"");
+ string StyleName=>(style.Liquid?"liquid+":"")+(style.WallShader?"wallshader+":"")+"vsync"+style.Vsync+"+glass"+style.Glass+(style.Shadow?"+shadow":"")+(style.Squircle?"+squircle":"");
 
  // ---- corners: squircle where the corner is a corner (never on circles or capsules) ----
  static readonly Vector4 Squareness=new Vector4(.6f,.6f,.6f,.6f);
@@ -82,7 +85,7 @@ public sealed partial class QuietHome
  Shadow heroFocus,tileFocus;
  void ApplyShadow(Slot s,bool focused)
  {
-  if(!style.Shadow)return;
+  if(!style.Shadow||style.Liquid)return;
   heroFocus??=new Shadow(32,new Color(0,0,0,.55f),new Vector2(0,16));
   tileFocus??=new Shadow(24,new Color(0,0,0,.5f),new Vector2(0,10));
   try{s.Card.BoxShadow=focused?(s.Kind==1?heroFocus:tileFocus):null;}catch{}

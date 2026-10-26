@@ -96,6 +96,8 @@ public sealed partial class QuietHome
   if(toast!=null){overlay.Remove(toast);toast.Dispose();toast=null;}
   var t=new View{Position2D=new Position2D(960-300,962),Size2D=new Size2D(600,68),BackgroundColor=new Color(.15f,.15f,.18f,.96f),CornerRadius=new Vector4(34,34,34,34),BorderlineWidth=1.5f,BorderlineColor=new Color(1,1,1,.12f),Opacity=0};
   Glass(t,34,600,68,true,new Color(.15f,.15f,.18f,.96f),dark:true);
+  toastRim?.Dispose();toastRim=null;
+  if(Liquid){t.BorderlineWidth=0;toastRim=RimOverlay(t,34,.45f,12,28,persistent:true);}
   t.Add(new ImageView{ResourceUrl=Root+"glyph-inputs.svg",Position2D=new Position2D(24,12),Size2D=new Size2D(44,44)});
   var l=Label(text,80,0,600-120,68,28,white,"Semibold");l.Ellipsis=true;t.Add(l);
   overlay.Add(t);toast=t;
@@ -107,7 +109,7 @@ public sealed partial class QuietHome
 
  // ---- Inputs sheet: every HDMI port by the TV's name for it; Up/Down, Select switches, Back closes ----
  sealed class SheetRow { public View Row,Dot; public TextLabel Name,Port; public ImageView Glyph,Check; public bool Current; public Dot State; }
- View inputsLayer,sheet;Animation sheetAnimation;
+ View inputsLayer,sheet;Animation sheetAnimation;Renderer sheetRim,toastRim;
  readonly List<SheetRow> sheetRows=new List<SheetRow>();
  List<InfoStats.InputSource> sheetInputs=new List<InfoStats.InputSource>();
  int inputSel;
@@ -118,6 +120,7 @@ public sealed partial class QuietHome
   inputsLayer=new View{Size2D=new Size2D(1920,1080),BackgroundColor=new Color(0,0,0,.6f),Opacity=0};
   sheet=new View{Position2D=new Position2D(SheetX,0),BackgroundColor=new Color(.13f,.13f,.15f,.97f),CornerRadius=new Vector4(34,34,34,34),BorderlineWidth=1.5f,BorderlineColor=new Color(1,1,1,.12f)};
   Glass(sheet,34,SheetW,400,true,new Color(.13f,.13f,.15f,.97f),dark:true);
+  if(Liquid)sheet.BorderlineWidth=0;
   inputsLayer.Add(sheet);overlay.Add(inputsLayer);
   inputSel=-1;FillSheet();
   // slide up 40 px while fading in
@@ -131,6 +134,8 @@ public sealed partial class QuietHome
  {
   int keepType=inputSel>=0&&inputSel<sheetInputs.Count?sheetInputs[inputSel].Type:lastSource;
   while(sheet.ChildCount>0){var v=sheet.GetChildAt(0);sheet.Remove(v);v.Dispose();}
+  sheetRim?.Dispose();sheetRim=null;
+  if(Liquid)sheetRim=RimOverlay(sheet,34,.55f,22,46,persistent:true); // edge light + shadow; the DALi blur stays the body
   sheetRows.Clear();sheetInputs=inputs;
   int h=96+sheetInputs.Count*RowH+20,y=Math.Max(60,SheetBottom-h);
   sheet.Size2D=new Size2D(SheetW,h);if(sheetAnimation==null||sheetAnimation.State!=Animation.States.Playing)sheet.Position2D=new Position2D(SheetX,y);
@@ -175,7 +180,7 @@ public sealed partial class QuietHome
  {
   if(inputsLayer==null)return;
   StopAnimation(ref sheetAnimation);
-  overlay.Remove(inputsLayer);inputsLayer.Dispose();inputsLayer=null;sheet=null;sheetRows.Clear();
+  overlay.Remove(inputsLayer);inputsLayer.Dispose();inputsLayer=null;sheet=null;sheetRows.Clear();sheetRim?.Dispose();sheetRim=null;
   if(refocus)MarkState("inputs_closed");
  }
  // ---- Ambient's Home key: the Art app always opens Samsung Home (hard-coded); come back to Quiet Home instead ----

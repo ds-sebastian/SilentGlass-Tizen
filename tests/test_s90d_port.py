@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs")
+PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs", "Home.Glass.cs")
 
 
 def launcher():
@@ -267,7 +267,7 @@ class S90dPortTests(unittest.TestCase):
     def test_apple_style_defaults_and_costs(self):
         style = (SRC / "Home.Style.cs").read_text()
         # glass + squircle on, shadows off by default (measured: shadows were the only real GPU cost)
-        self.assertIn("public int Glass=1,Bench=0; public bool Shadow=false,Squircle=true;", style)
+        self.assertIn("public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,WallShader=false;", style)
         # real backdrop blur only where the backdrop moves, unless glass=2
         self.assertIn("if(movingBackdrop||style.Glass==2)", style)
         src = launcher()
@@ -281,6 +281,25 @@ class S90dPortTests(unittest.TestCase):
             self.assertNotIn(word, key)
         # glass maps are cached, focus moves reuse them
         self.assertIn("glassMaps.TryGetValue", style)
+
+    def test_liquid_glass_shader(self):
+        glass = (SRC / "Home.Glass.cs").read_text()
+        # GLSL ES 1.0 like Samsung FLUX; no screen readback or blur passes
+        self.assertIn("gl_FragColor", glass)
+        self.assertNotIn("FrameBuffer", glass)
+        self.assertNotIn("RenderTask", glass)
+        # the procedural wallpaper must match the SVG it stands in for
+        bg = (ASSETS / "free-background.svg").read_text()
+        for stop in ("#2B3F8F", "#0F4D3A", "#4A2366"):
+            self.assertIn(stop, bg)
+        self.assertIn("vec3(0.169,0.247,0.561),0.42", glass)
+        # per-page renderers are released with the page; sheet/toast rims with their views
+        src = launcher()
+        self.assertIn("ReleasePageRenderers();", body(src, "void BuildPage("))
+        self.assertIn("sheetRim?.Dispose();", body(src, "void CloseInputs("))
+        # one shared quad geometry and one shared shader
+        self.assertIn("if(glassQuad!=null)return glassQuad;", glass)
+        self.assertIn("if(glassShader!=null)return glassShader;", glass)
 
     def test_live_preview_is_deferred_and_released(self):
         src = launcher()

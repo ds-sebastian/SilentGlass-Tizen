@@ -22,11 +22,12 @@ def run(label, body, t=60):
 cmd, name = sys.argv[1], sys.argv[2]
 if cmd == "set":
     g, s, q = sys.argv[3:6]
-    print(run(f"set-{name}", f"""printf 'glass={g}\\nshadow={s}\\nsquircle={q}\\nbench=60\\n' > /tmp/quiet-home-live.conf
+    extra = "".join(f"\\n{kv}" for kv in sys.argv[6:])
+    print(run(f"set-{name}", f"""printf 'glass={g}\\nshadow={s}\\nsquircle={q}\\nbench=60{extra}\\n' > /tmp/quiet-home-live.conf
 chmod 644 /tmp/quiet-home-live.conf; command -v chsmack >/dev/null && chsmack -a '*' /tmp/quiet-home-live.conf
 cat /tmp/quiet-home-live.conf | tr '\\n' ' '; echo
 app_launcher -k com.samsung.tv.bixby-promotion 2>&1 | tail -n 1; sleep 1
-app_launcher -S 2>/dev/null | grep -c bixby-promotion"""))
+app_launcher -s com.samsung.tv.bixby-promotion 2>&1 | tail -n 1; sleep 4; buxton2ctl get memory memory/appfw/current_fullscreen_appid | sed "s/.*= String: //"; grep -E "^style_conf=" /tmp/quiet-home-state.txt"""))
 elif cmd == "measure":
     text = run(f"meas-{name}", r"""W=$(enlightenment_info -topvwins 2>&1 | awk '/Quiet Home/{print $2; exit}')
 echo "win=$W fg=$(buxton2ctl get memory memory/appfw/current_fullscreen_appid | sed 's/.*= String: //')"

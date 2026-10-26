@@ -1,0 +1,246 @@
+{
+ "note": "GPU busy % (whole GPU, Mali DVFS, 8 s windows) and compositor fps [min,avg,samples] while Quiet Home redraws every frame. vsync1 = SetRenderRefreshRate(1) = 60 fps; vsync2 = DALi default on this TV = 30 fps. liquidB = ring meshes for rims/shadows; liquidC/D = + vertex backdrop. Key runs: same 18-key tab/tile sequence per config.",
+ "windows": [
+  {
+   "name": "liquid-vsync1",
+   "gpu_busy": [
+    83.2,
+    83.1,
+    83.2
+   ],
+   "fps": [
+    [
+     60.0,
+     60.0,
+     9
+    ],
+    [
+     59.9,
+     60.0,
+     9
+    ],
+    [
+     60.0,
+     60.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "liquid-vsync2",
+   "gpu_busy": [
+    78.6,
+    78.5,
+    78.3
+   ],
+   "fps": [
+    [
+     30.0,
+     30.0,
+     9
+    ],
+    [
+     30.0,
+     30.0,
+     9
+    ],
+    [
+     30.0,
+     30.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "flat-v1",
+   "gpu_busy": [
+    35.1,
+    35.1,
+    35.1
+   ],
+   "fps": [
+    [
+     59.9,
+     60.0,
+     9
+    ],
+    [
+     60.0,
+     60.0,
+     9
+    ],
+    [
+     60.0,
+     60.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "flat-v2",
+   "gpu_busy": [
+    14.5,
+    14.4,
+    14.4
+   ],
+   "fps": [
+    [
+     29.7,
+     30.0,
+     9
+    ],
+    [
+     29.9,
+     30.0,
+     9
+    ],
+    [
+     29.9,
+     30.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "liqwall-v1",
+   "gpu_busy": [
+    100.0,
+    100.0,
+    100.0
+   ],
+   "fps": [
+    [
+     47.6,
+     47.7,
+     9
+    ],
+    [
+     47.7,
+     47.7,
+     9
+    ],
+    [
+     47.7,
+     47.7,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "liquidB-vsync1",
+   "gpu_busy": [
+    58.3,
+    58.3,
+    58.4
+   ],
+   "fps": [
+    [
+     60.0,
+     60.0,
+     9
+    ],
+    [
+     60.0,
+     60.0,
+     9
+    ],
+    [
+     60.0,
+     60.0,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "liquidC-vsync1",
+   "gpu_busy": [
+    54.5,
+    54.6,
+    54.6
+   ],
+   "fps": [
+    [
+     57.9,
+     59.7,
+     9
+    ],
+    [
+     57.7,
+     59.7,
+     9
+    ],
+    [
+     59.6,
+     59.9,
+     9
+    ]
+   ]
+  },
+  {
+   "name": "liquidD-vsync1",
+   "gpu_busy": [
+    54.4,
+    54.6,
+    54.6,
+    54.5
+   ],
+   "fps": [
+    [
+     57.8,
+     59.6,
+     9
+    ],
+    [
+     59.8,
+     59.9,
+     9
+    ],
+    [
+     57.9,
+     59.7,
+     9
+    ],
+    [
+     59.4,
+     60.0,
+     9
+    ]
+   ]
+  }
+ ],
+ "key_runs": [
+  {
+   "name": "kA-liq60",
+   "key_count": "18",
+   "key_ms_avg": "47.11",
+   "key_ms_max": "222.25",
+   "style_conf": "liquid+vsync1+glass1+squircle(file)",
+   "build_ms_by_page": "0:101,1:34,2:115,3:220",
+   "rss_kb": "74720",
+   "pss_kb": "36431",
+   "gpu_kb": "30144"
+  },
+  {
+   "name": "kB-flat60",
+   "key_count": "18",
+   "key_ms_avg": "47.06",
+   "key_ms_max": "224.04",
+   "style_conf": "vsync1+glass0(file)",
+   "build_ms_by_page": "0:84,1:21,2:112,3:222",
+   "rss_kb": "73236",
+   "pss_kb": "34457",
+   "gpu_kb": "27448"
+  },
+  {
+   "name": "kC-liq30",
+   "key_count": "18",
+   "key_ms_avg": "49.51",
+   "key_ms_max": "210.02",
+   "style_conf": "liquid+vsync2+glass1+squircle(file)",
+   "build_ms_by_page": "0:87,1:27,2:119,3:208",
+   "rss_kb": "75740",
+   "pss_kb": "37025",
+   "gpu_kb": "29236"
+  }
+ ]
+}

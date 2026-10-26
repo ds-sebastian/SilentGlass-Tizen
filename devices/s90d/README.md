@@ -8,7 +8,7 @@ backup, a guarded inverse and hash verification, and re-checked after reboots.
 - Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
   **stdin** - unsigned script files cannot be executed under UEP.
 
-## Quiet Home on the S90D (v18d)
+## Quiet Home on the S90D (v19c)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -21,6 +21,16 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **Liquid Glass + 60 fps (v19)**: one GLSL ES 1.0 shader (`Home.Glass.cs`, same dialect as Samsung FLUX) draws every
+  glass surface: lensing of the backdrop near the rim with a colour split, a specular edge lit from the top left plus a
+  glint on the opposite corner, thick-glass edge darkening, a top-lit body, an analytic soft shadow and dithering. The
+  wallpaper is evaluated mathematically in the shader (no screen readback, no blur passes); focus glows are shared
+  shader uniforms. Rims and shadows of big cards use a ring mesh (edge band only); panel insides take the backdrop from
+  the vertices. Heroes: tvOS 26 icon-style art (vivid field + frosted glass symbol). DALi on this TV renders every
+  2nd vsync by default; `NUIApplication.SetRenderRefreshRate(1)` gives 60 fps (`vsync=` in the conf file).
+  Measured while redrawing every frame: flat 14% @30 / 35% @60; Liquid Glass first cut 83% @60, final 54.5% @60
+  (59.6-60 fps); procedural wallpaper saturated the GPU (48 fps) and stays off. Key handling, page builds and RSS
+  unchanged within noise; GPU memory +2.7 MB (bench/liquid-glass-20261025.json).
 - **Apple look (v18)**: glass surfaces (top-lit tint + fine rim) on tiles, tab capsule and Info panels; real GPU
   backdrop blur (`RenderEffect.CreateBackgroundBlurEffect`) on the Inputs sheet and toast, which float over moving
   content; Apple continuous corners (`CornerSquareness`). Tunable at runtime in `/tmp/quiet-home-live.conf`
