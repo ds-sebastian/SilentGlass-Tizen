@@ -8,7 +8,8 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/Home.cs"
 SRC = ROOT / "launcher/src"
-PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs", "Home.Style.cs", "Home.Glass.cs", "Home.Wallpaper.cs", "Home.Prefs.cs")
+PARTS = ("Home.cs", "Home.Controls.cs", "Home.Inputs.cs", "Home.Info.cs", "Home.Idle.cs", "Home.State.cs", "Home.Live.cs",
+         "Home.Style.cs", "Home.Glass.cs", "Home.Wallpaper.cs", "Home.Prefs.cs", "HomeLogic.cs")
 
 
 def launcher():
@@ -16,10 +17,33 @@ def launcher():
 
 
 def body(source, signature):
-    """Text of one C# member: from its signature to the closing brace at one-space indent."""
+    """Text of exactly one C# member: its signature through the brace that closes its body.
+    Braces inside string/char literals and comments are skipped, so one-line members do not run into the next."""
     start = source.index(signature)
-    end = source.find("\n }\n", start)
-    return source[start:end if end > 0 else None]
+    i, depth, quote = source.index("{", start), 0, None
+    while i < len(source):
+        ch = source[i]
+        if quote:
+            if ch == "\\":
+                i += 1
+            elif ch == quote:
+                quote = None
+        elif source.startswith("//", i):
+            i = source.find("\n", i)  # comments (TV's, don't, ...) are not literals
+            if i < 0:
+                break
+        elif source.startswith("/*", i):
+            i = source.index("*/", i) + 1
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:i + 1]
+        i += 1
+    raise AssertionError(f"unbalanced member: {signature}")
 ASSETS = ROOT / "launcher/assets"
 INVENTORY = ROOT / ".local/device-inventory/catalog-apps.csv"
 
@@ -29,6 +53,14 @@ class S90dPortTests(unittest.TestCase):
         proj = (SRC / "Home.csproj").read_text()
         for p in PARTS:
             self.assertIn(f'<Compile Include="{p}" />', proj)
+        # the NUI-free logic is also compiled into the off-TV C# tests
+        self.assertIn('<Compile Include="../launcher/src/HomeLogic.cs" />', (ROOT / "tests/CatalogTests.csproj").read_text())
+        self.assertNotIn("Tizen.", (SRC / "HomeLogic.cs").read_text())
+
+    def test_body_helper_stops_at_the_member(self):
+        src = "class C\n{\n void A(){x(\"}\"); // the TV's }\n }\n void B(){y();}\n}\n"
+        self.assertEqual(body(src, "void A("), 'void A(){x("}"); // the TV\'s }\n }')
+        self.assertEqual(body(launcher(), "protected override void OnResume()").count("\n"), 0)
 
     def test_primary_shield_uses_observed_source(self):
         src = launcher()
@@ -123,7 +155,7 @@ class S90dPortTests(unittest.TestCase):
 
     def test_settings_tiles_have_valid_local_artwork(self):
         import re
-        tiles = re.findall(r'SettingsTile\("([^"]+)","([^"]+)","[^"]*","([a-z]+)",(\d),(\d)\)', launcher())
+        tiles = re.findall(r'SettingsTile\("([^"]+)","([^"]+)","([a-z]+)",(\d),(\d)\)', launcher())
         self.assertEqual(len(tiles), 15)
         self.assertEqual(sorted((int(c), int(r)) for *_, c, r in tiles), [(c, r) for c in range(5) for r in range(3)])
         for _, _, icon, _, _ in tiles:
@@ -181,8 +213,8 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("Toolbar(", src)
         build_info = src.split("void BuildInfo()")[1].split("void InfoTick()")[0]
         self.assertIn('"Thread border router"', build_info)
-        self.assertNotIn("UsageSummary", build_info)
-        self.assertNotIn("RecordLaunch", src)
+        self.assertNotIn("UsageSummary", src + (SRC / "InfoStats.cs").read_text())
+        self.assertNotIn("RecordLaunch", src + (SRC / "InfoStats.cs").read_text())
         # the info timer must not run while another page or app is visible
         self.assertIn("infoTimer?.Stop();", body(src, "void BuildPage("))
         self.assertIn("if(page!=3)return false;", src)
@@ -191,7 +223,8 @@ class S90dPortTests(unittest.TestCase):
     def test_info_page_lists_match_applied_privacy_state(self):
         info = (SRC / "InfoStats.cs").read_text()
         self.assertEqual(info.count('"com.samsung.tv.') + info.count('"org.tizen.') + info.count('"AQKO') + info.count('"HEPsq') + info.count('"pisa-service"') + info.count('"canalysis-daemon"') + info.count('"slive-provider-daemon"'), 36)
-        self.assertNotIn("File.Delete", info.split("RecordLaunch")[0])
+        self.assertNotIn("File.Delete", info)
+        self.assertNotIn("File.Write", info)  # Info is read-only
         # SMACK: marker files are unreadable to the app and other apps' /proc is hidden; never infer from those.
         self.assertNotIn("File.Exists(\"/opt/usr/share/systemd", info)
         self.assertNotIn("attr/current", info)
@@ -206,7 +239,8 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("lastNet=null;lastCpu=null;\n  InfoTick();", build_info)
         # every live row is populated at build time, never a placeholder until the next tick
         self.assertNotIn('"Since start",null)', build_info)
-        self.assertIn('"Since start",TotalsText(InfoStats.NetDev()))', build_info)
+        self.assertIn('"Since start",TotalsText(netdev))', build_info)
+        self.assertEqual(build_info.count("InfoStats.NetDev()"), 1)  # one read of /proc/net/dev per build
 
     def test_oled_idle_dim(self):
         src = launcher()
@@ -268,21 +302,22 @@ class S90dPortTests(unittest.TestCase):
 
     def test_apple_style_defaults_and_costs(self):
         style = (SRC / "Home.Style.cs").read_text()
-        # glass + squircle on, shadows off by default (measured: shadows were the only real GPU cost)
-        self.assertIn('public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,HeroFade=false; public string Wall="photo",WallMode="auto";', style)
-        # real backdrop blur only where the backdrop moves, unless glass=2
-        self.assertIn("if(movingBackdrop||style.Glass==2)", style)
+        self.assertIn('Squircle=HomeLogic.Flag(c,"squircle",true)', style)
+        self.assertIn('Vsync=HomeLogic.Int(c,"vsync",1,1,4)', style)  # 60 fps by default
+        # measured-and-dropped experiments stay dropped: flat fallback, BoxShadow, procedural wallpaper
         src = launcher()
-        self.assertIn('Glass(sheet,34,SheetW,400,true,', src)
-        self.assertIn("Glass(t,34,600,68,true,", src)
+        for gone in ("BoxShadow", "ProceduralWallpaper", "style.Liquid", "style.Glass", '"shader"', "FocusRing"):
+            self.assertNotIn(gone, src)
+        # real backdrop blur only on the floating sheet and toast (their backdrop moves)
+        self.assertEqual(src.count("Frosted("), 3)  # definition, sheet, toast
+        self.assertIn("Frosted(sheet,34,SheetW,400);", src)
+        self.assertIn("Frosted(t,34,600,68);", src)
         # squircles never turn circles or capsules into squares
         self.assertIn("radius*2<Math.Min(w,h)", style)
         # nothing style-related is read or built on the key path
         key = body(src, "void OnKey(")
-        for word in ("ReadStyleConf", "GlassMap", "CreateBackgroundBlurEffect", "KeepRendering"):
+        for word in ("ReadStyleConf", "Frosted", "CreateBackgroundBlurEffect", "KeepRendering"):
             self.assertNotIn(word, key)
-        # glass maps are cached, focus moves reuse them
-        self.assertIn("glassMaps.TryGetValue", style)
 
     def test_liquid_glass_shader(self):
         glass = (SRC / "Home.Glass.cs").read_text()
@@ -290,7 +325,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("gl_FragColor", glass)
         self.assertNotIn("FrameBuffer", glass)
         self.assertNotIn("RenderTask", glass)
-        # the procedural wallpaper must match the SVG it stands in for
+        # the gradient backdrop formula must match the SVG wallpaper it stands in for
         bg = (ASSETS / "free-background.svg").read_text()
         for stop in ("#2B3F8F", "#0F4D3A", "#4A2366"):
             self.assertIn(stop, bg)
@@ -308,15 +343,15 @@ class S90dPortTests(unittest.TestCase):
         # missing images (they are not in git) fall back to the gradient wallpaper
         self.assertIn('File.Exists(Root+"wallpapers/wall-day.jpg")', wall)
         self.assertIn('ResourceUrl=Root+"free-background.svg",Size2D=new Size2D(1920,1080),DesiredWidth=960,DesiredHeight=540', wall)
-        # sunrise/sunset from UTC, so the TV time zone cannot break it; wraps past UTC midnight
-        self.assertIn("DateTime.UtcNow", wall)
-        self.assertIn("rise<set?now>=rise&&now<set:now>=rise||now<set", wall)
+        # sunrise/sunset from UTC, so the TV time zone cannot break it (behaviour tested in tests/CatalogTests.cs)
+        self.assertIn("HomeLogic.IsNight(DateTime.UtcNow,style.Lat,style.Lon)", wall)
         # one shared texture set: every glass surface switches at once
         self.assertIn("frostSet.SetTexture(0,tex);", wall)
         src = launcher()
         self.assertIn("CheckWallpaper();", body(src, "protected override void OnResume("))
         # no glow layers over the photo
-        self.assertIn('if(wallpaper==null&&!(Liquid&&style.Wall=="shader")){glowWatch=Glow("watch");', src)
+        self.assertIn('if(wallpaper==null){glowWatch=Glow("watch");', src)
+        self.assertIn("if(glassShader==null||wallpaper!=null)return;", body(src, "void GlowTo("))
         glass = (SRC / "Home.Glass.cs").read_text()
         self.assertIn("else bg = texture2D(sFrost,vUV).rgb;", glass)
         self.assertIn("if(kind==0&&frostSet!=null)r.SetTextures(frostSet);", glass)
@@ -334,7 +369,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("if(!RelayoutHeroes()){UpdateHeroBadges(false);UpdateFocus();ScheduleLive();}", home)
         self.assertLess(home.index("return;"), home.index("BuildPage(false)"))
         live = (SRC / "Home.Live.cs").read_text()
-        self.assertIn("var rect=(c.Item1-Bleed,c.Item2-Bleed,c.Item3+2*Bleed,c.Item4+2*Bleed);", live)
+        self.assertIn("var rect=HomeLogic.VideoRect(hero.X,hero.Y,hero.W,hero.H,4);", live)
         self.assertIn("if(liveView!=null&&liveSlot==hero){PushLiveGeometry(liveRect);", live)
 
     def test_live_band_and_light_shadows(self):
@@ -344,7 +379,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("Scrim=true", src)
         self.assertIn("(0f,0f),(.25f,.18f),(.5f,.48f),(.75f,.70f),(1f,.82f)", src)
         # heroes: no shadow at rest, a soft one only when focused
-        self.assertIn("slot.Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f);", src)
+        self.assertIn("Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f)", src)
         glass = (SRC / "Home.Glass.cs").read_text()
         self.assertIn("float shadow=.12f,float shadowY=6,float blur=18,float focusShadow=.16f,", glass)
 
@@ -352,13 +387,26 @@ class S90dPortTests(unittest.TestCase):
         src = launcher()
         prefs = (SRC / "Home.Prefs.cs").read_text()
         self.assertIn("DirectoryInfo.Data", prefs)
-        self.assertIn("int next=cur==0?13:cur>=16?0:cur+1;", prefs)
+        # read in OnCreate: in a field initializer the app framework (and its data directory) does not exist yet,
+        # so the saved choice was never read back
+        self.assertNotRegex(prefs, r"prefs\s*=\s*LoadPrefs\(\)")
+        self.assertIn("prefs=LoadPrefs();", body(src, "protected override void OnCreate()"))
+        create = body(src, "protected override void OnCreate()")
+        self.assertLess(create.index("prefs=LoadPrefs();"), create.index("ResolveHeroPorts();"))
+        # cycling never maps both cards to the same input (behaviour tested in tests/CatalogTests.cs)
+        self.assertIn("HomeLogic.NextPort(prefs.WatchPort,playPort)", prefs)
+        self.assertIn("HomeLogic.NextPort(prefs.PlayPort,watchPort)", prefs)
         self.assertIn('SettingsTile("Watch Input","heroport:watch"', src)
         self.assertIn('SettingsTile("Play Input","heroport:play"', src)
         self.assertIn("prefs.WatchPort!=0?prefs.WatchPort:PortNamed(\"shield\",15)", src)
         # Panel Care: Pixel Shift is a real setting; Pixel Refresh is never triggered from here
         self.assertIn('"cycle:pixel-shift-menu"', src)
         self.assertNotIn("ELSensing", src)
+
+    def test_tab_bar_select_enters_at_the_current_input(self):
+        key = body(launcher(), "void HandleKey(")
+        self.assertIn("if(area==0||area==TB){area=1;selected=page==0?SourceIndex():0;", key)
+        self.assertIn("if(selected<0||selected>=slots.Count)return;", body(launcher(), "void Activate()"))
 
     def test_live_preview_is_deferred_and_released(self):
         src = launcher()
@@ -371,11 +419,10 @@ class S90dPortTests(unittest.TestCase):
         self.assertLess(update.index("liveConf=ReadLiveConf();"), update.index("TVWindowControlAPI"))
         self.assertNotIn("ReadLiveConf", body(src, "void OnKey("))
         # the live card does not grow or lift on focus (the video plane does not follow those animations)
-        self.assertIn("bool still=IsLiveStill(s);scale=f&&!still?1.02f:1;lift=f&&!still?-3:0;", src)
+        self.assertIn("bool live=IsLive(s);scale=f&&!live?1.02f:1;lift=f&&!live?-3:0;", src)
         # crop to fill (16:9 plane covering the card) instead of squashing into the card's shape
-        self.assertIn("canvas.DisableAutoUpdateVideoGeometry=liveConf.Cover;", update)
+        self.assertIn("canvas.DisableAutoUpdateVideoGeometry=true;", update)
         self.assertLess(update.index("DisableAutoUpdateVideoGeometry"), update.index("canvas.SetPlayer("))
-        self.assertIn("if(s.W*9>=s.H*16){int h=s.W*9/16;", src)
         # video directly above the artwork, below the words
         self.assertIn("var art=hero.Card.GetChildAt(0);", update)
         # the status dot must not flicker with the signal flag

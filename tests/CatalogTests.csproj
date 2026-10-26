@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="../launcher/src/AppLibrary.cs" />
     <Compile Include="../launcher/src/InfoStats.cs" />
+    <Compile Include="../launcher/src/HomeLogic.cs" />
     <Compile Include="CatalogTests.cs" />
   </ItemGroup>
 </Project>

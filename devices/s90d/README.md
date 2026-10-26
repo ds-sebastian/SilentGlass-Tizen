@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v21d)
+## Quiet Home on the S90D (v22a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -37,6 +37,13 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **v22a (refactor)**: measured-and-dropped experiments removed (flat/`liquid=0` fallback, `glass=`/`shadow=` modes
+  and BoxShadow, procedural `wall=shader`, live `still`/`sync`/`cover` modes; old `/tmp` conf keys are now ignored).
+  Pure logic moved to NUI-free `HomeLogic.cs` (conf parsing, Watch/Play port rules, video rectangle, sunrise/sunset)
+  and unit-tested off the TV in `tests/CatalogTests.cs`. Fixes: the saved Watch/Play input was never read back
+  (loaded in a field initializer, before the app framework existed); cycling can no longer give both cards the same
+  input; Select on the tab bar enters Home at the current input's card; the state file is built from one key list
+  (duplicate `hero_ports` removed). Test helper `body()` now brace-matches (it used to run past one-line members).
 - **v21d**: interrupted focus animations land on their end values (`EndAction=StopFinal`; plain Stop() froze a
   tile mid-fade, e.g. Inputs stayed highlighted after Menu paused the app), and every slot is restyled on resume.
 - **v21c**: Home key while already on Home only refocuses (it used to rebuild the page: cards re-decoded and the

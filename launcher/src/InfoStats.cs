@@ -110,7 +110,6 @@ public static class InfoStats
     public static (long totalKb, long availableKb)? Memory() => ParseMemory(Read("/proc/meminfo"));
     public static (long idle, long total)? Cpu() => ParseCpu(Read("/proc/stat"));
     public static int Cores() => CpuCount(Read("/proc/stat"));
-    public static string LoadAverage() => Read("/proc/loadavg")?.Split(' ').FirstOrDefault();
     public static Dictionary<string, (long rx, long tx)> NetDev() => ParseNetDev(Read("/proc/net/dev"));
     public static string DefaultInterface() => ParseDefaultRoute(Read("/proc/net/route"));
     public static int? WifiLevel(string iface) => ParseWirelessLevel(Read("/proc/net/wireless"), iface);
@@ -181,32 +180,6 @@ public static class InfoStats
         catch { return null; }
     }
 
-    // ---- local usage log (data dir, never transmitted) ----
-    public static void RecordLaunch(string file, string name, DateTime when)
-    {
-        try
-        {
-            File.AppendAllText(file, when.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\t" + name.Replace('\t', ' ').Replace('\n', ' ') + "\n");
-            var lines = File.ReadAllLines(file);
-            if (lines.Length > 4000) File.WriteAllLines(file, lines.Skip(lines.Length - 2000));
-        }
-        catch { }
-    }
-    public static List<(string name, int count)> UsageSummary(IEnumerable<string> lines, DateTime today, int days)
-    {
-        var cutoff = today.Date.AddDays(1 - days);
-        var counts = new Dictionary<string, int>();
-        foreach (var line in lines)
-        {
-            int t = line.IndexOf('\t'); if (t <= 0) continue;
-            if (!DateTime.TryParseExact(line.Substring(0, t), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) || d < cutoff || d > today.Date) continue;
-            var n = line.Substring(t + 1).Trim(); if (n.Length == 0) continue;
-            counts[n] = (counts.TryGetValue(n, out var c) ? c : 0) + 1;
-        }
-        return counts.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => (kv.Key, kv.Value)).ToList();
-    }
-
-    // ---- formatting ----
     // Thread border router state from /proc/net/if_inet6 (readable in the app sandbox; ot-ctl is not).
     // RLOC = mesh-local prefix + 0000:00ff:fe00:<rloc16>; ALOC 0xfc00 = leader; an off-mesh global/ULA address = OMR route.
     public static (bool present, int rloc16, bool leader, bool homeRoute, int addresses) ParseThread(string text, string iface)

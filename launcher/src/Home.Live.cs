@@ -10,24 +10,15 @@ using Tizen.NUI.BaseComponents;
 public sealed partial class QuietHome
 {
  const string SignalKey="memory/tv-viewer/mainscreen_signal_state";
- // Tunables, re-read whenever the preview is (re)built: /tmp/quiet-home-live.conf with key=0|1 lines.
- //  enabled - show the preview at all;  still - the live card does not grow/lift on focus (the video plane does not
- //  follow scale/position animations);  sync - Graphic-Video sync mode;  scrim - darken the bottom for the words.
+ // Tunables in /tmp/quiet-home-live.conf, re-read whenever the preview is (re)built (never on the key path):
+ //  enabled=0 - no preview;  scrim=0 - no dark band behind the words
  const string LiveConfPath="/tmp/quiet-home-live.conf";
- sealed class LiveConf{public bool Enabled=true,Still=true,Sync=false,Scrim=true,Cover=true;public string Source="default";}
+ sealed class LiveConf{public bool Enabled=true,Scrim=true;public string Source="default";}
  LiveConf liveConf=new LiveConf();
  static LiveConf ReadLiveConf()
  {
-  var c=new LiveConf();
-  try{
-   if(!System.IO.File.Exists(LiveConfPath))return c;
-   c.Source="file";
-   foreach(var line in System.IO.File.ReadAllLines(LiveConfPath)){
-    var kv=line.Split('=');if(kv.Length!=2)continue;bool v=kv[1].Trim()=="1";
-    switch(kv[0].Trim()){case "enabled":c.Enabled=v;break;case "still":c.Still=v;break;case "sync":c.Sync=v;break;case "scrim":c.Scrim=v;break;case "cover":c.Cover=v;break;}
-   }
-  }catch(Exception ex){c.Source="error:"+ex.GetType().Name;}
-  return c;
+  var c=HomeLogic.ReadConf(LiveConfPath);
+  return new LiveConf{Enabled=HomeLogic.Flag(c,"enabled",true),Scrim=HomeLogic.Flag(c,"scrim",true),Source=c.Count>0?"file":"default"};
  }
  Slot liveSlot;bool liveWindow;Tizen.NUI.Timer liveGeometryTimer;
  VideoCanvasViewHolder liveView;
@@ -94,27 +85,19 @@ public sealed partial class QuietHome
    }
    // fill, don't squash: the canvas (the see-through hole) is exactly the card, but the video plane gets a 16:9
    // rectangle covering it; the overflow sits behind the opaque launcher and is never seen
-   canvas.DisableAutoUpdateVideoGeometry=liveConf.Cover;
-   canvas.SetPlayer(tvWindow,liveConf.Sync?Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.GraphicVideoSync:Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.None);
+   canvas.DisableAutoUpdateVideoGeometry=true;
+   canvas.SetPlayer(tvWindow,Tizen.TV.FLUX.VideoCanvasView.VideoSyncMode.None);
    liveView=new VideoCanvasViewHolder{View=canvas};liveSlot=hero;
    int idx=slots.IndexOf(hero);StyleSlot(hero,idx==selected&&area==1,false); // settle any focus transform first
    // once layout has settled, push the final rectangle to the video plane explicitly
    liveGeometryTimer?.Stop();liveGeometryTimer=new Tizen.NUI.Timer(250);
-   var c=liveConf.Cover?Cover(hero):(hero.X,hero.Y,hero.W,hero.H);
-   // 4 px bleed on every side: the see-through hole is exactly the card, so a plane even 1 px short showed as a thin
-   // dark line along the card edge; the bleed sits behind the card's own artwork
-   var rect=(c.Item1-Bleed,c.Item2-Bleed,c.Item3+2*Bleed,c.Item4+2*Bleed);liveRect=rect;
+   // 4 px bleed: a plane even 1 px short of the hole showed as a thin dark line along the card edge
+   var rect=HomeLogic.VideoRect(hero.X,hero.Y,hero.W,hero.H,4);liveRect=rect;
    PushLiveGeometry(rect);UnmuteLive();
    liveGeometryTimer.Tick+=(s,e)=>{PushLiveGeometry(rect);UnmuteLive();return false;};liveGeometryTimer.Start();
-   liveState="on:"+hero.Name+(liveConf.Still?":still":"")+(liveConf.Sync?":sync":"")+":conf="+liveConf.Source;
+   liveState="on:"+hero.Name+":conf="+liveConf.Source;
   }catch(Exception ex){liveState="failed:"+ex.GetType().Name+":"+ex.Message;HideLive();}
   MarkState("live");
- }
- static (int,int,int,int) Cover(Slot s)
- {
-  // smallest 16:9 rectangle that covers the card, centred on it
-  if(s.W*9>=s.H*16){int h=s.W*9/16;return (s.X,s.Y-(h-s.H)/2,s.W,h);}
-  int w=s.H*16/9;return (s.X-(w-s.W)/2,s.Y,w,s.H);
  }
  void PushLiveGeometry((int x,int y,int w,int h) r)
  {
@@ -129,8 +112,8 @@ public sealed partial class QuietHome
   catch(Exception ex){liveUnmute=-1;liveGeometry+=" unmute:"+ex.GetType().Name;}
  }
  string liveGeometry="";int liveUnmute=-99;
- const int Bleed=4;(int,int,int,int) liveRect;
- bool IsLiveStill(Slot s)=>s==liveSlot&&liveView!=null&&liveConf.Still;
+ (int x,int y,int w,int h) liveRect;
+ bool IsLive(Slot s)=>s==liveSlot&&liveView!=null;
  void HideLive()
  {
   liveGeometryTimer?.Stop();

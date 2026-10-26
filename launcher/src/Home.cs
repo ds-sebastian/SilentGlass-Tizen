@@ -19,7 +19,7 @@ public sealed partial class QuietHome : NUIApplication
  const string Root="/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
  const int TB=9; // toolbar focus area; 1..3 are content rows
  // Kind: 0 plain (Info panels), 1 hero, 2 control tile
- sealed class Slot { public Renderer Glass,Rim; public View Card,FocusRing,Disc,Badge,BadgeDot; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
+ sealed class Slot { public Renderer Glass,Rim; public View Card,Disc,Badge,BadgeDot; public TextLabel Label,Title; public ImageView Glyph; public string Name,Action; public int Row,X,Y,W,H,Kind; }
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
  readonly Dictionary<string,CachedArtwork> artworkCache=new Dictionary<string,CachedArtwork>();
@@ -46,13 +46,10 @@ public sealed partial class QuietHome : NUIApplication
  readonly Color white=new Color(1,1,1,1);
  readonly Color dark=new Color(0.07f,0.07f,0.09f,1);
  readonly Color clear=new Color(0,0,0,0);
- readonly Color tileFill=new Color(1,1,1,.10f);
  readonly Color discFill=new Color(1,1,1,.14f);
  readonly Color discFocus=new Color(0,0,0,.07f);
  readonly Color titleDim=new Color(1,1,1,.78f);
  readonly Color valueFocus=new Color(.32f,.33f,.37f,1);
- readonly Color heroLine=new Color(1,1,1,.95f);
- readonly Color panelLine=new Color(1,1,1,.7f);
  static AlphaFunction Ease()=>new AlphaFunction(AlphaFunction.BuiltinFunctions.EaseOutSine);
 
  protected override void OnCreate()
@@ -65,7 +62,7 @@ public sealed partial class QuietHome : NUIApplication
   if(!library.Exists(a=>a.Id=="com.samsung.tv.csfs")){int at=library.FindIndex(a=>a.Utility);var sh=new LibraryApp{Name="Samsung Home",Id="com.samsung.tv.csfs",Asset="tile-samsung-home.svg",Description="Samsung's home screen",Fit="cover",Background="#1C2638",Width=640,Height=360};if(at<0)library.Add(sh);else library.Insert(at,sh);}
   Window.Default.BackgroundColor=new Color(0,0,0,1);
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
-  style=ReadStyleConf();try{NUIApplication.SetRenderRefreshRate((uint)style.Vsync);}catch{}BuildChrome();
+  style=ReadStyleConf();prefs=LoadPrefs();try{NUIApplication.SetRenderRefreshRate((uint)style.Vsync);}catch{}BuildChrome();
   PreloadArtwork();
   RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();
   selected=SourceIndex();BuildPage(false);
@@ -113,14 +110,13 @@ public sealed partial class QuietHome : NUIApplication
   win.Add(BuildWallpaper());
   // colour glows belong to the gradient wallpaper; over a photo they would just wash it out (and cost two
   // full-screen blended layers on every Home frame)
-  if(wallpaper==null&&!(Liquid&&style.Wall=="shader")){glowWatch=Glow("watch");glowPlay=Glow("play");}
+  if(wallpaper==null){glowWatch=Glow("watch");glowPlay=Glow("play");}
   content=new View{Size2D=new Size2D(1920,1080)};win.Add(content);
   // tvOS-style centred tab bar; the selected tab stays lit, and turns white while it has focus
   string[] nav={"Home","Apps","Controls","Info"};int[] tw={132,122,178,110};int total=12;foreach(var w in tw)total+=w;
   int px=960-total/2;
-  var capsule=new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68),BackgroundColor=tileFill,CornerRadius=new Vector4(34,34,34,34)};
-  if(Liquid){win.Add(capsule);capsule.BackgroundColor=clear;AddGlass(capsule,0,px,36,34,persistent:true,tint:.07f,shadow:.1f,shadowY:4,blur:14,focusShadow:0,bevel:16,refract:18);}
-  else{Glass(capsule,34,total,68,false,tileFill);win.Add(capsule);}
+  var capsule=new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68)};win.Add(capsule);
+  AddGlass(capsule,0,px,36,34,persistent:true,tint:.07f,shadow:.1f,shadowY:4,blur:14,focusShadow:0,bevel:16,refract:18);
   tabs=new TextLabel[4];tabBg=new View[4];int tabX=px+6;
   for(int i=0;i<tabs.Length;i++){
    tabBg[i]=new View{Position2D=new Position2D(tabX,42),Size2D=new Size2D(tw[i],56),BackgroundColor=clear,CornerRadius=new Vector4(28,28,28,28)};win.Add(tabBg[i]);
@@ -182,21 +178,21 @@ public sealed partial class QuietHome : NUIApplication
  void BuildControls()
  {
   RefreshSettings();
-  SettingsTile("Volume","volume","Left / Right to adjust","volume",0,0);
-  SettingsTile("Sound","mute","","mute",1,0);
-  SettingsTile("Soundbar Mode","cycle:external-sound-mode","","soundmode",2,0);
-  SettingsTile("Output","output","","output",3,0);
-  SettingsTile("Sleep Timer","sleeptimer","","sleep",4,0);
-  SettingsTile("Picture Mode","cycle:picturemode","","picture",0,1);
-  SettingsTile("Brightness","brightness","Left / Right to adjust","brightness",1,1);
-  SettingsTile("Game Mode","game-mode","","game",2,1);
-  SettingsTile("Auto Game Mode","cycle:game-mode-auto","","autogame",3,1);
-  SettingsTile("Pixel Shift","cycle:pixel-shift-menu","","picture",4,1); // OLED Panel Care; Pixel Refresh runs by itself
-  SettingsTile("Watch Input","heroport:watch","","inputs",0,2);
-  SettingsTile("Play Input","heroport:play","","inputs",1,2);
-  SettingsTile("Network","network","","network",2,2);
-  SettingsTile("Bluetooth","controllers","","bluetooth",3,2);
-  SettingsTile("Advanced","app:org.tizen.menu","","settings",4,2);
+  SettingsTile("Volume","volume","volume",0,0);
+  SettingsTile("Sound","mute","mute",1,0);
+  SettingsTile("Soundbar Mode","cycle:external-sound-mode","soundmode",2,0);
+  SettingsTile("Output","output","output",3,0);
+  SettingsTile("Sleep Timer","sleeptimer","sleep",4,0);
+  SettingsTile("Picture Mode","cycle:picturemode","picture",0,1);
+  SettingsTile("Brightness","brightness","brightness",1,1);
+  SettingsTile("Game Mode","game-mode","game",2,1);
+  SettingsTile("Auto Game Mode","cycle:game-mode-auto","autogame",3,1);
+  SettingsTile("Pixel Shift","cycle:pixel-shift-menu","picture",4,1); // OLED Panel Care; Pixel Refresh runs by itself
+  SettingsTile("Watch Input","heroport:watch","inputs",0,2);
+  SettingsTile("Play Input","heroport:play","inputs",1,2);
+  SettingsTile("Network","network","network",2,2);
+  SettingsTile("Bluetooth","controllers","bluetooth",3,2);
+  SettingsTile("Advanced","app:org.tizen.menu","settings",4,2);
   RefreshTileValues();
  }
  void BuildLibrary()
@@ -209,11 +205,9 @@ public sealed partial class QuietHome : NUIApplication
    var app=library[start+i];int x=100+(i%5)*346,y=180+(i/5)*262,w=316,h=178;
    var card=Card(x,y,w,h,HexColor(app.Background),18);
    AddAppArtwork(card,app,w,h);
-   View ring=null;Renderer rim=null;
-   if(Liquid)rim=RimOverlay(card,18,.1f,6,16,focusShadow:.2f);
-   else{ring=new View{Size2D=new Size2D(w,h),BackgroundColor=new Color(0,0,0,0),CornerRadius=new Vector4(18,18,18,18),BorderlineWidth=4,BorderlineColor=white,Opacity=0};card.Add(ring);}
+   var rim=RimOverlay(card,18,.1f,6,16,focusShadow:.2f);
    var label=Text(app.Name,x,y+h+16,w,38,26,muted,"Semibold");label.HorizontalAlignment=HorizontalAlignment.Center;
-   slots.Add(new Slot{Card=card,FocusRing=ring,Rim=rim,Label=label,Name=app.Name,Action="app:"+app.Id,Row=i/5,X=x,Y=y,W=w,H=h});
+   slots.Add(new Slot{Card=card,Rim=rim,Label=label,Name=app.Name,Action="app:"+app.Id,Row=i/5,X=x,Y=y,W=w,H=h});
   }
   if(AppLibrary.PageCount(library.Count)>1){
    var pages=Text((libraryPage+1)+" / "+AppLibrary.PageCount(library.Count),1620,120,200,30,22,muted);
@@ -232,7 +226,7 @@ public sealed partial class QuietHome : NUIApplication
    if(cached.Image.LoadingStatus!=ImageView.LoadingStatusType.Ready)pageArtworkCold++;
    cached.Parent.Remove(cached.Image);card.Add(cached.Image);cached.Parent=card;
   }
-  if(app.Utility){
+  else{
    card.Add(new View{Position2D=new Position2D(w/2-28,h/2-2),Size2D=new Size2D(56,4),BackgroundColor=ink});
    card.Add(new View{Position2D=new Position2D(w/2-2,h/2-28),Size2D=new Size2D(4,56),BackgroundColor=ink});
   }
@@ -285,10 +279,10 @@ public sealed partial class QuietHome : NUIApplication
     pending.Add(entry.Key+":"+entry.Value.Image.LoadingStatus);
   return string.Join(";",pending);
  }
- void SettingsTile(string name,string action,string description,string icon,int column,int row)
+ void SettingsTile(string name,string action,string icon,int column,int row)
  {
   int w=322,h=236,x=100+column*(w+27),y=150+row*262; // five across
-  var card=Card(x,y,w,h,tileFill,30);Renderer glass=null;if(Liquid)glass=LiquidPanel(card,x,y,30);else Glass(card,30,w,h,false,tileFill);
+  var card=Card(x,y,w,h,clear,30);var glass=AddGlass(card,0,x,y,30);
   var disc=new View{Position2D=new Position2D(26,26),Size2D=new Size2D(84,84),BackgroundColor=new Color(1,1,1,.14f),CornerRadius=new Vector4(42,42,42,42)};
   var glyph=new ImageView{ResourceUrl=Root+"glyph-"+icon+".svg",Position2D=new Position2D(16,16),Size2D=new Size2D(52,52)};disc.Add(glyph);card.Add(disc);
   var title=Label(name,28,124,w-56,38,26,new Color(1,1,1,.78f),"Semibold");title.Ellipsis=true;card.Add(title);
@@ -306,15 +300,15 @@ public sealed partial class QuietHome : NUIApplication
   // status dot, no words: set by UpdateHeroBadges whenever the input or signal changes
   var badge=new View{Position2D=new Position2D(36,36),Size2D=new Size2D(44,44),BackgroundColor=new Color(0,0,0,.45f),CornerRadius=new Vector4(22,22,22,22),Opacity=0};
   var dot=new View{Position2D=new Position2D(11,11),Size2D=new Size2D(22,22),CornerRadius=new Vector4(11,11,11,11)};badge.Add(dot);card.Add(badge);
-  var slot=new Slot{Card=card,Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot};
-  if(Liquid)slot.Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f); // lit edge; shadow only when focused (tvOS lift)
+  // lit edge; shadow only when focused (tvOS lift)
+  var slot=new Slot{Card=card,Rim=RimOverlay(card,40,0,14,30,focusShadow:.26f),Name=word,Action=action,Row=0,X=x,Y=y,W=w,H=h,Kind=1,Badge=badge,BadgeDot=dot};
   slots.Add(slot);return slot;
  }
  // Control Centre style tile: glyph disc, name, current value. Five across.
  void Control(string name,string action,string glyph,int n)
  {
   const int Count=5,Gap=25;int w=(1720-(Count-1)*Gap)/Count,h=150,x=100+n*(w+Gap),y=780;
-  var card=Card(x,y,w,h,tileFill,30);Renderer glass=null;if(Liquid)glass=LiquidPanel(card,x,y,30);else Glass(card,30,w,h,false,tileFill);
+  var card=Card(x,y,w,h,clear,30);var glass=AddGlass(card,0,x,y,30);
   var disc=new View{Position2D=new Position2D(22,35),Size2D=new Size2D(80,80),BackgroundColor=discFill,CornerRadius=new Vector4(40,40,40,40)};
   var g=new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(15,15),Size2D=new Size2D(50,50)};disc.Add(g);card.Add(disc);
   var title=Label(name,120,32,w-136,42,28,white,"Semibold");title.Ellipsis=true;card.Add(title);
@@ -359,22 +353,18 @@ public sealed partial class QuietHome : NUIApplication
  void StyleSlot(Slot s,bool f,bool animate)
  {
   float scale=1,lift=0,opacity=1;
-  if(s.Kind==1){bool still=IsLiveStill(s);scale=f&&!still?1.02f:1;lift=f&&!still?-3:0;opacity=f||area==0||s==liveSlot?1:.7f;
-   if(Liquid)GlassFocus(s.Rim,f?1:0,0,animate);else{s.Card.BorderlineWidth=f?4:0;s.Card.BorderlineColor=heroLine;}}
+  // the live card never grows or lifts: the video plane does not follow view animations
+  if(s.Kind==1){bool live=IsLive(s);scale=f&&!live?1.02f:1;lift=f&&!live?-3:0;opacity=f||area==0||live?1:.7f;GlassFocus(s.Rim,f?1:0,0,animate);}
   else if(s.Kind==2){
    scale=f?1.06f:1;
-   if(s.Glass!=null)GlassFocus(s.Glass,f?1:0,0,animate);
-   else if(f){s.Card.BackgroundColor=white;s.Card.BorderlineWidth=0;}else GlassFill(s.Card,30);
+   GlassFocus(s.Glass,f?1:0,0,animate);
    s.Disc.BackgroundColor=f?discFocus:discFill;
    s.Glyph.Color=f?dark:white;
    s.Title.TextColor=f?dark:page==2?titleDim:white;
    s.Label.TextColor=f?(page==2?dark:valueFocus):page==2?white:muted;
   }
-  else if(page==1){scale=f?1.08f:1;lift=f?-6:0;if(s.Label!=null)s.Label.TextColor=f?white:muted;GlassFocus(s.Rim,f?1:0,f?1:0,animate);}
-  else if(s.Glass!=null){scale=f?1.015f:1;GlassFocus(s.Glass,0,f?1:0,animate);}
-  else{scale=f?1.015f:1;s.Card.BorderlineWidth=f?3:style.Glass>0?1.5f:0;s.Card.BorderlineColor=f?panelLine:Rim;}
-  if(s.Kind==1||s.Kind==2)ApplyShadow(s,f);
-  if(s.FocusRing!=null)s.FocusRing.Opacity=f?1:0;
+  else if(page==1){scale=f?1.08f:1;lift=f?-6:0;s.Label.TextColor=f?white:muted;GlassFocus(s.Rim,f?1:0,f?1:0,animate);}
+  else{scale=f?1.015f:1;GlassFocus(s.Glass,0,f?1:0,animate);} // Info panels: a bright ring, the panel stays dark
   var pos=new Position(s.X+s.W/2f,s.Y+s.H/2f+lift,0);var sc=new Vector3(scale,scale,1);
   // heroes dim by darkening, not fading: a faded card would show the photo wallpaper through its artwork
   bool hero=s.Kind==1&&!style.HeroFade;var tint=new Color(opacity,opacity,opacity,1);
@@ -412,7 +402,7 @@ public sealed partial class QuietHome : NUIApplication
    if(area==0){int next=Math.Max(0,Math.Min(3,page+d));if(next!=page){page=next;selected=page==0?SourceIndex():0;BuildPage();}}
    else{var r=Row(area-1);int n=r.IndexOf(selected);selected=r[(n+d+r.Count)%r.Count];UpdateFocus();}
   }
-  else if(k=="Return"||k=="KP_Enter"){if(area==0){area=1;selected=0;UpdateFocus();}else Activate();}
+  else if(k=="Return"||k=="KP_Enter"){if(area==0||area==TB){area=1;selected=page==0?SourceIndex():0;UpdateFocus();}else Activate();}
   else if(k=="XF86Back"||k=="Back"||k=="Escape"||k=="XF86Exit")SelectSource(lastSource);
  }
  bool HandleLibraryKey(string key)
@@ -432,6 +422,7 @@ public sealed partial class QuietHome : NUIApplication
  }
  void Activate()
  {
+  if(selected<0||selected>=slots.Count)return;
   string a=slots[selected].Action;notice.Text="";
   if(a=="info"){BuildPage(false);return;} // refresh in place: no fade (it read as a flash)
   if(a=="inputs"){OpenInputs();return;}

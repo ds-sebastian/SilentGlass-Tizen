@@ -1,105 +1,60 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
-// Apple-style surfaces (tvOS 26 "Liquid Glass" direction) and the measurements used to judge their cost.
-//  glass    0 = flat fills (pre-v18 look)  1 = glass tint + lit edge; real backdrop blur only where the backdrop moves
-//           (Inputs sheet, toast)          2 = real backdrop blur on every glass surface (cost comparison only)
-//  shadow   small focus-only drop shadow (tvOS lift) - off by default: barely visible on the OLED-black wallpaper
-//           and the one measurable cost (see below)
-// Measured on the S90D (GPU busy while redrawing every frame, whole GPU; 30 fps in every mode):
-//   flat 16-18%  |  glass+squircle 20%  |  +focus shadows 23%  |  +always-on soft shadows 27-28%
-//   real blur on every glass surface 25% (DALi caches the blurred backdrop while it is static)
-// Memory (RSS/PSS/GPU) and key handling were unchanged within noise.
-//  squircle Apple's continuous corners instead of circular arcs
-// Read once at start from /tmp/quiet-home-live.conf (same file as the live-preview tunables), never on the key path.
+// Look and measurement tunables, read once at start from /tmp/quiet-home-live.conf (never on the key path):
+//  squircle=0|1  continuous (Apple) corners          vsync=N  render every Nth vsync (1 = 60 fps; DALi's default here is 2)
+//  herofade=1    unfocused heroes fade instead of darkening
+//  wall=photo|gradient  wallmode=auto|day|night  lat= lon=   (Home.Wallpaper.cs)
+//  bench=N       keep redrawing every frame for N s after start/resume: the worst case, for GPU/fps measurements
+// Measured on the S90D while redrawing every frame (devices/s90d/bench/): flat UI 14% GPU @30 fps, 35% @60;
+// Liquid Glass 54.5% @60 with the gradient backdrop, 47.6% @60 with the photo's pre-blurred frost texture.
+// Real backdrop blur is used only where the backdrop moves (Inputs sheet, toast); shadows stay small (Apple-style).
 public sealed partial class QuietHome
 {
- sealed class StyleConf { public int Glass=1,Bench=0,Vsync=1; public bool Shadow=false,Squircle=true,Liquid=true,HeroFade=false; public string Wall="photo",WallMode="auto"; public double Lat=40.7,Lon=-74.0; public string Source="default"; }
+ sealed class StyleConf { public int Bench,Vsync=1; public bool Squircle=true,HeroFade; public string Wall="photo",WallMode="auto",Source="default"; public double Lat=40.7,Lon=-74.0; }
  StyleConf style=new StyleConf();
  static StyleConf ReadStyleConf()
  {
-  var c=new StyleConf();
-  try{
-   if(!System.IO.File.Exists(LiveConfPath))return c;
-   c.Source="file";
-   foreach(var line in System.IO.File.ReadAllLines(LiveConfPath)){
-    var kv=line.Split('=');if(kv.Length!=2)continue;string k=kv[0].Trim(),v=kv[1].Trim();
-    if(k=="glass"&&int.TryParse(v,out int g))c.Glass=Math.Max(0,Math.Min(2,g));
-    else if(k=="shadow")c.Shadow=v=="1";
-    else if(k=="squircle")c.Squircle=v=="1";
-    else if(k=="liquid")c.Liquid=v=="1";
-    else if(k=="herofade")c.HeroFade=v=="1";
-    else if(k=="wall"&&(v=="photo"||v=="gradient"||v=="shader"))c.Wall=v;
-    else if(k=="wallmode"&&(v=="auto"||v=="day"||v=="night"))c.WallMode=v;
-    else if(k=="lat"&&double.TryParse(v,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double la))c.Lat=la;
-    else if(k=="lon"&&double.TryParse(v,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double lo))c.Lon=lo;
-    else if(k=="vsync"&&int.TryParse(v,out int vs))c.Vsync=Math.Max(1,Math.Min(4,vs));
-    else if(k=="bench"&&int.TryParse(v,out int sec))c.Bench=Math.Max(0,Math.Min(120,sec));
-   }
-  }catch(Exception ex){c.Source="error:"+ex.GetType().Name;}
-  return c;
+  var c=HomeLogic.ReadConf(LiveConfPath);
+  return new StyleConf{
+   Source=c.Count>0?"file":"default",Squircle=HomeLogic.Flag(c,"squircle",true),HeroFade=HomeLogic.Flag(c,"herofade",false),
+   Vsync=HomeLogic.Int(c,"vsync",1,1,4),Bench=HomeLogic.Int(c,"bench",0,0,120),
+   Wall=HomeLogic.Pick(c,"wall","photo","photo","gradient"),WallMode=HomeLogic.Pick(c,"wallmode","auto","auto","day","night"),
+   Lat=HomeLogic.Num(c,"lat",40.7),Lon=HomeLogic.Num(c,"lon",-74.0)};
  }
- string StyleName=>(style.Liquid?"liquid+":"")+"wall-"+WallName+"+"+"vsync"+style.Vsync+"+glass"+style.Glass+(style.Shadow?"+shadow":"")+(style.Squircle?"+squircle":"");
+ string StyleName=>"liquid+wall-"+WallName+"+vsync"+style.Vsync+(style.Squircle?"+squircle":"")+(style.HeroFade?"+herofade":"");
 
  // ---- corners: squircle where the corner is a corner (never on circles or capsules) ----
  static readonly Vector4 Squareness=new Vector4(.6f,.6f,.6f,.6f);
  void Corners(View v,int radius,int w,int h){if(style.Squircle&&radius>0&&radius*2<Math.Min(w,h))v.CornerSquareness=Squareness;}
 
- // ---- glass: a light tint brighter at the top (light catching the surface) and a fine lit rim ----
- PropertyMap GlassMap(int radius,bool dark)
- {
-  var stops=new PropertyArray();
-  if(dark){stops.PushBack(new PropertyValue(new Vector4(.24f,.24f,.28f,.56f)));stops.PushBack(new PropertyValue(new Vector4(.10f,.10f,.12f,.70f)));}
-  else{stops.PushBack(new PropertyValue(new Vector4(1,1,1,.17f)));stops.PushBack(new PropertyValue(new Vector4(1,1,1,.06f)));}
-  var offsets=new PropertyArray();offsets.PushBack(new PropertyValue(0f));offsets.PushBack(new PropertyValue(1f));
-  var m=new PropertyMap();
-  m.Add(Visual.Property.Type,new PropertyValue((int)Visual.Type.Gradient));
-  m.Add(GradientVisualProperty.StartPosition,new PropertyValue(new Vector2(0,-.5f)));
-  m.Add(GradientVisualProperty.EndPosition,new PropertyValue(new Vector2(0,.5f)));
-  m.Add(GradientVisualProperty.StopOffset,new PropertyValue(offsets));
-  m.Add(GradientVisualProperty.StopColor,new PropertyValue(stops));
-  m.Add(Visual.Property.CornerRadius,new PropertyValue(new Vector4(radius,radius,radius,radius)));
-  return m;
- }
- readonly Dictionary<(int,bool),PropertyMap> glassMaps=new Dictionary<(int,bool),PropertyMap>();
- static readonly Color Rim=new Color(1,1,1,.22f);
+ // ---- floating dark glass (Inputs sheet, toast): tint brighter at the top + a real backdrop blur, because the
+ // content behind them can move. The glass rim and shadow come from a RimOverlay on top. ----
+ PropertyMap frostedMap;
  int blurSurfaces;
- // creation: tint, rim, corners and (when the backdrop can change, or glass=2) a real GPU backdrop blur
- void Glass(View v,int radius,int w,int h,bool movingBackdrop,Color flat,bool dark=false)
+ void Frosted(View v,int radius,int w,int h)
  {
-  if(style.Glass==0){v.BackgroundColor=flat;return;}
-  GlassFill(v,radius,dark);
-  if(movingBackdrop||style.Glass==2){try{v.SetRenderEffect(RenderEffect.CreateBackgroundBlurEffect(movingBackdrop?40:30));blurSurfaces++;}catch{}}
+  if(frostedMap==null){
+   var stops=new PropertyArray();stops.PushBack(new PropertyValue(new Vector4(.24f,.24f,.28f,.56f)));stops.PushBack(new PropertyValue(new Vector4(.10f,.10f,.12f,.70f)));
+   var offsets=new PropertyArray();offsets.PushBack(new PropertyValue(0f));offsets.PushBack(new PropertyValue(1f));
+   frostedMap=new PropertyMap();
+   frostedMap.Add(Visual.Property.Type,new PropertyValue((int)Visual.Type.Gradient));
+   frostedMap.Add(GradientVisualProperty.StartPosition,new PropertyValue(new Vector2(0,-.5f)));
+   frostedMap.Add(GradientVisualProperty.EndPosition,new PropertyValue(new Vector2(0,.5f)));
+   frostedMap.Add(GradientVisualProperty.StopOffset,new PropertyValue(offsets));
+   frostedMap.Add(GradientVisualProperty.StopColor,new PropertyValue(stops));
+   frostedMap.Add(Visual.Property.CornerRadius,new PropertyValue(new Vector4(radius,radius,radius,radius)));
+  }
+  v.Background=frostedMap;v.CornerRadius=new Vector4(radius,radius,radius,radius);
+  try{v.SetRenderEffect(RenderEffect.CreateBackgroundBlurEffect(40));blurSurfaces++;}catch{}
   Corners(v,radius,w,h);
  }
- // restyle (focus moved away): cached map, no new effect
- void GlassFill(View v,int radius,bool dark=false)
- {
-  if(style.Glass==0){v.BackgroundColor=tileFill;return;}
-  if(!glassMaps.TryGetValue((radius,dark),out var m))glassMaps[(radius,dark)]=m=GlassMap(radius,dark);
-  v.Background=m;v.CornerRadius=new Vector4(radius,radius,radius,radius);
-  v.BorderlineWidth=1.5f;v.BorderlineColor=Rim;
- }
 
- // ---- shadows: tvOS lift, on the focused card only. Measured on the S90D: soft shadows are the one costly
- // part of the look (always-on hero shadows at blur 36-70 took GPU busy from ~17% to ~27% while redrawing), so
- // they are small, focus-only, and off unless shadow=1. ----
- Shadow heroFocus,tileFocus;
- void ApplyShadow(Slot s,bool focused)
- {
-  if(!style.Shadow||style.Liquid)return;
-  heroFocus??=new Shadow(32,new Color(0,0,0,.55f),new Vector2(0,16));
-  tileFocus??=new Shadow(24,new Color(0,0,0,.5f),new Vector2(0,10));
-  try{s.Card.BoxShadow=focused?(s.Kind==1?heroFocus:tileFocus):null;}catch{}
- }
-
- // ---- measurements ----
- // bench=N (seconds): keep redrawing every frame for N s after start/resume - the worst case for glass, since
- // every backdrop blur re-runs each frame. Frame rate and GPU busy time are read from outside (compositor,
- // Mali DVFS counters); page build and key handling times are recorded here.
+ // ---- measurements: page build and key times are recorded here; fps and GPU busy are read from outside ----
  readonly Dictionary<int,long> buildMsByPage=new Dictionary<int,long>();
  void BenchRender(){if(style.Bench>0){try{Window.Default.KeepRendering(style.Bench);}catch{}}}
- string BuildStats(){var parts=new List<string>();foreach(var kv in buildMsByPage)parts.Add(kv.Key+":"+kv.Value);return string.Join(",",parts);}
+ string BuildStats()=>string.Join(",",buildMsByPage.Select(kv=>kv.Key+":"+kv.Value));
 }

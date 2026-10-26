@@ -20,9 +20,7 @@ public sealed partial class QuietHome
  }
  View InfoPanel(int x,int y,int w,int h,string title,Color dot,int row)
  {
-  var card=Card(x,y,w,h,new Color(1,1,1,.08f),30);Renderer glass=null;
-  if(Liquid)glass=AddGlass(card,0,x,y,30,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);else Glass(card,30,w,h,false,new Color(1,1,1,.08f));
-  if(glass!=null){card.BackgroundColor=clear;card.BorderlineWidth=0;}
+  var card=Card(x,y,w,h,clear,30);var glass=AddGlass(card,0,x,y,30,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);
   card.Add(new View{Position2D=new Position2D(30,39),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)});
   card.Add(Label(title,56,24,w-86,44,29,white,"Semibold"));
   slots.Add(new Slot{Card=card,Glass=glass,Name=title,Action="info",Row=row,X=x,Y=y,W=w,H=h});
@@ -40,7 +38,8 @@ public sealed partial class QuietHome
  void BuildInfo()
  {
   var good=new Color(.45f,.88f,.58f,1);var warn=new Color(1f,.74f,.36f,1);
-  infoIface=InfoStats.DefaultInterface()??"eth0";
+  string route=InfoStats.DefaultInterface();infoIface=route??"eth0";
+  var netdev=InfoStats.NetDev();
   var tv=InfoPanel(100,140,540,390,"This TV",new Color(.56f,.66f,1f,1),0);
   string ver=InfoStats.SystemInfo("http://tizen.org/feature/platform.version");
   string build=InfoStats.ParseBuildDate(InfoStats.SystemInfo("http://tizen.org/system/build.string"));
@@ -53,10 +52,10 @@ public sealed partial class QuietHome
   var net=InfoPanel(690,140,540,390,"Network",new Color(.33f,.82f,.75f,1),0);
   bool wifi=infoIface.StartsWith("wlan");int? level=wifi?InfoStats.WifiLevel(infoIface):null;
   string link=wifi?"Wi-Fi"+(level.HasValue?" · "+level+" dBm":""):"Wired"+(InfoStats.LinkSpeed(infoIface) is string spd?" · "+spd:"");
-  InfoRow(net,540,0,"Connection",InfoStats.DefaultInterface()==null?"Not connected":link);
+  InfoRow(net,540,0,"Connection",route==null?"Not connected":link);
   InfoRow(net,540,1,"IP address",InfoStats.Ipv4(infoIface));
   var dns=InfoStats.Nameservers();InfoRow(net,540,2,"DNS",dns.Count>0?string.Join(" · ",dns.ConvertAll(d=>d=="8.8.8.8"?"Google backup":d)):null);
-  liveTotal=InfoRow(net,540,3,"Since start",TotalsText(InfoStats.NetDev()));
+  liveTotal=InfoRow(net,540,3,"Since start",TotalsText(netdev));
 
   var pv=InfoPanel(1280,140,540,390,"Privacy",new Color(.72f,.56f,1f,1),0);
   infoMarkers=InfoStats.MarkersInPlace();int total=InfoStats.VendorMarkers.Length;
@@ -74,8 +73,7 @@ public sealed partial class QuietHome
   var tr=InfoPanel(100,570,830,390,"Thread border router",routing?good:th.present?warn:muted,1);
   InfoRow(tr,830,0,"Status",status,routing?good:th.present?warn:muted);
   InfoRow(tr,830,1,"Home network",home,home=="Connected"?good:home==null?null:warn);
-  var all=InfoStats.NetDev();
-  InfoRow(tr,830,2,"Thread traffic",all.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):null);
+  InfoRow(tr,830,2,"Thread traffic",netdev.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):null);
   InfoRow(tr,830,3,"Interface",th.present?"wpan0 · "+th.addresses+" addresses":"Not running");
   infoThread=status+" | "+(home??"-")+" | fwd="+fwd;
 

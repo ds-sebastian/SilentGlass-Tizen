@@ -5,14 +5,12 @@ using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
 // Liquid Glass (tvOS/iOS 26 direction) as one GPU shader per surface - no screen readback, no blur passes.
-// The wallpaper is a few radial gradients, so the shader evaluates it mathematically at any point: each glass
-// surface shows the backdrop behind it bent toward its centre near the rim (lensing) with a slight colour split,
-// a crisp specular edge lit from the top left plus a fainter glint on the opposite corner, a top-lit body, an
-// analytic soft shadow (no blur buffer), and dithering against OLED banding.
+// Each glass surface shows the backdrop behind it bent toward its centre near the rim (lensing) with a slight
+// colour split, a crisp specular edge lit from the top left plus a fainter glint on the opposite corner, a
+// top-lit body, an analytic soft shadow (no blur buffer) and dithering against OLED banding.
+// Backdrop: the photo wallpaper's pre-blurred frost texture (Home.Wallpaper.cs), or - gradient wallpaper - the
+// same radial gradients evaluated mathematically.
 // Kinds: 0 clear glass panel, 1 rim + shadow overlay (over artwork, video or a DALi-blurred sheet), 2 shadow only.
-// With the photo wallpaper the backdrop comes from a pre-blurred texture (Home.Wallpaper.cs) instead of the formula.
-// liquid=0 in /tmp/quiet-home-live.conf falls back to the v18 tint. wall=shader also draws the wallpaper itself -
-// measured too expensive (GPU saturated, 48 fps), kept only for comparison.
 public sealed partial class QuietHome
 {
  const string GlassVertex = @"
@@ -146,14 +144,6 @@ highp float dither(highp vec2 p){ return (fract(52.9829189*fract(dot(p,vec2(0.06
  static string FrostFragment=>GlassFragment.Replace(WallGlsl,FrostGlsl).Replace("varying mediump vec3 vWall;","varying highp vec2 vUV;")
   .Replace("else bg = vWall;","else bg = texture2D(sFrost,vUV).rgb;");
 
- const string WallFragment = @"
-precision highp float;
-varying highp vec2 vLocal;
-uniform highp vec3 uSize;
-uniform lowp vec4 uColor;
-" + WallGlsl + @"
-void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dither(gl_FragCoord.xy),uColor.a); }";
-
  static Geometry glassQuad,glassRing;
  static PropertyBuffer Vertices(float[] v)
  {
@@ -173,9 +163,8 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
   g.SetIndexBuffer(new ushort[]{0,1,5,0,5,4, 1,2,6,1,6,5, 2,3,7,2,7,6, 3,0,4,3,4,7},24);g.SetType(Geometry.Type.TRIANGLES);
   return glassRing=g;
  }
- Shader glassShader,wallShader;
+ Shader glassShader;
  readonly List<Renderer> pageRenderers=new List<Renderer>();
- bool Liquid=>style.Liquid;
 
  static Geometry Quad()
  {
@@ -209,12 +198,6 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
   if(!persistent)pageRenderers.Add(r);
   return r;
  }
- // glass surface for a card: the renderer replaces the card's own background and border
- Renderer LiquidPanel(View card,int x,int y,int radius)
- {
-  card.BackgroundColor=clear;card.BorderlineWidth=0;
-  return AddGlass(card,0,x,y,radius);
- }
  // a child overlay that follows its parent's size (rim + shadow over artwork, video or a blurred sheet)
  // Apple-style shadows: none (or barely any) at rest, a soft low-contrast one when focused or floating
  Renderer RimOverlay(View parent,int radius,float shadow=.12f,float shadowY=6,float blur=18,bool persistent=false,float focusShadow=.16f)
@@ -225,28 +208,17 @@ void main(){ highp vec3 c = wall(vLocal+uSize.xy*0.5); gl_FragColor = vec4(c+dit
  }
  void ReleasePageRenderers(){foreach(var r in pageRenderers){try{r.Dispose();}catch{}}pageRenderers.Clear();}
 
- // focus glow behind the heroes: shader uniforms (glass and procedural wallpaper read the same values)
+ // focus glow behind the heroes, as seen through the glass (gradient wallpaper only; the photo has none)
  void GlowTo(float watch,float play,bool animate)
  {
-  foreach(var sh in new[]{glassShader,wallShader}){
-   if(sh==null)continue;
-   if(animate){var a=FocusAnimation();a.AnimateTo(sh,"uGlowW",watch);a.AnimateTo(sh,"uGlowP",play);}
-   else{sh.SetProperty("uGlowW",new PropertyValue(watch));sh.SetProperty("uGlowP",new PropertyValue(play));}
-  }
+  if(glassShader==null||wallpaper!=null)return;
+  if(animate){var a=FocusAnimation();a.AnimateTo(glassShader,"uGlowW",watch);a.AnimateTo(glassShader,"uGlowP",play);}
+  else{glassShader.SetProperty("uGlowW",new PropertyValue(watch));glassShader.SetProperty("uGlowP",new PropertyValue(play));}
  }
  void GlassFocus(Renderer r,float focus,float ring,bool animate)
  {
   if(r==null)return;
   if(animate){var a=FocusAnimation();a.AnimateTo(r,"uFocus",focus);a.AnimateTo(r,"uRing",ring);}
   else{r.SetProperty("uFocus",new PropertyValue(focus));r.SetProperty("uRing",new PropertyValue(ring));}
- }
- // wall=shader: the wallpaper itself is drawn by the same function (no 1920x1080 texture)
- View ProceduralWallpaper()
- {
-  wallShader=new Shader(GlassVertex,WallFragment);
-  wallShader.RegisterProperty("uGlowW",new PropertyValue(0f));wallShader.RegisterProperty("uGlowP",new PropertyValue(0f));
-  var v=new View{Size2D=new Size2D(1920,1080)};
-  var r=new Renderer(Quad(),wallShader);r.RegisterProperty("uExtent",new PropertyValue(0f));r.RegisterProperty("uInset",new PropertyValue(0f));r.RegisterProperty("uPlace",new PropertyValue(new Vector4(0,0,0,0)));v.AddRenderer(r);
-  return v;
  }
 }

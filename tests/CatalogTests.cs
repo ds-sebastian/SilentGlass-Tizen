@@ -42,7 +42,8 @@ static class CatalogTests
         }
         finally { File.Delete(tmp); }
         InfoTests();
-        Console.WriteLine("Catalog loading, invalid-input and navigation checks passed.");
+        HomeLogicTests();
+        Console.WriteLine("Catalog, info parser and Home logic checks passed.");
         return 0;
     }
     static void True(bool ok, string context) { if (!ok) throw new Exception("Info check failed: " + context); }
@@ -65,9 +66,6 @@ static class CatalogTests
         string tcp6 = "  sl  local_address remote_address st\n   0: 00000000000000000000000000000000:65F5 00000000000000000000000000000000:0000 0A 0\n   1: 00000000000000000000000000000000:1F90 00000000000000000000000000000000:0000 01 0\n";
         True(InfoStats.ParseListening(tcp6, 26101) && !InfoStats.ParseListening(tcp6, 8080), "listen");
         True(InfoStats.ParseBuildDate("TIZEN-TRUNK2025-PontusM-OSU-2024-HOTFIX-RELEASE_20260514.3") == "2026-05-14", "build date");
-        var today = new DateTime(2026, 10, 24);
-        var usage = InfoStats.UsageSummary(new[] { "2026-10-24\tSHIELD", "2026-10-23\tSHIELD", "2026-10-20\tSwitch", "2026-10-17\tNetflix", "bad", "2026-10-25\tFuture", "2026-10-22\t" }, today, 7);
-        True(usage.Count == 2 && usage[0].name == "SHIELD" && usage[0].count == 2 && usage[1].name == "Switch", "usage window");
         // synthetic documentation-style prefixes, not this network's
         string i6 = "fd00000000000a01000000fffe00b400 05 40 00 a2    wpan0\n"
                   + "fd00000000000b02c6c92fc22fceb270 05 40 00 82    wpan0\n"
@@ -98,8 +96,37 @@ static class CatalogTests
         True(InfoStats.Duration(11586) == "3 h 13 min" && InfoStats.Duration(30) == "1 min" && InfoStats.Duration(90000) == "1 d 1 h", "duration");
         True(InfoStats.CountMarkers(InfoStats.VendorMarkers) == 10, "all markers");
         True(InfoStats.CountMarkers(new[] { "pisa-service", "bixby-prov", "canalysis-daemon.service", "other" }) == 1, "exact marker names only");
-        string tmp = Path.GetTempFileName();
-        try { InfoStats.RecordLaunch(tmp, "Tab\tName", today); True(File.ReadAllText(tmp) == "2026-10-24\tTab Name\n", "record sanitises"); }
-        finally { File.Delete(tmp); }
+    }
+    static void HomeLogicTests()
+    {
+        // runtime conf: last value wins, junk lines ignored, values clamped / validated, missing file = defaults
+        var conf = HomeLogic.ParseConf("vsync=9\nwall=shader\nlat=40.5\nlon=abc\n=x\nnoequals\nscrim=0\nscrim=1\n");
+        True(HomeLogic.Int(conf, "vsync", 1, 1, 4) == 4, "conf int clamps");
+        True(HomeLogic.Pick(conf, "wall", "photo", "photo", "gradient") == "photo", "conf rejects removed modes");
+        True(HomeLogic.Num(conf, "lat", 0) == 40.5 && HomeLogic.Num(conf, "lon", -74.0) == -74.0, "conf numbers");
+        True(HomeLogic.Flag(conf, "scrim", false) && HomeLogic.Flag(conf, "enabled", true), "conf flags");
+        True(HomeLogic.ReadConf("/nonexistent/quiet-home.conf").Count == 0, "missing conf");
+        // Watch / Play inputs: only Automatic or HDMI 1-4 survive a round trip
+        True(HomeLogic.ParsePrefs(HomeLogic.FormatPrefs(15, 0)) == (15, 0), "prefs round trip");
+        True(HomeLogic.ParsePrefs("watch=99\nplay=14\n") == (0, 14) && HomeLogic.ParsePrefs(null) == (0, 0), "prefs reject junk");
+        True(HomeLogic.NextPort(0, 15) == 13 && HomeLogic.NextPort(16, 15) == 0, "port cycle wraps through Automatic");
+        True(HomeLogic.NextPort(0, 13) == 14 && HomeLogic.NextPort(14, 15) == 16, "port cycle skips the other card's input");
+        for (int other = 13; other <= 16; other++)
+            for (int cur = 0; cur <= 16; cur = cur == 0 ? 13 : cur + 1)
+            {
+                int n = HomeLogic.NextPort(cur, other);
+                True(n != other && (n == 0 || HomeLogic.IsHdmi(n)), "port cycle never collides");
+            }
+        // live video: the wide card is exactly 16:9 (no crop); a narrow card is covered and centred; plus the bleed
+        True(HomeLogic.VideoRect(100, 170, 996, 560, 4) == (96, 166, 1004, 568), "wide card + bleed");
+        True(HomeLogic.VideoRect(100, 170, 684, 560, 0) == (-55, 170, 995, 560), "narrow card covered");
+        // sunrise / sunset for New York (EDT = UTC-4): 25 Oct 2026 about 07:29 / 18:28 local
+        var (rise, set) = HomeLogic.SunTimes(new DateTime(2026, 10, 25, 12, 0, 0, DateTimeKind.Utc), 40.7, -74.0);
+        True(Math.Abs(rise - (11 * 60 + 18)) <= 5 && Math.Abs(set - (22 * 60 + 0)) <= 5, "sun times " + rise + " " + set);
+        True(!HomeLogic.IsNight(new DateTime(2026, 10, 25, 16, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "noon is day");
+        True(HomeLogic.IsNight(new DateTime(2026, 10, 26, 2, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "10 pm is night (after UTC midnight)");
+        True(HomeLogic.IsNight(new DateTime(2026, 10, 25, 9, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "5 am is night");
+        // a place whose day wraps past UTC midnight (Tokyo): local noon = 03:00 UTC
+        True(!HomeLogic.IsNight(new DateTime(2026, 6, 21, 3, 0, 0, DateTimeKind.Utc), 35.7, 139.7), "wrapped day");
     }
 }
