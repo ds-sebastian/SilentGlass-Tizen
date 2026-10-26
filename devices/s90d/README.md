@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v22a)
+## Quiet Home on the S90D (v23a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -37,6 +37,9 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **v23a**: Info page switch "Show Apps tab" (own focus row under the panels; panels 370/330 tall to make room).
+  Hidden = the tab bar is rebuilt without Apps and Left/Right skips it (`HomeLogic.NextTab`); saved as `hideapps=`
+  in `quiet-home-prefs.txt`. TV apps stay installed; Samsung Home is only reachable from the Apps tab.
 - **v22a (refactor)**: measured-and-dropped experiments removed (flat/`liquid=0` fallback, `glass=`/`shadow=` modes
   and BoxShadow, procedural `wall=shader`, live `still`/`sync`/`cover` modes; old `/tmp` conf keys are now ignored).
   Pure logic moved to NUI-free `HomeLogic.cs` (conf parsing, Watch/Play port rules, video rectangle, sunrise/sunset)

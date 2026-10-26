@@ -208,8 +208,8 @@ class S90dPortTests(unittest.TestCase):
 
     def test_info_page_navigation_and_tab_bar(self):
         src = launcher()
-        self.assertIn('string[] nav={"Home","Apps","Controls","Info"}', src)
-        self.assertIn("int next=Math.Max(0,Math.Min(3,page+d));", src)
+        self.assertIn('Nav={"Home","Apps","Controls","Info"}', src)
+        self.assertIn("int next=HomeLogic.NextTab(page,d,prefs.HideApps);", src)
         self.assertNotIn("Toolbar(", src)
         build_info = src.split("void BuildInfo()")[1].split("void InfoTick()")[0]
         self.assertIn('"Thread border router"', build_info)
@@ -402,6 +402,21 @@ class S90dPortTests(unittest.TestCase):
         # Panel Care: Pixel Shift is a real setting; Pixel Refresh is never triggered from here
         self.assertIn('"cycle:pixel-shift-menu"', src)
         self.assertNotIn("ELSensing", src)
+
+    def test_apps_tab_can_be_hidden_from_info(self):
+        src = launcher()
+        # switch row on Info (its own focus row below the panels); saved with the Watch/Play choice
+        self.assertIn("AppsTabSwitch(100,900);", body(src, "void BuildInfo()"))
+        self.assertIn('Action="toggle:apps",Row=2', src)
+        self.assertIn('if(a=="toggle:apps"){ToggleAppsTab();return;}', body(src, "void Activate()"))
+        self.assertIn("SavePrefs();BuildTabs();", body(src, "void ToggleAppsTab()"))
+        # the tab bar is rebuilt inside its own layer, so it stays under the sheet, toast and OLED dim
+        self.assertIn("tabBar=new View{Size2D=new Size2D(1920,120)};win.Add(tabBar);BuildTabs();", body(src, "void BuildChrome()"))
+        self.assertNotIn("win.Add", body(src, "void BuildTabs()"))
+        self.assertIn("if(tabs[i]==null)continue;", body(src, "void StyleTabs()"))
+        # panels shrank to make room: the switch row ends above the notice line
+        self.assertIn("InfoPanel(970,540,850,330,", src)
+        self.assertLessEqual(900 + 72, 1000)
 
     def test_tab_bar_select_enters_at_the_current_input(self):
         key = body(launcher(), "void HandleKey(")

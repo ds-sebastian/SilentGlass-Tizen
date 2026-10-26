@@ -107,8 +107,11 @@ static class CatalogTests
         True(HomeLogic.Flag(conf, "scrim", false) && HomeLogic.Flag(conf, "enabled", true), "conf flags");
         True(HomeLogic.ReadConf("/nonexistent/quiet-home.conf").Count == 0, "missing conf");
         // Watch / Play inputs: only Automatic or HDMI 1-4 survive a round trip
-        True(HomeLogic.ParsePrefs(HomeLogic.FormatPrefs(15, 0)) == (15, 0), "prefs round trip");
-        True(HomeLogic.ParsePrefs("watch=99\nplay=14\n") == (0, 14) && HomeLogic.ParsePrefs(null) == (0, 0), "prefs reject junk");
+        True(HomeLogic.ParsePrefs(HomeLogic.FormatPrefs(15, 0, true)) == (15, 0, true), "prefs round trip");
+        True(HomeLogic.ParsePrefs("watch=99\nplay=14\n") == (0, 14, false) && HomeLogic.ParsePrefs(null) == (0, 0, false), "prefs reject junk; old files keep the Apps tab");
+        // tab bar: a hidden Apps tab is skipped both ways; the ends stop
+        True(HomeLogic.NextTab(0, 1, true) == 2 && HomeLogic.NextTab(2, -1, true) == 0, "skip hidden Apps tab");
+        True(HomeLogic.NextTab(0, 1, false) == 1 && HomeLogic.NextTab(0, -1, true) == 0 && HomeLogic.NextTab(3, 1, false) == 3, "tab ends");
         True(HomeLogic.NextPort(0, 15) == 13 && HomeLogic.NextPort(16, 15) == 0, "port cycle wraps through Automatic");
         True(HomeLogic.NextPort(0, 13) == 14 && HomeLogic.NextPort(14, 15) == 16, "port cycle skips the other card's input");
         for (int other = 13; other <= 16; other++)

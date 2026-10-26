@@ -31,13 +31,15 @@ public static class HomeLogic
  // ---- Watch / Play inputs: 0 = Automatic (by the TV's input name), else an HDMI source type 13-16 ----
  public const int Hdmi1=13,Hdmi4=16;
  public static bool IsHdmi(int type)=>type>=Hdmi1&&type<=Hdmi4;
- public static (int watch,int play) ParsePrefs(string text)
+ public static (int watch,int play,bool hideApps) ParsePrefs(string text)
  {
   var c=ParseConf(text);
   int Port(string k)=>c.TryGetValue(k,out var v)&&int.TryParse(v,out int n)&&(n==0||IsHdmi(n))?n:0;
-  return (Port("watch"),Port("play"));
+  return (Port("watch"),Port("play"),Flag(c,"hideapps",false));
  }
- public static string FormatPrefs(int watch,int play)=>"watch="+watch+"\nplay="+play+"\n";
+ public static string FormatPrefs(int watch,int play,bool hideApps)=>"watch="+watch+"\nplay="+play+"\nhideapps="+(hideApps?1:0)+"\n";
+ // tab bar Left/Right over Home 0, Apps 1, Controls 2, Info 3: a hidden Apps tab is skipped, the ends stop
+ public static int NextTab(int page,int d,bool hideApps){int n=page+d;if(hideApps&&n==1)n+=d;return n<0||n>3?page:n;}
  // Select cycles Automatic -> HDMI 1..4 -> Automatic, skipping the input the other card already opens
  public static int NextPort(int current,int otherCard)
  {

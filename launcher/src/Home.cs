@@ -113,19 +113,30 @@ public sealed partial class QuietHome : NUIApplication
   if(wallpaper==null){glowWatch=Glow("watch");glowPlay=Glow("play");}
   content=new View{Size2D=new Size2D(1920,1080)};win.Add(content);
   // tvOS-style centred tab bar; the selected tab stays lit, and turns white while it has focus
-  string[] nav={"Home","Apps","Controls","Info"};int[] tw={132,122,178,110};int total=12;foreach(var w in tw)total+=w;
-  int px=960-total/2;
-  var capsule=new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68)};win.Add(capsule);
-  AddGlass(capsule,0,px,36,34,persistent:true,tint:.07f,shadow:.1f,shadowY:4,blur:14,focusShadow:0,bevel:16,refract:18);
-  tabs=new TextLabel[4];tabBg=new View[4];int tabX=px+6;
-  for(int i=0;i<tabs.Length;i++){
-   tabBg[i]=new View{Position2D=new Position2D(tabX,42),Size2D=new Size2D(tw[i],56),BackgroundColor=clear,CornerRadius=new Vector4(28,28,28,28)};win.Add(tabBg[i]);
-   tabs[i]=Label(nav[i],tabX,42,tw[i],56,28,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;win.Add(tabs[i]);tabX+=tw[i];
-  }
+  tabBar=new View{Size2D=new Size2D(1920,120)};win.Add(tabBar);BuildTabs();
   clock=Label(Clock(),1520,40,300,60,30,chromeText);clock.HorizontalAlignment=HorizontalAlignment.End;win.Add(clock);
   detail=Label("",100,952,1720,40,24,muted);detail.HorizontalAlignment=HorizontalAlignment.Center;win.Add(detail);
   notice=Label("",100,1000,1720,40,24,new Color(1f,.76f,.46f,1));notice.HorizontalAlignment=HorizontalAlignment.Center;win.Add(notice);
   overlay=new View{Size2D=new Size2D(1920,1080)};win.Add(overlay); // inputs sheet, toast and OLED dim: always on top
+ }
+ // rebuilt in place (same layer) when the Apps tab is shown or hidden
+ View tabBar;Renderer tabGlass;
+ static readonly string[] Nav={"Home","Apps","Controls","Info"};static readonly int[] TabW={132,122,178,110};
+ void BuildTabs()
+ {
+  while(tabBar.ChildCount>0){var v=tabBar.GetChildAt(0);tabBar.Remove(v);v.Dispose();}
+  tabGlass?.Dispose();
+  int total=12;for(int i=0;i<Nav.Length;i++)if(TabShown(i))total+=TabW[i];
+  int px=960-total/2,x=px+6;
+  var capsule=new View{Position2D=new Position2D(px,36),Size2D=new Size2D(total,68)};tabBar.Add(capsule);
+  tabGlass=AddGlass(capsule,0,px,36,34,persistent:true,tint:.07f,shadow:.1f,shadowY:4,blur:14,focusShadow:0,bevel:16,refract:18);
+  tabs=new TextLabel[Nav.Length];tabBg=new View[Nav.Length];
+  for(int i=0;i<Nav.Length;i++){
+   if(!TabShown(i))continue;
+   tabBg[i]=new View{Position2D=new Position2D(x,42),Size2D=new Size2D(TabW[i],56),BackgroundColor=clear,CornerRadius=new Vector4(28,28,28,28)};tabBar.Add(tabBg[i]);
+   tabs[i]=Label(Nav[i],x,42,TabW[i],56,28,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;tabBar.Add(tabs[i]);x+=TabW[i];
+  }
+  styledTabs=-1;
  }
  ImageView Glow(string name)
  {
@@ -344,6 +355,7 @@ public sealed partial class QuietHome : NUIApplication
  {
   int key=page*2+(area==0?1:0);if(key==styledTabs)return;styledTabs=key;
   for(int i=0;i<tabs.Length;i++){
+   if(tabs[i]==null)continue; // hidden tab
    bool cur=i==page;
    tabs[i].TextColor=cur&&area==0?dark:cur?white:chromeText;
    string face="Quiet Inter "+(cur?"Semibold":"Medium");if(tabs[i].FontFamily!=face)tabs[i].FontFamily=face;
@@ -399,7 +411,7 @@ public sealed partial class QuietHome : NUIApplication
   else if(k=="Down"){if(area==0||area==TB){area=1;selected=page==0?SourceIndex():Row(0)[0];}else if(Row(area).Count>0){area++;selected=Nearest(Row(area-1));}UpdateFocus();}
   else if(k=="Left"||k=="Right"){
    int d=k=="Left"?-1:1;
-   if(area==0){int next=Math.Max(0,Math.Min(3,page+d));if(next!=page){page=next;selected=page==0?SourceIndex():0;BuildPage();}}
+   if(area==0){int next=HomeLogic.NextTab(page,d,prefs.HideApps);if(next!=page){page=next;selected=page==0?SourceIndex():0;BuildPage();}}
    else{var r=Row(area-1);int n=r.IndexOf(selected);selected=r[(n+d+r.Count)%r.Count];UpdateFocus();}
   }
   else if(k=="Return"||k=="KP_Enter"){if(area==0||area==TB){area=1;selected=page==0?SourceIndex():0;UpdateFocus();}else Activate();}
@@ -433,6 +445,7 @@ public sealed partial class QuietHome : NUIApplication
   if(a=="controllers"){Launch("org.tizen.menu","add-bluetooth-keyboard");return;}
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
   if(a.StartsWith("heroport:")){CycleHeroPort(a.Substring(9)=="watch");return;}
+  if(a=="toggle:apps"){ToggleAppsTab();return;}
   if(a=="volume"||a=="brightness"){RefreshSettings();RefreshTileValues();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a.StartsWith("cycle:")){CycleSetting(a.Substring(6));return;}
