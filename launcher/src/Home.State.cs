@@ -19,7 +19,7 @@ public sealed partial class QuietHome
   if(stateTimer==null){stateTimer=new Tizen.NUI.Timer(600);stateTimer.Tick+=(s,e)=>{WriteState(stateActivity);return false;};}
   if(!stateTimer.IsRunning())stateTimer.Start();
  }
- const string StyleVersion="liquid-v24";
+ const string StyleVersion="liquid-v25";
  void WriteState(string activity)
  {
   stateTimer?.Stop();
@@ -35,7 +35,7 @@ public sealed partial class QuietHome
   Put("process_id",ProcessId);Put("editing",editing);Put("volume",currentVolume);Put("mute",currentMute);
   foreach(var (key,id) in new[]{("brightness","brightness"),("game-mode","game-mode"),("pixel-shift","pixel-shift-menu"),("sleeptimer","sleeptimer"),
    ("sound-mode","external-sound-mode"),("soundoutput","soundoutput"),("picturemode","picturemode"),("game-mode-auto","game-mode-auto")})Put(key,SettingValue(id));
-  Put("hero_ports",watchPort+","+playPort+"("+prefs.WatchPort+","+prefs.PlayPort+")");Put("apps_tab",prefs.HideApps?"hidden":"shown");Put("thread_switch",ThreadSwitchable()?ThreadWanted()?"on":"off":"absent");
+  Put("hero_ports",watchPort+","+playPort+"("+prefs.Watch+","+prefs.Play+")");Put("apps_tab",prefs.HideApps?"hidden":"shown");Put("prefs",HomeLogic.FormatPrefs(prefs).Trim().Replace('\n',','));Put("thread_switch",ThreadSwitchable()?ThreadWanted()?"on":"off":"absent");
   Put("info_markers",infoMarkers);Put("info_disabled_apps",infoDisabled);Put("info_live",lastRateText+" | "+lastCpuText);Put("info_thread",infoThread);
   Put("source",lastSource);Put("inputs",InputsState());Put("inputs_watch",inputsWatch);Put("source_list_events",sourceListEvents);
   Put("source_type_events",sourceTypeEvents);Put("sources_us",sourcesMicros);Put("inputs_open",inputsLayer!=null);

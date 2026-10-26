@@ -3,117 +3,150 @@ using System.Collections.Generic;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
+// Info page: four status cards that answer "is it fine?" at a glance (a coloured glyph disc + one big word, details
+// below), then Quiet Home's own settings as a grid of tiles. Only the settings take focus. Live values refresh every
+// 2 s and only while the page is visible.
 public sealed partial class QuietHome
 {
- // ---- TV Info page: read-only, refreshed every 2 s only while visible ----
  Tizen.NUI.Timer infoTimer;
- TextLabel liveRate,liveCpu,liveMem,liveTotal;
+ readonly Color good=new Color(.45f,.88f,.58f,1),warn=new Color(1f,.74f,.36f,1),neutral=new Color(.56f,.58f,.64f,1);
+ string infoIface="eth0",lastRateText="Measuring…",lastCpuText,infoThread="";int infoMarkers=-2,infoDisabled=-2;
+ (long rx,long tx)? lastNet;(long idle,long total)? lastCpu;long lastNetAt=-100000;
+
+ // ---- status cards (not focusable) ----
+ const int CardY=150,CardW=415,CardH=380,CardGap=20;
+ sealed class Status { public View Card,Disc;public TextLabel Head;public readonly List<TextLabel> Rows=new List<TextLabel>(); }
+ Status StatusCard(int n,string title,string glyph,params string[] keys)
+ {
+  int x=100+n*(CardW+CardGap);
+  var s=new Status{Card=Card(x,CardY,CardW,CardH,clear,30)};
+  AddGlass(s.Card,0,x,CardY,30,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:0);
+  s.Disc=new View{Position2D=new Position2D(28,28),Size2D=new Size2D(64,64),CornerRadius=new Vector4(32,32,32,32),BackgroundColor=neutral};
+  s.Disc.Add(new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(12,12),Size2D=new Size2D(40,40)});
+  s.Card.Add(s.Disc);
+  s.Card.Add(Label(title,108,26,CardW-136,30,22,muted,"Semibold"));
+  s.Head=Label("",108,52,CardW-136,50,38,white,"Display");s.Card.Add(s.Head);
+  s.Card.Add(new View{Position2D=new Position2D(28,124),Size2D=new Size2D(CardW-56,1),BackgroundColor=new Color(1,1,1,.10f)});
+  for(int i=0;i<keys.Length;i++){
+   int y=144+i*52;
+   s.Card.Add(Label(keys[i],28,y,118,40,21,muted));
+   var v=Label("",146,y,CardW-174,40,22,ink,"Semibold");v.HorizontalAlignment=HorizontalAlignment.End;s.Card.Add(v);s.Rows.Add(v);
+  }
+  return s;
+ }
+ static void Show(Status s,string head,Color c,params string[] rows)
+ {
+  s.Head.Text=head;s.Disc.BackgroundColor=c;
+  for(int i=0;i<rows.Length&&i<s.Rows.Count;i++)s.Rows[i].Text=rows[i]??"—";
+ }
+ Status netCard,threadCard,tvCard;
  readonly List<View> spark=new List<View>();
- readonly double[] sparkValues=new double[36];
- (long rx,long tx)? lastNet;(long idle,long total)? lastCpu;long lastNetAt=-100000;string infoIface="eth0";
- string lastRateText="Measuring…",lastCpuText;int infoMarkers=-2,infoDisabled=-2;
- string TotalsText(Dictionary<string,(long rx,long tx)> all)=>all.TryGetValue(infoIface,out var c)?"↓ "+InfoStats.Bytes(c.rx)+"  ↑ "+InfoStats.Bytes(c.tx):null;
- const int SparkBase=296; // bottom of the bars inside the 330-tall Live panel
- void DrawSpark()
+ readonly double[] sparkValues=new double[24];
+
+ // ---- settings tiles: glyph disc, name, one line of explanation; a switch (green = on) or the current choice ----
+ const int SetY=610,SetW=560,SetH=120,SetGap=20;
+ (int x,int y) SetCell(int n)=>(100+n%3*(SetW+SetGap),SetY+n/3*(SetH+SetGap));
+ void SettingTile(int n,string name,string sub,string glyph,string action,bool? on,string choice=null)
  {
-  double peak=50000;foreach(var v in sparkValues)peak=Math.Max(peak,v);
-  for(int i=0;i<spark.Count;i++){int h=Math.Max(3,(int)(150*sparkValues[i]/peak));spark[i].Size2D=new Size2D(14,h);spark[i].Position2D=new Position2D(30+i*22,SparkBase-h);}
+  var (x,y)=SetCell(n);
+  var card=Card(x,y,SetW,SetH,clear,30);var glass=AddGlass(card,0,x,y,30);
+  var disc=new View{Position2D=new Position2D(24,24),Size2D=new Size2D(72,72),BackgroundColor=discFill,CornerRadius=new Vector4(36,36,36,36)};
+  var g=new ImageView{ResourceUrl=Root+"glyph-"+glyph+".svg",Position2D=new Position2D(14,14),Size2D=new Size2D(44,44)};disc.Add(g);card.Add(disc);
+  var title=Label(name,116,22,SetW-250,42,28,white,"Semibold");card.Add(title);
+  var value=Label(sub,116,64,SetW-250,34,22,muted);card.Add(value);
+  if(on.HasValue){
+   // the off track stays visible on the bright focused glass too
+   var track=new View{Position2D=new Position2D(SetW-28-80,41),Size2D=new Size2D(80,38),CornerRadius=new Vector4(19,19,19,19),BackgroundColor=on.Value?onNowGreen:new Color(.5f,.5f,.55f,.55f)};
+   track.Add(new View{Position2D=new Position2D(on.Value?47:5,5),Size2D=new Size2D(28,28),CornerRadius=new Vector4(14,14,14,14),BackgroundColor=white});
+   card.Add(track);
+  }
+  else{var c=Label(choice,SetW-28-110,40,110,40,26,ink,"Semibold");c.HorizontalAlignment=HorizontalAlignment.End;card.Add(c);}
+  slots.Add(new Slot{Card=card,Glass=glass,Label=value,Title=title,Glyph=g,Disc=disc,Name=name,Action=action,Row=n/3,X=x,Y=y,W=SetW,H=SetH,Kind=2});
  }
- readonly Color good=new Color(.45f,.88f,.58f,1),warn=new Color(1f,.74f,.36f,1);
- View panelDot; // the status dot of the panel built last
- View InfoPanel(int x,int y,int w,int h,string title,Color dot,int row)
+ // fills the last grid cell: what is running (not focusable)
+ void AboutTile(int n)
  {
-  var card=Card(x,y,w,h,clear,30);var glass=AddGlass(card,0,x,y,30,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);
-  panelDot=new View{Position2D=new Position2D(30,39),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)};card.Add(panelDot);
-  card.Add(Label(title,56,24,w-86,44,29,white,"Semibold"));
-  slots.Add(new Slot{Card=card,Glass=glass,Name=title,Action="info",Row=row,X=x,Y=y,W=w,H=h});
-  return card;
+  var (x,y)=SetCell(n);
+  var card=Card(x,y,SetW,SetH,clear,30);AddGlass(card,0,x,y,30,tint:.03f,shadow:0,shadowY:0,blur:8,focusShadow:0);
+  card.Add(Label("Quiet Home "+StyleVersion.Replace("liquid-",""),28,22,SetW-56,42,26,muted,"Semibold"));
+  card.Add(Label("Liquid Glass · "+60/style.Vsync+" fps · nothing sent anywhere",28,64,SetW-56,34,22,neutral));
  }
- TextLabel InfoRow(View card,int w,int n,string key,string value,Color color=null)
- {
-  int y=90+n*54;
-  card.Add(Label(key,30,y,200,42,23,muted));
-  var v=Label(value??"Unavailable",196,y,w-226,42,24,color??ink,"Semibold");v.HorizontalAlignment=HorizontalAlignment.End;v.Ellipsis=true;card.Add(v);
-  return v;
- }
- static string MemText((long totalKb,long availableKb)? m)=>m.HasValue?InfoStats.Bytes((m.Value.totalKb-m.Value.availableKb)*1024.0)+" of "+InfoStats.Bytes(m.Value.totalKb*1024.0)+" used":"Unavailable";
- string infoThread="";
+
  void BuildInfo()
  {
   string route=InfoStats.DefaultInterface();infoIface=route??"eth0";
   var netdev=InfoStats.NetDev();
-  var tv=InfoPanel(100,140,540,370,"This TV",new Color(.56f,.66f,1f,1),0);
-  string ver=InfoStats.SystemInfo("http://tizen.org/feature/platform.version");
-  string build=InfoStats.ParseBuildDate(InfoStats.SystemInfo("http://tizen.org/system/build.string"));
-  InfoRow(tv,540,0,"Model",InfoStats.SystemInfo("http://tizen.org/system/model_name"));
-  InfoRow(tv,540,1,"Software",(ver!=null?"Tizen "+ver:"Tizen")+(build!=null?" · "+build:""));
-  var up=InfoStats.Uptime();InfoRow(tv,540,2,"Up for",up.HasValue?InfoStats.Duration(up.Value):null);
-  liveMem=InfoRow(tv,540,3,"Memory",MemText(InfoStats.Memory()));
-  int cores=InfoStats.Cores();liveCpu=InfoRow(tv,540,4,"Processor","Measuring…"+(cores>0?" · "+cores+" cores":""));
-
-  var net=InfoPanel(690,140,540,370,"Network",new Color(.33f,.82f,.75f,1),0);
-  bool wifi=infoIface.StartsWith("wlan");int? level=wifi?InfoStats.WifiLevel(infoIface):null;
-  string link=wifi?"Wi-Fi"+(level.HasValue?" · "+level+" dBm":""):"Wired"+(InfoStats.LinkSpeed(infoIface) is string spd?" · "+spd:"");
-  InfoRow(net,540,0,"Connection",route==null?"Not connected":link);
-  InfoRow(net,540,1,"IP address",InfoStats.Ipv4(infoIface));
-  var dns=InfoStats.Nameservers();InfoRow(net,540,2,"DNS",dns.Count>0?string.Join(" · ",dns.ConvertAll(d=>d=="8.8.8.8"?"Google backup":d)):null);
-  liveTotal=InfoRow(net,540,3,"Since start",TotalsText(netdev));
-
-  var pv=InfoPanel(1280,140,540,370,"Privacy",new Color(.72f,.56f,1f,1),0);
-  infoMarkers=InfoStats.MarkersInPlace();int total=InfoStats.VendorMarkers.Length;
-  InfoRow(pv,540,0,"Vendor blocks",infoMarkers<0?"Unavailable":infoMarkers+" of "+total+" in place",infoMarkers<0?null:infoMarkers==total?good:warn);
-  infoDisabled=InfoStats.DisabledAppCount("com.samsung.tv.bixby-promotion");int apps=InfoStats.DisabledApps.Length;
-  InfoRow(pv,540,1,"Disabled apps",infoDisabled<0?"Unavailable":infoDisabled+" of "+apps+" off",infoDisabled<0?null:infoDisabled==apps?good:warn);
-  bool sdb=InfoStats.SdbListening();
-  InfoRow(pv,540,2,"Developer access",sdb?"SDB on":"SDB off",sdb?good:muted);
-
-  // Thread border router: role from wpan0's RLOC/ALOC addresses, home reach from forwarding + an off-mesh address
-  bool threadWanted=ThreadWanted(); // for the switch row below
-  var tr=InfoPanel(100,540,830,330,"Thread border router",muted,1);
-  threadStatus=InfoRow(tr,830,0,"Status","",muted);threadHome=InfoRow(tr,830,1,"Home network","",muted);
-  threadTraffic=InfoRow(tr,830,2,"Thread traffic","");threadIface=InfoRow(tr,830,3,"Interface","");
-  threadDot=panelDot;UpdateThread(netdev);
-
-  var live=InfoPanel(970,540,850,330,"Live · TV network",new Color(.4f,.78f,1f,1),1);
   bool fresh=Environment.TickCount64-lastNetAt>10000;
   if(fresh){Array.Clear(sparkValues,0,sparkValues.Length);lastNet=null;lastCpu=null;lastRateText="Measuring…";}
-  if(lastCpuText!=null&&!fresh)liveCpu.Text=lastCpuText;
-  liveRate=Label(lastRateText,30,86,790,52,36,white,"Display");live.Add(liveRate);
+
+  // Privacy: everything this mod switched off is still off
+  var pv=StatusCard(0,"Privacy","shield","Blocks","Apps off","Developer");
+  infoMarkers=InfoStats.MarkersInPlace();infoDisabled=InfoStats.DisabledAppCount("com.samsung.tv.bixby-promotion");
+  int marks=InfoStats.VendorMarkers.Length,apps=InfoStats.DisabledApps.Length;
+  bool known=infoMarkers>=0&&infoDisabled>=0,ok=infoMarkers==marks&&infoDisabled==apps;
+  Show(pv,!known?"Unknown":ok?"Protected":"Check",!known?neutral:ok?good:warn,
+   infoMarkers<0?null:infoMarkers+" of "+marks,infoDisabled<0?null:infoDisabled+" of "+apps,InfoStats.SdbListening()?"SDB open":"Closed");
+
+  // Network: how the TV is connected; the live rate with a small sparkline along the bottom
+  netCard=StatusCard(1,"Network","network","Address","Speed","Now");
+  bool wifi=infoIface.StartsWith("wlan");
+  string link=route==null?"Offline":wifi?"Wi-Fi":"Wired";
+  string detail=route==null?null:wifi?(InfoStats.WifiLevel(infoIface) is int dbm?dbm+" dBm":null):InfoStats.LinkSpeed(infoIface);
+  // one short word up top; details in rows (rates as one combined number so nothing is ever cut off)
+  Show(netCard,link,route==null?warn:good,InfoStats.Ipv4(infoIface),detail,lastRateText);
   spark.Clear();
-  for(int i=0;i<sparkValues.Length;i++){var b=new View{Position2D=new Position2D(30+i*22,SparkBase),Size2D=new Size2D(14,3),BackgroundColor=new Color(.4f,.78f,1f,.85f),CornerRadius=new Vector4(4,4,4,4)};spark.Add(b);live.Add(b);}
+  for(int i=0;i<sparkValues.Length;i++){
+   var b=new View{Position2D=new Position2D(28+i*15,CardH-27),Size2D=new Size2D(9,3),BackgroundColor=new Color(.4f,.78f,1f,.85f),CornerRadius=new Vector4(3,3,3,3)};
+   spark.Add(b);netCard.Card.Add(b);
+  }
   DrawSpark();
-  SwitchRow(100,"Show Apps tab",!prefs.HideApps,"toggle:apps");
-  if(ThreadSwitchable())SwitchRow(690,"Thread border router",threadWanted,"toggle:thread");
+
+  threadCard=StatusCard(2,"Thread","thread","Home","Traffic","Mesh");
+  UpdateThread(netdev);
+
+  tvCard=StatusCard(3,"This TV","tv","Model","Software","Memory","Processor");
+  string ver=InfoStats.SystemInfo("http://tizen.org/feature/platform.version");
+  string build=InfoStats.ParseBuildDate(InfoStats.SystemInfo("http://tizen.org/system/build.string"));
+  var up=InfoStats.Uptime();int cores=InfoStats.Cores();
+  Show(tvCard,up.HasValue?"Up "+InfoStats.Duration(up.Value):"Running",good,
+   InfoStats.SystemInfo("http://tizen.org/system/model_name"),(ver!=null?"Tizen "+ver:"Tizen")+(build!=null?" · "+build.Substring(0,7):""),
+   MemText(InfoStats.Memory()),lastCpuText!=null&&!fresh?lastCpuText:"Measuring…");
+
+  // Quiet Home's own settings (saved in the app's data directory: they survive reboots)
+  Text("Quiet Home",108,SetY-50,600,40,26,muted,"Semibold");
+  int n=0;
+  SettingTile(n++,"Apps tab","Samsung apps and Home","apps","toggle:apps",!prefs.HideApps);
+  SettingTile(n++,"Live preview","Video in the input card","picture","toggle:live",prefs.Live);
+  SettingTile(n++,"Dim when idle","Black after 5 minutes","sleep","toggle:dim",prefs.Dim);
+  if(wallpaper!=null)SettingTile(n++,"Wallpaper",prefs.Wall=="auto"?"Follows sunset":prefs.Wall=="day"?"Always day":"Always night","wallpaper","toggle:wall",null,
+   prefs.Wall=="auto"?"Auto":prefs.Wall=="day"?"Day":"Night");
+  if(ThreadSwitchable())SettingTile(n++,"Thread border router","Smart-home mesh","thread","toggle:thread",ThreadWanted());
+  if(n<6)AboutTile(n);
+
   if(fresh)InfoTick();
   if(infoTimer==null){infoTimer=new Tizen.NUI.Timer(2000);infoTimer.Tick+=(s,e)=>{if(page!=3)return false;InfoTick();return true;};}
   infoTimer.Start();
  }
- // Apple-style switch rows under the panels: one phrase and a switch (green = on); Select flips it
- void SwitchRow(int x,string name,bool on,string action)
+ void DrawSpark()
  {
-  const int Y=900,W=540,H=72;
-  var card=Card(x,Y,W,H,clear,H/2);var glass=AddGlass(card,0,x,Y,H/2,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);
-  card.Add(Label(name,32,0,W-160,H,28,white,"Semibold"));
-  var track=new View{Position2D=new Position2D(W-32-76,18),Size2D=new Size2D(76,36),CornerRadius=new Vector4(18,18,18,18),BackgroundColor=on?onNowGreen:new Color(1,1,1,.22f)};
-  track.Add(new View{Position2D=new Position2D(on?44:4,4),Size2D=new Size2D(28,28),CornerRadius=new Vector4(14,14,14,14),BackgroundColor=white});
-  card.Add(track);
-  slots.Add(new Slot{Card=card,Glass=glass,Name=name,Action=action,Row=2,X=x,Y=Y,W=W,H=H});
+  double peak=50000;foreach(var v in sparkValues)peak=Math.Max(peak,v);
+  for(int i=0;i<spark.Count;i++){int h=Math.Max(3,(int)(34*sparkValues[i]/peak));spark[i].Size2D=new Size2D(9,h);spark[i].Position2D=new Position2D(28+i*15,CardH-24-h);}
  }
- TextLabel threadStatus,threadHome,threadTraffic,threadIface;View threadDot;
- // also called from InfoTick, so the panel follows the border router starting or stopping after a flip of the switch
+ static string MemText((long totalKb,long availableKb)? m)=>m.HasValue?InfoStats.Bytes((m.Value.totalKb-m.Value.availableKb)*1024.0)+" of "+InfoStats.Bytes(m.Value.totalKb*1024.0):null;
+
+ // role from wpan0's RLOC/ALOC addresses, home reach from forwarding + an off-mesh address; also called from InfoTick,
+ // so the card follows the border router starting or stopping after a flip of its switch
  void UpdateThread(Dictionary<string,(long rx,long tx)> netdev)
  {
-  if(threadStatus==null)return;
+  if(threadCard==null)return;
   var th=InfoStats.Thread();bool fwd=InfoStats.Ipv6Forwarding(),wanted=ThreadWanted();
   bool routing=th.present&&th.rloc16>=0&&(th.rloc16&0x1ff)==0;
-  string status=!th.present?(wanted?"Not running":"Paused"):!wanted?"Stopping…":th.rloc16<0?"Starting…":routing?"Online · Router "+(th.rloc16>>10)+(th.leader?" · Leader":""):"Online · Child";
-  string home=!th.present?"—":!fwd?"Forwarding off":th.homeRoute?"Connected":"Waiting for route";
-  var c=routing&&wanted?good:th.present?warn:muted;
-  threadStatus.Text=status;threadStatus.TextColor=c;threadDot.BackgroundColor=c;
-  threadHome.Text=home;threadHome.TextColor=home=="Connected"?good:home=="—"?muted:warn;
-  threadTraffic.Text=netdev.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):"—";
-  threadIface.Text=th.present?"wpan0 · "+th.addresses+" addresses":"—";
-  infoThread=status+" | "+home+" | fwd="+fwd;
+  string head=!th.present?(!ThreadSwitchable()?"Not set up":wanted?"Not running":"Paused"):!wanted?"Stopping…":th.rloc16<0?"Starting…":routing?(th.leader?"Leader":"Router"):"Child";
+  string home=!th.present?null:!fwd?"No forwarding":th.homeRoute?"Connected":"Waiting";
+  Show(threadCard,head,routing&&wanted?good:th.present?warn:neutral,home,
+   netdev.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):null,
+   th.present&&th.rloc16>=0?"Node "+(th.rloc16>>10)+" · "+th.addresses+" addr":null);
+  infoThread=head+" | "+(home??"-")+" | fwd="+fwd;
  }
  void InfoTick()
  {
@@ -121,23 +154,22 @@ public sealed partial class QuietHome
    long now=Environment.TickCount64;
    var all=InfoStats.NetDev();
    UpdateThread(all);
-   if(all.TryGetValue(infoIface,out var cur)){
-    if(liveTotal!=null)liveTotal.Text=TotalsText(all);
+   if(netCard!=null&&all.TryGetValue(infoIface,out var cur)){
     if(lastNet.HasValue&&now>lastNetAt){
      double dt=(now-lastNetAt)/1000.0,rx=Math.Max(0,(cur.rx-lastNet.Value.rx)/dt),tx=Math.Max(0,(cur.tx-lastNet.Value.tx)/dt);
      Array.Copy(sparkValues,1,sparkValues,0,sparkValues.Length-1);sparkValues[sparkValues.Length-1]=rx+tx;
-     lastRateText=liveRate.Text="↓ "+InfoStats.Bytes(rx)+"/s   ↑ "+InfoStats.Bytes(tx)+"/s";
+     lastRateText=netCard.Rows[2].Text=InfoStats.Bytes(rx+tx)+"/s";
      DrawSpark();
     }
     lastNet=cur;lastNetAt=now;
-   }else if(liveRate!=null)liveRate.Text="Unavailable";
+   }
    var cpu=InfoStats.Cpu();
-   if(cpu.HasValue&&lastCpu.HasValue&&cpu.Value.total>lastCpu.Value.total){
+   if(tvCard!=null&&cpu.HasValue&&lastCpu.HasValue&&cpu.Value.total>lastCpu.Value.total){
     double busy=100.0*(1-(double)(cpu.Value.idle-lastCpu.Value.idle)/(cpu.Value.total-lastCpu.Value.total));
-    int cores=InfoStats.Cores();lastCpuText=liveCpu.Text=Math.Round(Math.Max(0,Math.Min(100,busy)))+"% busy"+(cores>0?" · "+cores+" cores":"");
+    lastCpuText=tvCard.Rows[3].Text=Math.Round(Math.Clamp(busy,0,100))+"% · "+InfoStats.Cores()+" cores";
    }
    lastCpu=cpu;
-   if(liveMem!=null)liveMem.Text=MemText(InfoStats.Memory());
+   if(tvCard!=null)tvCard.Rows[2].Text=MemText(InfoStats.Memory())??"—";
   }catch{}
  }
 }

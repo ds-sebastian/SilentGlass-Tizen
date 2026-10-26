@@ -13,7 +13,7 @@ public sealed partial class QuietHome
  void IdleTick()
  {
   if(dimmed){MoveDimClock();return;}
-  if(editing==""&&Environment.TickCount64-lastActivity>=IdleMs)Dim();
+  if(prefs.Dim&&editing==""&&Environment.TickCount64-lastActivity>=IdleMs)Dim();
  }
  void Dim()
  {

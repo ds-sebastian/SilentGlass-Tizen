@@ -368,7 +368,7 @@ public sealed partial class QuietHome : NUIApplication
   // the live card never grows or lifts: the video plane does not follow view animations
   if(s.Kind==1){bool live=IsLive(s);scale=f&&!live?1.02f:1;lift=f&&!live?-3:0;opacity=f||area==0||live?1:.7f;GlassFocus(s.Rim,f?1:0,0,animate);}
   else if(s.Kind==2){
-   scale=f?1.06f:1;
+   scale=f?page==3?1.03f:1.06f:1; // Info tiles are wide: 6% would almost touch the neighbours
    GlassFocus(s.Glass,f?1:0,0,animate);
    s.Disc.BackgroundColor=f?discFocus:discFill;
    s.Glyph.Color=f?dark:white;
@@ -445,8 +445,7 @@ public sealed partial class QuietHome : NUIApplication
   if(a=="controllers"){Launch("org.tizen.menu","add-bluetooth-keyboard");return;}
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
   if(a.StartsWith("heroport:")){CycleHeroPort(a.Substring(9)=="watch");return;}
-  if(a=="toggle:apps"){ToggleAppsTab();return;}
-  if(a=="toggle:thread"){ToggleThread();return;}
+  if(a.StartsWith("toggle:")){ToggleSetting(a.Substring(7));return;}
   if(a=="volume"||a=="brightness"){RefreshSettings();RefreshTileValues();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a.StartsWith("cycle:")){CycleSetting(a.Substring(6));return;}

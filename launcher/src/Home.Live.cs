@@ -47,7 +47,7 @@ public sealed partial class QuietHome
  {
   liveConf=ReadLiveConf();
   Slot hero=null;
-  if(liveConf.Enabled&&page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
+  if(liveConf.Enabled&&prefs.Live&&page==0&&visible&&!dimmed&&CurrentHasSignal)foreach(var s in slots)if(s.Kind==1&&s.Action=="hdmi:"+lastSource)hero=s;
   if(hero==null){HideLive();MarkState("live");return;}
   // already live: re-assert the plane rectangle (the viewer can reset it when the source re-syncs or changes mode)
   if(liveView!=null&&liveSlot==hero){PushLiveGeometry(liveRect);MarkState("live");return;}

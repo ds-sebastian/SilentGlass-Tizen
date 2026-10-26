@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v24a)
+## Quiet Home on the S90D (v25b)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -37,6 +37,11 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **v25b (Info overhaul)**: four status cards (Privacy / Network / Thread / This TV: coloured glyph disc + one word,
+  details below, small sparkline in Network; not focusable) and a grid of Quiet Home settings: Apps tab, Live
+  preview, Dim when idle, Wallpaper (Auto / Day / Night), Thread border router (where installed). Settings are
+  saved in `quiet-home-prefs.txt` (app data dir, survives reboots); older files load with defaults. Info tiles
+  grow 3% on focus (6% touched neighbours); no value is ever truncated (rates shown as one combined number).
 - **v24a**: Info switch "Thread border router" (only where the switchable units are installed); the Thread panel
   now refreshes every 2 s, so it follows the daemons stopping and starting. See thread-border-router.md section 5.
 - **v23a**: Info page switch "Show Apps tab" (own focus row under the panels; panels 370/330 tall to make room).

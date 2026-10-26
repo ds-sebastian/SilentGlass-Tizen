@@ -79,8 +79,8 @@ public sealed partial class QuietHome
    case "page:2":return "All controls";
    case "ambient":return "Art & photos";
    case "inputs":{var cur=inputs.Find(i=>i.Type==lastSource);return cur!=null?cur.Name:"Choose";}
-   case "heroport:watch":return HeroPortValue(prefs.WatchPort,watchPort);
-   case "heroport:play":return HeroPortValue(prefs.PlayPort,playPort);
+   case "heroport:watch":return HeroPortValue(prefs.Watch,watchPort);
+   case "heroport:play":return HeroPortValue(prefs.Play,playPort);
   }
   return SettingName(action.StartsWith("cycle:")?action.Substring(6):action);
  }

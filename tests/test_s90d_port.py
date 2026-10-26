@@ -1,6 +1,7 @@
 """S90D port configuration checks, not a substitute for on-TV rendering tests."""
 import csv
 import json
+import re
 from pathlib import Path
 import unittest
 import xml.etree.ElementTree as ET
@@ -67,7 +68,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn('Hero("Watch","hdmi:"+watchPort,HeroSubtitle(watchPort,"shield","SHIELD")', src)
         self.assertIn('lastSource=15', src)
         # heroes follow the TV's own input names, falling back to the observed ports
-        self.assertIn('int w=prefs.WatchPort!=0?prefs.WatchPort:PortNamed("shield",15),p=prefs.PlayPort!=0?prefs.PlayPort:PortNamed("switch",13);', src)
+        self.assertIn('int w=prefs.Watch!=0?prefs.Watch:PortNamed("shield",15),p=prefs.Play!=0?prefs.Play:PortNamed("switch",13);', src)
 
     def test_secondary_keeps_the_tvs_stored_label(self):
         self.assertIn('Hero("Play","hdmi:"+playPort,HeroSubtitle(playPort,"switch","Nintendo Switch")', launcher())
@@ -230,17 +231,21 @@ class S90dPortTests(unittest.TestCase):
         self.assertNotIn("attr/current", info)
         self.assertIn("if (AppEnabled(selfId) != true) return -1;", info)
         src = launcher()
-        self.assertIn('infoMarkers<0?"Unavailable"', src)
-        self.assertIn('infoDisabled<0?"Unavailable"', src)
+        # unreadable counts show as unknown, never as a failed check
+        self.assertIn('!known?"Unknown":ok?"Protected":"Check"', src)
+        self.assertIn("infoMarkers<0?null:", src)
+        self.assertIn("infoDisabled<0?null:", src)
 
     def test_info_live_state_survives_card_select(self):
-        build_info = launcher().split("void BuildInfo()")[1].split("void InfoTick()")[0]
-        self.assertIn("bool fresh=Environment.TickCount64-lastNetAt>10000;", build_info)
-        self.assertNotIn("lastNet=null;lastCpu=null;\n  InfoTick();", build_info)
-        # every live row is populated at build time, never a placeholder until the next tick
-        self.assertNotIn('"Since start",null)', build_info)
-        self.assertIn('"Since start",TotalsText(netdev))', build_info)
-        self.assertEqual(build_info.count("InfoStats.NetDev()"), 1)  # one read of /proc/net/dev per build
+        src = launcher()
+        info = body(src, "void BuildInfo()")
+        # rebuilding Info (after a setting flips) keeps the live rate and sparkline unless the last sample is stale
+        self.assertIn("bool fresh=Environment.TickCount64-lastNetAt>10000;", info)
+        self.assertIn("if(fresh){Array.Clear(sparkValues", info)
+        self.assertIn("InfoStats.Ipv4(infoIface),detail,lastRateText);", info)
+        self.assertEqual(info.count("InfoStats.NetDev()"), 1)  # one read of /proc/net/dev per build
+        # the timer only runs while Info is visible
+        self.assertIn("if(page!=3)return false;InfoTick();return true;", info)
 
     def test_oled_idle_dim(self):
         src = launcher()
@@ -394,45 +399,73 @@ class S90dPortTests(unittest.TestCase):
         create = body(src, "protected override void OnCreate()")
         self.assertLess(create.index("prefs=LoadPrefs();"), create.index("ResolveHeroPorts();"))
         # cycling never maps both cards to the same input (behaviour tested in tests/CatalogTests.cs)
-        self.assertIn("HomeLogic.NextPort(prefs.WatchPort,playPort)", prefs)
-        self.assertIn("HomeLogic.NextPort(prefs.PlayPort,watchPort)", prefs)
+        self.assertIn("HomeLogic.NextPort(prefs.Watch,playPort)", prefs)
+        self.assertIn("HomeLogic.NextPort(prefs.Play,watchPort)", prefs)
         self.assertIn('SettingsTile("Watch Input","heroport:watch"', src)
         self.assertIn('SettingsTile("Play Input","heroport:play"', src)
-        self.assertIn("prefs.WatchPort!=0?prefs.WatchPort:PortNamed(\"shield\",15)", src)
+        self.assertIn("prefs.Watch!=0?prefs.Watch:PortNamed(\"shield\",15)", src)
         # Panel Care: Pixel Shift is a real setting; Pixel Refresh is never triggered from here
         self.assertIn('"cycle:pixel-shift-menu"', src)
         self.assertNotIn("ELSensing", src)
 
     def test_apps_tab_can_be_hidden_from_info(self):
         src = launcher()
-        # switch row on Info (its own focus row below the panels); saved with the Watch/Play choice
-        self.assertIn('SwitchRow(100,"Show Apps tab",!prefs.HideApps,"toggle:apps");', body(src, "void BuildInfo()"))
-        self.assertIn("Action=action,Row=2", body(src, "void SwitchRow("))
-        self.assertIn('if(a=="toggle:apps"){ToggleAppsTab();return;}', body(src, "void Activate()"))
-        self.assertIn("SavePrefs();BuildTabs();", body(src, "void ToggleAppsTab()"))
+        self.assertIn('SettingTile(n++,"Apps tab","Samsung apps and Home","apps","toggle:apps",!prefs.HideApps);', body(src, "void BuildInfo()"))
+        self.assertIn('if(a.StartsWith("toggle:")){ToggleSetting(a.Substring(7));return;}', body(src, "void Activate()"))
+        self.assertIn("SavePrefs();BuildTabs();", body(src, "void ToggleSetting("))
         # the tab bar is rebuilt inside its own layer, so it stays under the sheet, toast and OLED dim
         self.assertIn("tabBar=new View{Size2D=new Size2D(1920,120)};win.Add(tabBar);BuildTabs();", body(src, "void BuildChrome()"))
         self.assertNotIn("win.Add", body(src, "void BuildTabs()"))
         self.assertIn("if(tabs[i]==null)continue;", body(src, "void StyleTabs()"))
-        # panels shrank to make room: the switch row ends above the notice line
-        self.assertIn("InfoPanel(970,540,850,330,", src)
-        self.assertLessEqual(900 + 72, 1000)
 
     def test_thread_switch_on_info(self):
         src = launcher()
         info = body(src, "void BuildInfo()")
         # only TVs with the switchable border router units get the switch
-        self.assertIn('if(ThreadSwitchable())SwitchRow(690,"Thread border router",threadWanted,"toggle:thread");', info)
-        self.assertIn('if(a=="toggle:thread"){ToggleThread();return;}', body(src, "void Activate()"))
+        self.assertIn('if(ThreadSwitchable())SettingTile(n++,"Thread border router","Smart-home mesh","thread","toggle:thread",ThreadWanted());', info)
+        self.assertIn('case "thread":ToggleThread();return;', body(src, "void ToggleSetting("))
         toggle = body(src, "void ToggleThread()")
         # the marker decides (also at boot); thread-switch only wakes the path unit, so it is written last
         self.assertLess(toggle.index('DataFile("thread-off")'), toggle.index('DataFile("thread-switch")'))
         self.assertIn("DirectoryInfo.Data", body(src, "static string DataFile("))
-        # the panel follows the daemons after a flip
+        # the card follows the daemons after a flip
         self.assertIn("UpdateThread(all);", body(src, "void InfoTick()"))
-        # the marker and the units agree on the path
         unit = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-cpcd.service").read_text()
         self.assertIn("com.samsung.tv.bixby-promotion/data/thread-off", unit)
+
+    def test_info_page_layout(self):
+        src = launcher()
+        info = body(src, "void BuildInfo()")
+        # four status cards side by side, fitting the 1720 px content width; none of them takes focus
+        self.assertEqual(4 * 415 + 3 * 20, 1720)
+        self.assertNotIn("slots.Add", body(src, "Status StatusCard("))
+        for card in ('StatusCard(0,"Privacy"', 'StatusCard(1,"Network"', 'StatusCard(2,"Thread"', 'StatusCard(3,"This TV"'):
+            self.assertIn(card, info)
+        # settings grid: 3 x 560 + 2 gaps; rows map to focus rows 0 and 1 (Down from the tab bar lands on Row(0))
+        self.assertEqual(3 * 560 + 2 * 20, 1720)
+        self.assertIn("Row=n/3", body(src, "void SettingTile("))
+        self.assertIn("SetY+n/3*(SetH+SetGap)", src)
+        self.assertLessEqual(610 + 2 * 120 + 20, 1000)  # ends above the notice line
+        # the page header goes through content (rebuilt with the page), never straight onto the window
+        self.assertIn('Text("Quiet Home"', info)
+        self.assertNotIn("win.Add", info)
+        # the throughput graph is a small sparkline inside the Network card
+        self.assertIn("netCard.Card.Add(b);", info)
+        self.assertIn("(int)(34*sparkValues[i]/peak)", body(src, "void DrawSpark()"))
+        # every glyph the page uses ships
+        for g in re.findall(r'"(shield|network|thread|tv|apps|picture|sleep|wallpaper)"', info):
+            self.assertTrue((ASSETS / f"glyph-{g}.svg").exists(), g)
+
+    def test_info_settings_apply_and_persist(self):
+        src = launcher()
+        toggle = body(src, "void ToggleSetting(")
+        for case in ('case "apps":', 'case "live":', 'case "dim":', 'case "wall":', 'case "thread":'):
+            self.assertIn(case, toggle)
+        self.assertEqual(toggle.count("SavePrefs();"), 4)  # thread is stored as its marker file instead
+        self.assertIn("prefs.Live&&page==0", (SRC / "Home.Live.cs").read_text())
+        self.assertIn("if(prefs.Dim&&editing==", (SRC / "Home.Idle.cs").read_text())
+        self.assertIn('string WallMode=>prefs.Wall!="auto"?prefs.Wall:style.WallMode;', (SRC / "Home.Wallpaper.cs").read_text())
+        self.assertIn("CheckWallpaper();", toggle)
 
     def test_tab_bar_select_enters_at_the_current_input(self):
         key = body(launcher(), "void HandleKey(")

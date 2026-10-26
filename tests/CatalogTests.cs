@@ -107,8 +107,16 @@ static class CatalogTests
         True(HomeLogic.Flag(conf, "scrim", false) && HomeLogic.Flag(conf, "enabled", true), "conf flags");
         True(HomeLogic.ReadConf("/nonexistent/quiet-home.conf").Count == 0, "missing conf");
         // Watch / Play inputs: only Automatic or HDMI 1-4 survive a round trip
-        True(HomeLogic.ParsePrefs(HomeLogic.FormatPrefs(15, 0, true)) == (15, 0, true), "prefs round trip");
-        True(HomeLogic.ParsePrefs("watch=99\nplay=14\n") == (0, 14, false) && HomeLogic.ParsePrefs(null) == (0, 0, false), "prefs reject junk; old files keep the Apps tab");
+        var saved = new HomeLogic.Prefs { Watch = 15, HideApps = true, Live = false, Dim = false, Wall = "night" };
+        var back = HomeLogic.ParsePrefs(HomeLogic.FormatPrefs(saved));
+        True(back.Watch == 15 && back.Play == 0 && back.HideApps && !back.Live && !back.Dim && back.Wall == "night", "prefs round trip");
+        var junk = HomeLogic.ParsePrefs("watch=99\nplay=14\nwall=sepia\n");
+        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto", "prefs reject junk");
+        // a file from an older Quiet Home (or none) keeps every newer setting at its default
+        var old = HomeLogic.ParsePrefs("watch=0\nplay=0\nhideapps=1\n");
+        True(old.HideApps && old.Live && old.Dim && old.Wall == "auto", "older prefs files load with defaults");
+        True(HomeLogic.ParsePrefs(null).Live && !HomeLogic.ParsePrefs(null).HideApps, "no prefs file = defaults");
+        True(HomeLogic.NextWall("auto") == "day" && HomeLogic.NextWall("day") == "night" && HomeLogic.NextWall("night") == "auto", "wallpaper cycle");
         // tab bar: a hidden Apps tab is skipped both ways; the ends stop
         True(HomeLogic.NextTab(0, 1, true) == 2 && HomeLogic.NextTab(2, -1, true) == 0, "skip hidden Apps tab");
         True(HomeLogic.NextTab(0, 1, false) == 1 && HomeLogic.NextTab(0, -1, true) == 0 && HomeLogic.NextTab(3, 1, false) == 3, "tab ends");

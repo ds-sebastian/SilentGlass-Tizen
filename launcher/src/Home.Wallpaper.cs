@@ -15,7 +15,9 @@ public sealed partial class QuietHome
  bool wallNight;
  bool PhotoWall=>style.Wall=="photo"&&System.IO.File.Exists(Root+"wallpapers/wall-day.jpg")&&System.IO.File.Exists(Root+"wallpapers/wall-night.jpg");
 
- bool WantNight()=>style.WallMode=="night"||style.WallMode!="day"&&HomeLogic.IsNight(DateTime.UtcNow,style.Lat,style.Lon);
+ // the Info page setting wins; the /tmp conf wallmode= only applies while the setting is Auto
+ string WallMode=>prefs.Wall!="auto"?prefs.Wall:style.WallMode;
+ bool WantNight()=>WallMode=="night"||WallMode!="day"&&HomeLogic.IsNight(DateTime.UtcNow,style.Lat,style.Lon);
 
  View BuildWallpaper()
  {

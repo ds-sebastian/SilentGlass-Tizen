@@ -31,13 +31,24 @@ public static class HomeLogic
  // ---- Watch / Play inputs: 0 = Automatic (by the TV's input name), else an HDMI source type 13-16 ----
  public const int Hdmi1=13,Hdmi4=16;
  public static bool IsHdmi(int type)=>type>=Hdmi1&&type<=Hdmi4;
- public static (int watch,int play,bool hideApps) ParsePrefs(string text)
+ // user choices made on the TV (Controls and Info pages); unknown or missing keys keep their defaults, so older
+ // files load unchanged
+ public sealed class Prefs
+ {
+  public int Watch,Play;          // 0 = Automatic
+  public bool HideApps,Live=true,Dim=true;
+  public string Wall="auto";      // auto (sunrise/sunset) | day | night
+ }
+ public static readonly string[] WallModes={"auto","day","night"};
+ public static Prefs ParsePrefs(string text)
  {
   var c=ParseConf(text);
   int Port(string k)=>c.TryGetValue(k,out var v)&&int.TryParse(v,out int n)&&(n==0||IsHdmi(n))?n:0;
-  return (Port("watch"),Port("play"),Flag(c,"hideapps",false));
+  return new Prefs{Watch=Port("watch"),Play=Port("play"),HideApps=Flag(c,"hideapps",false),Live=Flag(c,"live",true),Dim=Flag(c,"dim",true),Wall=Pick(c,"wall","auto",WallModes)};
  }
- public static string FormatPrefs(int watch,int play,bool hideApps)=>"watch="+watch+"\nplay="+play+"\nhideapps="+(hideApps?1:0)+"\n";
+ public static string FormatPrefs(Prefs p)=>
+  "watch="+p.Watch+"\nplay="+p.Play+"\nhideapps="+(p.HideApps?1:0)+"\nlive="+(p.Live?1:0)+"\ndim="+(p.Dim?1:0)+"\nwall="+p.Wall+"\n";
+ public static string NextWall(string mode)=>WallModes[(Array.IndexOf(WallModes,mode)+1)%WallModes.Length];
  // tab bar Left/Right over Home 0, Apps 1, Controls 2, Info 3: a hidden Apps tab is skipped, the ends stop
  public static int NextTab(int page,int d,bool hideApps){int n=page+d;if(hideApps&&n==1)n+=d;return n<0||n>3?page:n;}
  // Select cycles Automatic -> HDMI 1..4 -> Automatic, skipping the input the other card already opens

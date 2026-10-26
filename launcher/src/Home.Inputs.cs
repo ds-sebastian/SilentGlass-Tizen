@@ -46,7 +46,7 @@ public sealed partial class QuietHome
  // falling back to HDMI 3 / HDMI 1
  bool ResolveHeroPorts()
  {
-  int w=prefs.WatchPort!=0?prefs.WatchPort:PortNamed("shield",15),p=prefs.PlayPort!=0?prefs.PlayPort:PortNamed("switch",13);
+  int w=prefs.Watch!=0?prefs.Watch:PortNamed("shield",15),p=prefs.Play!=0?prefs.Play:PortNamed("switch",13);
   bool changed=w!=watchPort||p!=playPort;watchPort=w;playPort=p;return changed;
  }
  int PortNamed(string word,int fallback){var m=inputs.Find(i=>i.Known&&i.Type>=13&&i.Type<=16&&i.Name.IndexOf(word,StringComparison.OrdinalIgnoreCase)>=0);return m!=null?m.Type:fallback;}
