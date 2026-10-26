@@ -61,9 +61,11 @@ requested state: [`device/ha-bridge/ha-power-automation.yaml`](device/ha-bridge/
 
 1. On the TV, as root: feed `device/ha-bridge/ha-bridge-install.sh` to `/bin/sh` on stdin.
 2. Copy `/opt/usr/home/owner/.config/silentglass-ha.conf.example` to `silentglass-ha.conf` (owner, mode 600, same
-   SMACK label as the home directory) and fill in the broker. Optional `input_<id>=Label` lines name the inputs
-   (HDMI1=13 ... HDMI4=16). The unit starts once the file exists.
-3. The device appears in Home Assistant under Settings > Devices (MQTT).
+   SMACK label as the home directory) and fill in the broker. The unit starts once the file exists; input names come
+   from the TV.
+3. For the Power switch, add [`ha-power-automation.yaml`](device/ha-bridge/ha-power-automation.yaml) to Home
+   Assistant and reload automations.
+4. The device appears in Home Assistant under Settings > Devices (MQTT).
 
 The credentials live only in that file on the TV, never in the repo. A broker user limited to `silentglass/#` and
 `homeassistant/+/silentglass_s90d/#` is the tidy choice; a shared house user works too.
