@@ -439,7 +439,7 @@ class S90dPortTests(unittest.TestCase):
         # four status cards side by side, fitting the 1720 px content width; none of them takes focus
         self.assertEqual(4 * 415 + 3 * 20, 1720)
         self.assertNotIn("slots.Add", body(src, "Status StatusCard("))
-        for card in ('StatusCard(0,"Privacy"', 'StatusCard(1,"Network"', 'StatusCard(2,"Thread"', 'StatusCard(3,"This TV"'):
+        for card in ('StatusCard(0,"Privacy"', 'StatusCard(1,"Network",', 'StatusCard(2,"Thread"', 'StatusCard(3,"This TV"'):
             self.assertIn(card, info)
         # settings grid: 3 x 560 + 2 gaps; rows map to focus rows 0 and 1 (Down from the tab bar lands on Row(0))
         self.assertEqual(3 * 560 + 2 * 20, 1720)
@@ -447,13 +447,15 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("SetY+n/3*(SetH+SetGap)", src)
         self.assertLessEqual(610 + 2 * 120 + 20, 1000)  # ends above the notice line
         # the page header goes through content (rebuilt with the page), never straight onto the window
-        self.assertIn('Text("Quiet Home"', info)
+        self.assertIn('Text("SilentGlass Home"', info)
         self.assertNotIn("win.Add", info)
         # the throughput graph is a small sparkline inside the Network card
         self.assertIn("netCard.Card.Add(b);", info)
         self.assertIn("(int)(34*sparkValues[i]/peak)", body(src, "void DrawSpark()"))
+        # the Network card shows a wired or a Wi-Fi glyph to match the connection
+        self.assertIn('StatusCard(1,"Network",wifi?"network":"wired"', info)
         # every glyph the page uses ships
-        for g in re.findall(r'"(shield|network|thread|tv|apps|picture|sleep|wallpaper)"', info):
+        for g in re.findall(r'"(shield|network|wired|thread|tv|apps|picture|sleep|wallpaper)"', info):
             self.assertTrue((ASSETS / f"glyph-{g}.svg").exists(), g)
 
     def test_info_settings_apply_and_persist(self):

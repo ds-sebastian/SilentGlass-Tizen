@@ -1,10 +1,12 @@
-# Instructions for an agent working in this repository
+# Instructions for an agent working in this repository (SilentGlass-Tizen)
 
 ## Start with the owner's device and goals
 
 Read README.md, then docs/10-agent-workflow.md. Choose the device track before
-running commands: this fork's S90D record is devices/s90d/README.md; docs/01 through
-09 preserve the original U8000F case study. The bundled tools/tv.py identity gate
+running commands: the S90D record (SilentGlass Home, privacy phases, Thread border router) is
+devices/s90d/README.md; docs/01 through 09 and docs/u8000f-case-study.md preserve the original Quiet Tizen
+U8000F case study. Keep on-device identifiers (`quiet-home-*`, `quiet-otbr-*`, `quiet-tizen-backups`)
+unchanged: existing installs, backups and restore scripts depend on them. The bundled tools/tv.py identity gate
 is still U8000F-only. The S90D uses the separately reviewed s90c-tools tv-access
 helper; do not substitute another model's firmware declaration to bypass a gate.
 

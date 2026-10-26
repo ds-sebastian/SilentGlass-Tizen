@@ -29,7 +29,7 @@ cat /tmp/quiet-home-live.conf | tr '\\n' ' '; echo
 app_launcher -k com.samsung.tv.bixby-promotion 2>&1 | tail -n 1; sleep 1
 app_launcher -s com.samsung.tv.bixby-promotion 2>&1 | tail -n 1; sleep 4; buxton2ctl get memory memory/appfw/current_fullscreen_appid | sed "s/.*= String: //"; grep -E "^style_conf=" /tmp/quiet-home-state.txt"""))
 elif cmd == "measure":
-    text = run(f"meas-{name}", r"""W=$(enlightenment_info -topvwins 2>&1 | awk '/Quiet Home/{print $2; exit}')
+    text = run(f"meas-{name}", r"""W=$(enlightenment_info -topvwins 2>&1 | awk '/SilentGlass Home|Quiet Home/{print $2; exit}')
 echo "win=$W fg=$(buxton2ctl get memory memory/appfw/current_fullscreen_appid | sed 's/.*= String: //')"
 echo "dvfs0=$(tr -d '\n' < /sys/kernel/debug/mali0/dvfs_utilization)"; s0=$(cut -d' ' -f1 /proc/uptime)
 winfo -fps -win_id $W > /tmp/qhfps.txt 2>&1 & p=$!

@@ -1,6 +1,6 @@
 # Samsung QN65S90DAFXZA (S90D, 2024 OLED)
 
-This fork's working target. Owner setup: **SHIELD TV Pro** (via the Q990D soundbar, HDMI 3) is the main
+SilentGlass-Tizen's tested TV. Owner setup: **SHIELD TV Pro** (via the Q990D soundbar, HDMI 3) is the main
 device, **Nintendo Switch** on HDMI 1; the TV's own apps are backups. The phases below carry backups,
 guarded inverses and hash checks. Recorded reboot checks apply to their tested phase/version;
 newer edits still need their own acceptance rather than inheriting a blanket reboot guarantee.
@@ -24,21 +24,22 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v25b)
+## SilentGlass Home (v26a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
-Version history and measurements: [quiet-home-changelog.md](quiet-home-changelog.md).
+Version history and measurements: [changelog.md](changelog.md). On the TV it keeps its original file names
+(`quiet-home-*`), so earlier installs and restore scripts keep working.
 
-![Quiet Home - Home page](../../docs/screenshots/s90d-home.jpg)
+![SilentGlass Home - Home page](../../docs/screenshots/s90d-home.jpg)
 
 *Home (v22a, night wallpaper). The SHIELD is on screen, so Watch is the wide 16:9 card and its live video plays
 inside it; the TV's video plane cannot be captured, so it shows black in screenshots. Tab bar with the Apps tab shown
 (the default).*
 
-![Quiet Home - Info page](../../docs/screenshots/s90d-info.jpg)
+![SilentGlass Home - Info page](../../docs/screenshots/s90d-info.jpg)
 
-*Info (v25b): status cards on top, Quiet Home's settings below (here with the Apps tab hidden and Dim when idle off).
+*Info (v25b): status cards on top, SilentGlass Home's settings below (here with the Apps tab hidden and Dim when idle off).
 LAN address blurred.*
 
 ### Pages
@@ -73,7 +74,7 @@ reboot): `squircle=0|1`, `vsync=N` (render every Nth vsync, 1 = 60 fps), `herofa
 New York), `bench=N` (redraw every frame for N s), `enabled=0` (no preview), `scrim=0` (no band behind the words).
 
 The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: build it with
-`tools/make_wallpapers.py DAY.jpg NIGHT.jpg`; without it Quiet Home uses the gradient wallpaper. (The screenshots
+`tools/make_wallpapers.py DAY.jpg NIGHT.jpg`; without it SilentGlass Home uses the gradient wallpaper. (The screenshots
 above show it.)
 
 ### How it works
@@ -100,7 +101,7 @@ above show it.)
     `ForceUpdateVideoGeometry(x,y,w,h)` give the plane a covering 16:9 rect; overflow hides behind the opaque UI and
     the HW clips the off-screen part with a matching source crop (seen: src 3423x2160 -> dst 887x560);
   - the TV can leave the main video muted while tv-viewer is backgrounded (black but correctly placed plane after
-    Quiet Home restarted mid-preview): `IAVControl.MuteVideo(0)` on attach, as Channel List does.
+    SilentGlass Home restarted mid-preview): `IAVControl.MuteVideo(0)` on attach, as Channel List does.
   Verify without looking: `enlightenment_info -hwc_wins` lists the `VD` plane's `dst_pos` (e.g. `1100x0560+0100+0170`
   for the Watch card); `enlightenment_info -dump topvwins DIR` dumps the UI layer (the hole is alpha 0; video is not
   captured). Tunables: see *Settings* below.
@@ -108,7 +109,7 @@ above show it.)
   `powerState` is deliberately not shown: on this TV the on-screen SHIELD reports Off (devices behind the soundbar,
   empty CEC device list).
 - **Ambient**: one press to `org.tizen.art-app`. The Art app grabs Home and always opens Samsung Home
-  (`ReturnType.Home` -> CSFS, hard-coded); Quiet Home watches `memory/appfw/current_fullscreen_appid` and brings
+  (`ReturnType.Home` -> CSFS, hard-coded); SilentGlass Home watches `memory/appfw/current_fullscreen_appid` and brings
   itself back on that one hand-off.
 
 Source: `launcher/src/Home*.cs` (partials: Controls, Inputs, Info, Idle, State). Latency rules are enforced by
@@ -128,7 +129,7 @@ verifies every file) and `restore-v(N-1).sh`. Build with `python3 tools/build.py
 | boot-units/quiet-recog-off | owner user-systemd watcher stopping content recognition (later boot targets restart it) | recog-boot-restore.sh |
 | cleanup/batchd | SHIELD does everything: Prime Video, Apple TV, web browser **uninstalled**; TV YouTube and Samsung Home media rows disabled (cast to SHIELD's Chromecast; AirPlay unaffected); janitor unit removed | batchd-restore.sh (store apps: reinstall from Samsung Apps) |
 | boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background | batchd-restore.sh |
-| thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; Quiet Home Info switch ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
+| thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; SilentGlass Home Info switch ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
 
 Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
@@ -142,7 +143,7 @@ SmartThings/OTBR components are kept (the TV is a Thread border router on the ho
 ## Pi side (pi/)
 
 `s90d_drift_check.py` + `s90d_expected.json` (set `tv`): weekly read-only check of firmware, Home/startup apps,
-vendor markers, disabled apps, Quiet Home DLL hash, boot units and recognition. Prints nothing when all is well
+vendor markers, disabled apps, SilentGlass Home DLL hash, boot units and recognition. Prints nothing when all is well
 (cron watchdog pattern); reports only after 3 consecutive unreachable runs.
 
 `thread_dataset.py`: saves Home Assistant's preferred Thread dataset to a private file for `otbr-join.sh`.

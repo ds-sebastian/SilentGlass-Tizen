@@ -68,7 +68,7 @@ public sealed partial class QuietHome
  {
   var (x,y)=SetCell(n);
   var card=Card(x,y,SetW,SetH,clear,30);AddGlass(card,0,x,y,30,tint:.03f,shadow:0,shadowY:0,blur:8,focusShadow:0);
-  card.Add(Label("Quiet Home "+StyleVersion.Replace("liquid-",""),28,22,SetW-56,42,26,muted,"Semibold"));
+  card.Add(Label("SilentGlass Home "+StyleVersion.Replace("liquid-",""),28,22,SetW-56,42,26,muted,"Semibold"));
   card.Add(Label("Liquid Glass · "+60/style.Vsync+" fps · nothing sent anywhere",28,64,SetW-56,34,22,neutral));
  }
 
@@ -88,8 +88,8 @@ public sealed partial class QuietHome
    infoMarkers<0?null:infoMarkers+" of "+marks,infoDisabled<0?null:infoDisabled+" of "+apps,InfoStats.SdbListening()?"SDB open":"Closed");
 
   // Network: how the TV is connected; the live rate with a small sparkline along the bottom
-  netCard=StatusCard(1,"Network","network","Address","Speed","Now");
   bool wifi=infoIface.StartsWith("wlan");
+  netCard=StatusCard(1,"Network",wifi?"network":"wired","Address","Speed","Now");
   string link=route==null?"Offline":wifi?"Wi-Fi":"Wired";
   string detail=route==null?null:wifi?(InfoStats.WifiLevel(infoIface) is int dbm?dbm+" dBm":null):InfoStats.LinkSpeed(infoIface);
   // one short word up top; details in rows (rates as one combined number so nothing is ever cut off)
@@ -113,7 +113,7 @@ public sealed partial class QuietHome
    MemText(InfoStats.Memory()),lastCpuText!=null&&!fresh?lastCpuText:"Measuring…");
 
   // Quiet Home's own settings (saved in the app's data directory: they survive reboots)
-  Text("Quiet Home",108,SetY-50,600,40,26,muted,"Semibold");
+  Text("SilentGlass Home",108,SetY-50,600,40,26,muted,"Semibold");
   int n=0;
   SettingTile(n++,"Apps tab","Samsung apps and Home","apps","toggle:apps",!prefs.HideApps);
   SettingTile(n++,"Live preview","Video in the input card","picture","toggle:live",prefs.Live);

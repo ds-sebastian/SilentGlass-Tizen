@@ -1,8 +1,13 @@
-# Quiet Home on the S90D - changelog
+# SilentGlass Home - changelog
+
+The launcher was called Quiet Home (the name inherited from Quiet Tizen) until the SilentGlass-Tizen rename; older
+entries keep that name.
 
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v26a (SilentGlass-Tizen)**: the fork is renamed SilentGlass-Tizen and the launcher SilentGlass Home (window
+  title, Info heading and About tile; on-TV file names unchanged). Network card shows a wired glyph on Ethernet.
 - **v25b (Info overhaul)**: four status cards (Privacy / Network / Thread / This TV: coloured glyph disc + one word,
   details below, small sparkline in Network; not focusable) and a grid of Quiet Home settings: Apps tab, Live
   preview, Dim when idle, Wallpaper (Auto / Day / Night), Thread border router (where installed). Settings are

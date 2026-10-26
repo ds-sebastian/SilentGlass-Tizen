@@ -11,7 +11,7 @@ project. Accurate context helps reviewers; euphemisms do not change permissions.
 
 | Track | Read first | Access tooling | Compatibility boundary |
 | --- | --- | --- | --- |
-| This fork's QN65S90D | [S90D record](../devices/s90d/README.md), then this guide | Separately checked-out `s90c-tools` / `tv-access` | Match exact model, firmware, architecture and runtime; see the S90D record |
+| SilentGlass-Tizen's QN65S90D | [S90D record](../devices/s90d/README.md), then this guide | Separately checked-out `s90c-tools` / `tv-access` | Match exact model, firmware, architecture and runtime; see the S90D record |
 | Original U8000F case study | [Inventory](01-inventory.md), [access](02-access.md), [cleanup](03-cleanup.md), [launcher](04-launcher.md), [recovery](09-recovery.md) | Bundled `tools/tv.py` | Its identity gate is for the original U8000F, not the S90D |
 | Another TV or firmware | Inventory and a new compatibility assessment | No inherited deployment authorization | A successful access check is not proof of safe cleanup, launcher or boot compatibility |
 

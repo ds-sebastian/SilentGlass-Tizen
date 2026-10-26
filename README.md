@@ -1,162 +1,135 @@
-# Quiet Tizen
+# SilentGlass-Tizen
 
-> **This fork** carries the work for a **Samsung QN65S90D (2024 OLED)**: a SHIELD-first Quiet Home (Liquid Glass
-> look at 60 fps, live video in the current input's card, on-TV settings), reversible privacy cleanup and boot units,
-> and a standalone **Thread border router** that joins your existing Thread network (Samsung's SmartThings hub can
-> only create its own). Start with [devices/s90d/README.md](devices/s90d/README.md) and
-> [devices/s90d/thread-border-router.md](devices/s90d/thread-border-router.md). The original U8000F case study
-> below is kept as the reference framework.
+**A calmer, more private Samsung Tizen TV with a Liquid Glass home screen - and a real Thread border router.**
 
-![Quiet Home on the S90D](docs/screenshots/s90d-home.jpg)
+SilentGlass-Tizen turns a Samsung **QN65S90D** (2024 OLED, Tizen) into a quiet display for the devices you actually
+use. Its own launcher, **SilentGlass Home**, puts your streaming box and console first, plays the current input live
+inside its card, and keeps the TV's apps one tab away. Underneath, it switches off the TV's recognition, voice,
+advertising and recommendation services - each change reversible - and runs the TV's built-in Thread radio as a
+border router on **your** smart-home network.
 
-## Start here: agent maintenance guide
+![SilentGlass Home](docs/screenshots/s90d-home.jpg)
 
-- [Agent walkthrough](docs/10-agent-workflow.md): choose the S90D/U8000F track,
-  inventory, prepare rollback, apply once, verify normal use and boot behavior.
-- [Access and persistence](docs/11-access-and-persistence.md): compare on-demand
-  access, owner boot tasks, host controllers and Couchroot administration.
-- [Upstream notes](docs/12-upstream-notes.md): pinned sources, useful tips,
-  compatibility limits and reported versus locally verified results.
-- [Phase record template](docs/templates/maintenance-phase.md): private evidence,
-  expected diff, inverse, unknown-outcome handling and acceptance checklist.
+*SilentGlass Home on the S90D. The SHIELD is on screen, so its card is the wide one with live video (the TV's video
+plane cannot be captured, so it shows black in screenshots).*
 
-This is owner-authorized maintenance of a local TV. Administrative commands can
-run as UID 0 (root); they do not remove SMACK or firmware restrictions. These guides
-use plain language without hiding the access mechanism or changing security boundaries.
-**The bundled `tools/tv.py` remains U8000F-gated.** The S90D track uses a separately
-reviewed external `tv-access`; do not reuse another model's identity to pass a check.
+## What you get
 
-## Original U8000F case study
+### SilentGlass Home - the launcher
 
-A practical, agent-readable guide to making a Samsung Tizen TV quieter and
-more useful as an HDMI display.
+- **Two big cards, no clutter**: *Watch* (e.g. an NVIDIA SHIELD) and *Play* (e.g. a Nintendo Switch). The input on
+  screen gets the wide 16:9 card with its **live picture**; status dots instead of words. Made to be obvious at a
+  glance for anyone in the house.
+- **Liquid Glass** at **60 fps**: one GPU shader for every glass surface (lensing, specular rims, soft shadows), a
+  day/night photo wallpaper that switches at local sunset, Apple continuous corners. Measured on the TV, not guessed.
+- **Live inputs**: plug something in and its card, the Inputs sheet and a short toast follow - no polling.
+- **Controls**: picture, sound, game mode, Pixel Shift, sleep timer, Bluetooth controllers and which input each card
+  opens, as large tiles with their current values.
+- **Info**: four status cards - Privacy, Network, Thread, This TV - and the launcher's settings: hide the Apps tab,
+  live preview, dim when idle (OLED care), wallpaper mode and the Thread border router. Saved on the TV; they survive
+  reboots.
 
-This project documents work performed on one **Samsung UN75U8000FFXZA (2025
-U8000F)**. It includes **Quiet Home**, a native launcher with a colorful,
-English-language interface, lightweight settings, local app cards and a
-shortcut to native Bluetooth controller pairing.
+![Info page](docs/screenshots/s90d-info.jpg)
 
-![Quiet Home layout illustration](docs/quiet-home-preview.svg)
+### Privacy and cleanup
 
-*Layout illustration with the public text-only app cards. Input labels are configurable.*
+Measured, targeted and reversible, never a blanket "remove everything" list:
 
-It also includes targeted cleanup profiles, source-build tools and rollback
-recipes. **It is a working case study with a reusable toolkit, not a universal
-installer or a replacement operating system.**
+- **Content recognition (ACR)** and its databases off, with a boot watcher that keeps it off.
+- **Voice assistants** - Bixby, Alexa, far-field and on-device voice, wake-word engines - disabled.
+- **Advertising and recommendations** - targeted ads, TV Plus, voice "suggestions", AI companion, Samsung Home media
+  rows - disabled; apps your streaming box replaces (Prime Video, Apple TV, the web browser) uninstalled.
+- 26 apps disabled and 10 vendor services blocked in total; the Info page checks every one of them, every time.
+- Each phase ships with a first-run backup, a guarded inverse script and hash checks.
 
-## Give this repository to your coding agent
+What still works: every HDMI input, eARC/soundbar, Ambient/Art mode, AirPlay, "power on with mobile", IP remote
+control, network and Bluetooth settings. See [devices/s90d/README.md](devices/s90d/README.md) for the full list and
+what was deliberately left alone.
 
-Clone the repository, open it in your coding assistant, and use:
+### Thread border router
 
-> Read AGENTS.md and docs/10-agent-workflow.md. Work only on the local TV I identify.
-> Select the correct device record and compatible helper before contacting it.
-> Inventory first, preserve the features I use, and prepare a narrow inverse before
-> changing anything. Distinguish stored settings, boot tasks and root reacquisition.
-> Use the pinned upstream notes as references, not automatic installation recipes.
-> Report actual readbacks and separately mark reboot, standby and recovery tests.
+The S90D has a Thread/Zigbee radio for Samsung's SmartThings hub, which can only create its *own* Thread network.
+SilentGlass runs the radio with OpenThread as a standalone **border router that joins your existing network** - Home
+Assistant, Apple Home, Google Home or any OTBR - or forms a new one if you have none. Matter-over-Thread devices get
+one more router in the living room, with the SmartThings hub left off.
 
-For reproducing the original U8000F case study, the more specific prompt is:
+- One script to join (`otbr-join.sh`); a helper pulls Home Assistant's preferred network into a private file.
+- On/off switch on the Info page; the choice holds across reboots.
+- Uses whichever connection the TV is online through (tested wired); no Samsung system files changed; full uninstall.
 
-> Read README.md and AGENTS.md, then inspect the documentation before touching
-> my TV. Help me reproduce Quiet Tizen on a TV I own. First identify its exact
-> model, firmware and runtime, compare them with the tested profile, and show
-> me any compatibility gaps. Keep HDMI, sound, networking, Bluetooth and
-> accessibility working. Prefer HDMI and minimize smart features; keep the
-> streaming apps I choose. Back up my actual settings and prepare rollback
-> before each change. Install and verify Quiet Home before assigning it to
-> Home/startup or replacing the slow settings sidebar. Use the measured
-> findings and known limitations rather than assuming every package is spyware
-> or promising a particular speed improvement.
+Guide: [devices/s90d/thread-border-router.md](devices/s90d/thread-border-router.md).
 
-If your TV differs, begin with an inventory. A matching brand, year, Tizen
-version or successful admin-access check is **not** enough to establish launcher or
-cleanup compatibility.
+## Tested hardware
 
-## What is here
+| TV | Firmware | Track |
+|---|---|---|
+| Samsung **QN65S90DAFXZA** (S90D, 2024 OLED) | `T-PTMDAKUC-0090-REL-202605141701` | SilentGlass: launcher, privacy, Thread - [devices/s90d](devices/s90d/README.md) |
+| Samsung UN75U8000FFXZA (U8000F, 2025) | `T-KSU2EFAKUC-0090-1300.9` | inherited Quiet Tizen toolkit - [case study](docs/u8000f-case-study.md) |
 
-| Component | What it does |
+Everything here was done on one owner's TV. Another model or firmware needs its own inventory first: a matching brand,
+year or Tizen version is not enough to establish compatibility.
+
+## How it changes the TV
+
+- **Owner-authorized, local and reversible.** Administrative commands run as root through a separately reviewed
+  per-command helper; that does not remove Samsung's SMACK sandbox or firmware protections, and nothing here tries to.
+- **No TV firmware is flashed** and no bootloader, partition or SDB key is touched. The one exception is the Thread
+  radio's application image, switched between images Samsung ships on the TV, with Samsung's own flasher and only
+  with the owner's approval.
+- **The launcher replaces a stock app in place** (Samsung's Bixby promotion app) and is set as the Home handler;
+  power-on still goes to the last input. Restore scripts put the original back.
+- **Persistence uses the owner's own systemd user units** - no system services are modified.
+
+## Getting started
+
+Give the repository to your coding agent:
+
+> Read README.md, AGENTS.md and docs/10-agent-workflow.md. Work only on the TV I identify. Inventory it first and
+> compare it with the tested profile in devices/s90d. Preserve the features I use, prepare a narrow inverse before
+> changing anything, apply one phase at a time and report what the TV actually reads back - separately for reboot,
+> standby and recovery.
+
+Then, in order: [agent walkthrough](docs/10-agent-workflow.md) -> [access and persistence](docs/11-access-and-persistence.md)
+-> [S90D record](devices/s90d/README.md) -> [recovery](docs/09-recovery.md).
+
+## Repository map
+
+| Path | What |
 |---|---|
-| [Quiet Home source](launcher/src/Home.cs) | Native .NET/NUI home, HDMI cards, app library and quick settings |
-| [App catalog](launcher/assets/apps.json) | Example shortcuts for Netflix, YouTube, Prime Video, HBO Max, Disney+, Hulu, Spotify, Apple TV, Tubi, Luna and Xbox |
-| [Artwork tools](docs/06-artwork.md) | Vector/high-resolution artwork sources, optional local downloads and retained image views |
-| [Cleanup profile](profiles/un75u8000ffxza-1300.9.json) | Separately selectable advertising, voice, context, smart-extras, sidebar and TV Plus groups |
-| [Cleanup planner](tools/plan_cleanup.py) | Field-specific apply/restore SQL generated from your own fresh snapshot |
-| [Access helper](tools/tv.py) | Explicit-target SDB preflight, temporary authenticated admin access, bounded transfers and session cleanup checks |
-| [Recipes](recipes) | Snapshot, stop-marker, launcher, settings-bridge and restoration scripts |
-| [Evidence](evidence/observations.json) | Sanitized observations and the limits of what was verified |
-
-Quiet Home uses Tizen's existing display, audio, HDMI and application stack.
-It can become the default Home/startup experience; Samsung's underlying OS
-continues to run. The TV does not need a laptop running after installation.
-Admin access is reacquired from the computer when maintenance requires it.
-
-## Tested scope and current status
-
-| Item | Recorded result |
-|---|---|
-| Model | `UN75U8000FFXZA` |
-| Firmware | `T-KSU2EFAKUC-0090-1300.9` |
-| Platform | Tizen 9.0, Linux 5.4.261, ARMv7; .NET runtime 6.0.9 |
-| Temporary admin access | Authenticated UID/EUID 0; session staging cleaned; passwd/SDB key unchanged |
-| Home/startup | Quiet Home launch verified after a full restart |
-| Inputs and everyday controls | HDMI switching, volume and mute verified; native settings remain available |
-| Controller | Native DualSense pairing and launcher navigation verified |
-| Cleanup | Package flags and selected service-stop conditions checked; a subset survives restart |
-| App preloading | Vendor refreshes can restore the preference; no permanent enforcement daemon |
-| Netflix | More available memory after closing background apps; perceived input lag **not yet confirmed fixed** |
-
-The native launcher and underlying techniques were exercised on that TV.
-The **generalized scripts in this public release were checked locally and
-compiled where applicable; they have not been replayed end-to-end on a second
-TV**. This matters especially for private Samsung APIs and registry schemas.
-
-## Walkthrough
-
-1. [Understand compatibility and inventory the TV](docs/01-inventory.md).
-2. [Enable Developer Mode and check temporary access](docs/02-access.md).
-3. [Take snapshots and apply selected cleanup](docs/03-cleanup.md).
-4. [Build, install and assign Quiet Home](docs/04-launcher.md).
-5. [Pair a DualSense using the TV's Bluetooth support](docs/05-controller.md).
-6. [Customize apps, fetch artwork and keep it preloaded](docs/06-artwork.md).
-7. [Diagnose slow streaming apps without overclaiming](docs/07-performance.md).
-8. [Understand privacy findings](docs/08-privacy.md).
-9. [Restore the original experience](docs/09-recovery.md).
-
-Read [AGENTS.md](AGENTS.md) before using the tools. TV commands require a
-specific address and a verified firmware declaration. All downloaded
-proprietary references, local artwork, snapshots and session records stay
-under ignored paths.
+| [launcher/](launcher/src) | SilentGlass Home (.NET 6 / Tizen NUI): `Home*.cs` partials, `HomeLogic.cs` (pure, unit-tested), assets |
+| [devices/s90d/](devices/s90d/README.md) | the S90D record: launcher deploy scripts, privacy and cleanup phases, boot units, Thread border router, Pi-side drift check, benchmarks |
+| [docs/](docs) | agent workflow, access/persistence, upstream notes, and the inherited U8000F guides (01-09) |
+| [tests/](tests) | offline tests: launcher source rules, Thread recipe integrity, catalog and logic checks in C# |
+| [tools/](tools) | build (`tools/build.py launcher`), wallpaper builder, artwork and cleanup planners |
+| profiles/, recipes/, evidence/ | the U8000F track inherited from Quiet Tizen |
 
 ## Development
 
-Host tools use Python 3.12+ and the standard library. Raster artwork conversion
-optionally uses Pillow. Source builds use the .NET 6 SDK to match the tested
-TV; it is an older SDK and should be isolated from unrelated projects.
-Install Samsung's SDB separately.
-
 ```sh
-python3 -m unittest discover -s tests -v
-python3 tools/build.py payloads
-# After obtaining the four private Tizen reference assemblies:
-python3 tools/build.py launcher --framework .local/tv-framework
+python3 -m unittest discover -s tests            # offline: source rules, Thread recipe, scripts
+python3 tools/build.py launcher --framework .local/tv-framework   # needs the TV's private reference assemblies
+dotnet run --project tests/CatalogTests.csproj -c Release -- .local/package/quiet-home/apps.json
 ```
 
-The included GitHub Actions workflow defines offline tests, open-source access
-component builds and app-catalog checks; its presence does not prove checks ran
-on a particular fork or commit. Two device-specific tests skip when their ignored
-private inputs are absent; public catalog and offline logic checks still run.
-The NUI launcher build needs matching Samsung reference assemblies and is
-not built from redistributed SDK files.
+The launcher builds with the .NET 6 SDK against reference assemblies copied from your own TV (never redistributed).
+Deploys go through versioned `update-vN.sh` / `restore-v(N-1).sh` pairs that verify every file.
 
-## Credits
+## Lineage and credits
 
-The visual design adapts [Free My TV](https://github.com/simbasjungles/free-my-tv);
-the temporary archive-launcher access route comes from
-[samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root).
-This is a native Tizen port of the visual approach, not an installation of
-the Android launcher. See [NOTICE.md](NOTICE.md) and
-[provenance](docs/provenance.md) for exact commits, licenses and local changes.
+SilentGlass-Tizen began as a fork of [Quiet Tizen](https://github.com/jss8649/quiet-tizen) (commit `cf518d7`, MIT),
+whose U8000F launcher, reversible-cleanup method and agent workflow it builds on; that track is kept in
+[docs/u8000f-case-study.md](docs/u8000f-case-study.md). New here: the S90D port, the SilentGlass Home launcher and its
+Liquid Glass renderer, live input previews, the wider privacy phases with boot watchers, the Thread border router
+and the on-TV settings.
 
-Original project code is MIT-licensed. Third-party fonts, symbols and access
-code retain their own licenses. No Samsung firmware, stock app binaries,
-private TV backups or publisher app artwork is included.
+Also: the original visual approach adapts [Free My TV](https://github.com/simbasjungles/free-my-tv); the temporary
+access route comes from [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root). Fonts (Inter, OFL) and
+symbols (Material Symbols, Apache 2.0) keep their licenses. Exact commits and terms: [NOTICE.md](NOTICE.md),
+[provenance](docs/provenance.md).
+
+Not affiliated with Samsung, NVIDIA, Nintendo, Apple, Google, the Thread Group or any streaming service. Code is
+MIT-licensed ([LICENSE](LICENSE)).
+
+> **Internal names.** On the TV, files keep their original identifiers (`quiet-home-*` state and settings files,
+> `quiet-otbr-*` units, `/opt/usr/share/quiet-tizen-backups/`) so existing installs, backups and restore scripts keep
+> working. Only the visible name changed.

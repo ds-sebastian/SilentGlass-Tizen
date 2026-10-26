@@ -61,7 +61,7 @@ public sealed partial class QuietHome : NUIApplication
   // Samsung Home lives on the Apps page (not on Home); keep it before the "Get more apps" utility.
   if(!library.Exists(a=>a.Id=="com.samsung.tv.csfs")){int at=library.FindIndex(a=>a.Utility);var sh=new LibraryApp{Name="Samsung Home",Id="com.samsung.tv.csfs",Asset="tile-samsung-home.svg",Description="Samsung's home screen",Fit="cover",Background="#1C2638",Width=640,Height=360};if(at<0)library.Add(sh);else library.Insert(at,sh);}
   Window.Default.BackgroundColor=new Color(0,0,0,1);
-  Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
+  Window.Default.Title="SilentGlass Home";Window.Default.KeyEvent+=OnKey;
   style=ReadStyleConf();prefs=LoadPrefs();try{NUIApplication.SetRenderRefreshRate((uint)style.Vsync);}catch{}BuildChrome();
   PreloadArtwork();
   RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();

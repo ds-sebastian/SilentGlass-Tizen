@@ -6,7 +6,7 @@ from pathlib import Path
 
 SC = Path("/home/dietpi/.hermes/cache/scratch"); OBS = Path("/home/dietpi/opt/samsung-tv-lab/observations/tv-cleanup-20261024")
 name = sys.argv[1]; n = int(sys.argv[2]) if len(sys.argv) > 2 else 3
-body = r"""W=$(enlightenment_info -topvwins 2>&1 | awk '/Quiet Home/{print $2; exit}')
+body = r"""W=$(enlightenment_info -topvwins 2>&1 | awk '/SilentGlass Home|Quiet Home/{print $2; exit}')
 echo "win=$W fg=$(buxton2ctl get memory memory/appfw/current_fullscreen_appid | sed 's/.*= String: //')"
 echo "dvfs0=$(tr -d '\n' < /sys/kernel/debug/mali0/dvfs_utilization)"
 i=1; while [ $i -le N ]; do

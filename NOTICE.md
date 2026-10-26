@@ -1,5 +1,9 @@
 # Attribution and distribution
 
+SilentGlass-Tizen is a fork of [Quiet Tizen](https://github.com/jss8649/quiet-tizen), commit
+`cf518d7a9278dca7990e27756218258e44044a29`, copyright 2026 Quiet Tizen contributors, MIT (kept in `LICENSE`).
+"Quiet Home" below is the launcher as inherited; this fork's launcher is SilentGlass Home.
+
 Quiet Home is a native Tizen .NET/NUI implementation. Its layout measurements,
 palette, dock proportions and focus treatment adapt
 [Free My TV](https://github.com/simbasjungles/free-my-tv/tree/73409804e5085e720dccea9ab95078a515cae098),

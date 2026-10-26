@@ -1,4 +1,4 @@
-# Contributing
+# Contributing to SilentGlass-Tizen
 
 Useful contributions are new compatibility reports, corrections to observed
 behavior, small reviewed recipes and improvements to the native launcher.
