@@ -57,18 +57,19 @@ public sealed partial class QuietHome
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemDataListVisible(string id,string value,out bool visible);
  // Options the TV reports as enabled AND visible for the current input; numeric values only
  // (the native list can end with garbage bytes).
- List<string> AvailableOptions(string id){
+ List<string> AvailableOptions(string id,bool visibleOnly=true){
   var result=new List<string>();var sb=new System.Text.StringBuilder(32768);
   try{if(!CSharpGetItemDataList(id,sb))return result;}catch{return result;}
   foreach(var entry in sb.ToString().Split(';')){
    int c=entry.IndexOf(',');string v=c<0?entry:entry.Substring(0,c);
    if(v.Length==0||v.Length>9||!int.TryParse(v,NumberStyles.None,CultureInfo.InvariantCulture,out _))continue;
-   try{if(CSharpGetItemDataListEnable(id,v,out var en)&&en&&CSharpGetItemDataListVisible(id,v,out var vis)&&vis&&!result.Contains(v))result.Add(v);}catch{}
+   try{if(CSharpGetItemDataListEnable(id,v,out var en)&&en&&(!visibleOnly||CSharpGetItemDataListVisible(id,v,out var vis)&&vis)&&!result.Contains(v))result.Add(v);}catch{}
   }
   return result;
  }
  void CycleSetting(string id,int dir=1){
-  RefreshSettings();var options=AvailableOptions(id);
+  // Game Mode's item is marked hidden in this menu context though its values (Auto, On, Off) all apply
+  RefreshSettings();var options=AvailableOptions(id,id!="game-mode-auto");
   if(options.Count<2){ShowError("No other options are available for the current input.");return;}
   int i=options.IndexOf(SettingValue(id));SetSetting(id,options[((i<0?0:i)+dir+options.Count)%options.Count]);
  }

@@ -148,6 +148,26 @@ def controls(focus=0):
     return f'<div class="dimr"></div><div class="glass cc" style="left:{CC_X}px;top:{(1080-h)//2}px;width:{CC_W}px;height:{h}px">{"".join(out)}</div>'
 
 
+# ---- notification banner (Home.Notice.cs) ----
+NOTICE_W = {"small": 420, "medium": 520, "large": 640, "max": 800}
+NOTICE_MARGIN, NOTICE_R, NOTICE_PAD, NOTICE_TEXT_PAD = 56, 36, 14, 26
+
+
+def notice(img, size, pos, title, msg, aspect=0.75):
+    w = NOTICE_W[size]
+    iw = w - 2 * NOTICE_PAD
+    ih = int(iw * min(max(aspect, 9 / 16), 3 / 4)) if img else 0
+    # text block height is measured by the browser; position with CSS from the chosen corner
+    side = "right" if "right" in pos else "left"
+    vert = "bottom" if "bottom" in pos else "top"
+    image = (f'<div style="margin:{NOTICE_PAD}px {NOTICE_PAD}px 0;height:{ih}px;border-radius:{NOTICE_R - NOTICE_PAD}px;'
+             f'background:url({uri(img)}) center/cover"></div>') if img else ""
+    return (f'<div class="abs" style="{side}:{NOTICE_MARGIN}px;{vert}:{NOTICE_MARGIN}px;width:{w}px;border-radius:{NOTICE_R}px;'
+            f'background:rgba(26,26,30,.9);box-shadow:inset 0 0 0 1.5px {EDGE},0 18px 50px rgba(0,0,0,.35)">{image}'
+            f'<div style="padding:{20 if img else 24}px {NOTICE_TEXT_PAD}px 24px"><div style="font-weight:600;font-size:30px;line-height:1.2">{html.escape(title)}</div>'
+            f'<div style="font-weight:500;font-size:25px;line-height:1.3;opacity:.72;margin-top:4px">{html.escape(msg)}</div></div></div>')
+
+
 INPUTS_X = 0  # set after measuring the bar
 
 
@@ -161,7 +181,11 @@ def main():
     apps.append({"Name": "Samsung Home", "Asset": "tile-samsung-home.svg", "Background": "#1C2638"})
     global INPUTS_X
     INPUTS_X = 960 - 150  # approximate centre of "Inputs" in the mock bar
-    pages = {"bar": bar(0), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
+    sample = ROOT / ".local/notice-mock/sample.jpg"
+    pages = {"notice": notice(sample if sample.exists() else None, "large", "bottom-right", "Doorbell",
+                              "A person was detected on the Doorbell camera in the Porch.")
+             + notice(None, "medium", "top-right", "Washer", "The laundry is done."),
+             "bar": bar(0), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
     for name, body in pages.items():
         (out / f"{name}.html").write_text(page(name, body, bg))
         subprocess.run(["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",

@@ -16,14 +16,53 @@ built-in MQTT 3.1.1 client. It runs as the TV's owner user from a systemd user u
 | `number.<tv>_brightness`, `number.<tv>_contrast` | picture settings (the TV's own ranges, 0-50) |
 | `select.<tv>_picture_mode`, `select.<tv>_sound_mode` | only the modes the TV offers right now (they change with the input and the soundbar) |
 | `select.<tv>_sound_output` | TV Speaker / Soundbar |
-| `select.<tv>_sleep_timer`, `switch.<tv>_game_mode` | |
-| `sensor.<tv>_app` | foreground app: SilentGlass Home, Ambient, Samsung Home, or the input's name while watching it |
+| `select.<tv>_sleep_timer` | |
+| `select.<tv>_game_mode` | Automatic / Always / Never - the TV's one Game Mode setting (Auto / On / Off). Bridge 2.0-2.1 had a switch that drove the value which only mirrors whether Game Mode is engaged |
+| `switch.<tv>_notifications` | banners on the TV (see Notifications); off drops them |
+| `sensor.<tv>_app` | foreground app: SilentGlass Home, Ambient, Samsung Home, or the input's name while watching it (also while SilentGlass only shows a banner over it) |
 | `sensor.<tv>_thread_role` | router / child / leader / detached / off (only if the border router is installed) |
 | `switch.<tv>_thread_border_router` | same as the Info switch; survives reboots |
 | `button.<tv>_home`, `button.<tv>_ambient` | open SilentGlass Home / Ambient |
 | `sensor.<tv>_chip_temperature`, `sensor.<tv>_free_memory` | diagnostics |
 
 The device shows as unavailable only when the TV is unplugged or rebooting (retained MQTT last will).
+
+## Notifications
+
+Home Assistant can show notifications **on the TV itself, over whatever input is on screen** (SHIELD, the Switch,
+an app), as a tvOS-style banner from SilentGlass Home - with the picture (a Frigate snapshot, a doorbell frame), title
+and message. The bridge speaks the protocol of the *Notifications for Android TV* app, so the TV is added with Home
+Assistant's built-in integration and every existing automation works unchanged:
+
+1. Settings > Devices & services > Add integration > **Notifications for Android TV / Fire TV**, host = the TV's
+   address. This makes a `notify.android_tv_fire_tv_<address>` action (and a notify entity).
+2. Use it directly, or put it in a notify group (`platform: group`) that your automations already target - e.g. the
+   SgtBatten Frigate blueprint's *notify group* with its TV options (`tv_position`, `tv_size`, `tv_duration`).
+
+What is honoured: `title`, `message`, `data.image` (URL or path; Home Assistant downloads it and sends the bytes - JPEG,
+PNG, GIF, WebP), `data.duration` (seconds, 3-60 on screen), `data.position` (bottom-right, bottom-left, top-right,
+top-left, center) and `data.fontsize` (small / medium / large / max = the banner width). `transparency`, `color` and
+`interrupt` are accepted and ignored: the banner never takes the remote, and its glass is always readable.
+
+Rules:
+- **Never wakes the TV.** In standby a notification is dropped (Home Assistant still gets *OK*); so is one while
+  Ambient is up, or while `switch.<tv>_notifications` is off.
+- A newer notification replaces the one on screen.
+- Accepted only from the MQTT broker's host (normally Home Assistant's machine) and the addresses in `notify_from=`
+  of `silentglass-ha.conf`; anything else is refused. Port 7676, one request per connection, at most 12 MB.
+- The banner is SilentGlass's own small notification-level window that never takes focus; the video is not touched.
+
+How it travels: the bridge writes the image and `notice.json` into SilentGlass Home's data folder (the app's own
+SMACK label, so the app may read them); the running app picks it up at once with a file watcher and deletes it as the
+acknowledgement. SilentGlass is closed whenever the TV goes to standby, so the first notification after power-on
+finds it not running: the bridge then starts it with `quiet_notice=1`, and it starts **hidden** (no flash, the viewer
+stays in front, ~1 s later the banner appears). It is only started like that over the TV viewer (inputs); over another
+app it would push that app to the background, so the notification is dropped there instead and logged.
+
+Checked on the TV: dropped in standby (no wake); shown on a cold start (SilentGlass started hidden) and from the
+watcher; remote focus stayed on the viewer (`enlightenment_info -topvwins` Foc column), the HDMI signal never dropped,
+and Home still opened the bar afterwards. Off the TV, `tests/test_s90d_notice.py` runs Home Assistant's own client
+library (notifications-android-tv 0.1.5) against the bridge's request reader and parser (`tests/notice-harness`).
 
 ## Input names
 

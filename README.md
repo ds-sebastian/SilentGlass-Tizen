@@ -46,6 +46,12 @@ plane itself cannot be captured).*
 
 *Inputs opens above its bar item; Controls is a panel on the right, so the picture stays in view while it changes.*
 
+
+![Notification over the picture](docs/screenshots/s90d-notice.jpg)
+
+*A Home Assistant notification (a Frigate-style doorbell snapshot), captured from the TV's banner window and composited
+over a stand-in photo.*
+
 ![Info page](docs/screenshots/s90d-info.jpg)
 
 ### Privacy and cleanup
@@ -70,6 +76,10 @@ The TV shows up in Home Assistant by itself (MQTT discovery): power, the input o
 inputs (by the TV's own input names, renamable from Home Assistant, with an HDMI-CEC resync for stale names), volume,
 mute, brightness, contrast, picture and sound mode, sound output, sleep timer, game mode, the foreground app, the
 Thread router's role and switch, Home and Ambient buttons, and chip temperature. A small owner service with a fixed set of commands; your broker credentials stay on the TV.
+
+**Notifications on any input**: add the TV with Home Assistant's *Notifications for Android TV* integration and your
+notifications (Frigate snapshots, the doorbell) appear as a tvOS-style banner over whatever is on screen - SHIELD, a
+console or an app - without taking the remote. They never wake the TV.
 Guide: [devices/s90d/ha-bridge.md](devices/s90d/ha-bridge.md).
 
 ### Thread border router

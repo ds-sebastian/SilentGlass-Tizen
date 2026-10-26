@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,13 +16,15 @@ using System.Threading;
 // fixed set of commands. Runs as the TV's owner user (not root). Minimal MQTT 3.1.1 client, no dependencies.
 // Config: /opt/usr/home/owner/.config/silentglass-ha.conf (mode 600): host, port, user, password, optional name.
 // Input names come from the TV itself (renamable from Home Assistant). Log (events only): /run/user/5001/silentglass-ha.log
+// Notifications: Home Assistant's "Notifications for Android TV" integration can send to the TV (port 7676, accepted
+// only from the broker's host and notify_from= addresses); SilentGlass shows them as a banner on any input.
 static class Bridge
 {
     const string Base = "silentglass/s90d", Node = "silentglass_s90d";
     const string Launcher = "com.samsung.tv.bixby-promotion", ArtApp = "org.tizen.art-app";
     const string Data = "/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data";
     const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    const string Version = "2.1";
+    const string Version = "2.2";
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf;
     static Mqtt mqtt;
@@ -198,14 +201,14 @@ static class Bridge
     public static List<(string value, string name)> ParseOptions(string list) =>
         (list ?? "").Split(';').Select(e => e.Split(',', 2)).Where(p => p.Length == 2 && p[0].Length is > 0 and < 10 && p[0].All(char.IsDigit) && p[1].Trim().Length > 0)
             .Select(p => (p[0], p[1].Trim())).ToList();
-    static List<(string value, string name)> Options(string id)
+    static List<(string value, string name)> Options(string id, bool visibleOnly = true)
     {
         lock (tv) {
             var sb = new StringBuilder(32768);
             try { if (!CSharpGetItemDataList(id, sb)) return new(); } catch { return new(); }
             var all = ParseOptions(sb.ToString()); var r = new List<(string, string)>();
             foreach (var o in all)
-                try { if (CSharpGetItemDataListEnable(id, o.value, out var en) && en && CSharpGetItemDataListVisible(id, o.value, out var vis) && vis && !r.Any(x => x.Item2 == o.name)) r.Add(o); } catch { }
+                try { if (CSharpGetItemDataListEnable(id, o.value, out var en) && en && (!visibleOnly || CSharpGetItemDataListVisible(id, o.value, out var vis) && vis) && !r.Any(x => x.Item2 == o.name)) r.Add(o); } catch { }
             return r;
         }
     }
@@ -215,6 +218,9 @@ static class Bridge
         return (dmin, dmax);
     }
     static readonly (string value, string name)[] Outputs = { ("0", "TV Speaker"), ("2", "Soundbar") };
+    // Game Mode is one three-way setting (game-mode-auto: Auto / On / Off); "game-mode" only mirrors whether it is engaged
+    public static string GameName(string tvName) => tvName switch { "Auto" => "Automatic", "On" => "Always", "Off" => "Never", _ => tvName };
+    static List<(string value, string name)> GameOptions() => Options("game-mode-auto", false).Select(o => (o.value, GameName(o.name))).ToList();
     static string OptionName(List<(string value, string name)> opts, string v) => opts.Where(o => o.value == v).Select(o => o.name).FirstOrDefault() ?? "";
 
     static string Run(string file, string args, int ms)
@@ -233,6 +239,16 @@ static class Bridge
         return Regex.IsMatch(role, "^(router|leader|child|detached|disabled)$") ? role : "unavailable";
     }
     static string Read(string f) { try { return File.ReadAllText(f); } catch { return ""; } }
+    // SilentGlass keeps its full-screen window hidden while it only shows the bar or a banner over the picture; the
+    // foreground app id still names it then, so report the app it last saw in front (from its state file)
+    public static string OnScreenApp(string fg, string state = null)
+    {
+        if (fg != Launcher) return fg;
+        var m = Regex.Match(state ?? Read("/tmp/quiet-home-state.txt"), @"(?m)^overlay=([^\n]*)$");
+        if (!m.Success || !m.Groups[1].Value.Contains("main-hidden")) return fg;
+        var other = Regex.Match(m.Groups[1].Value, @"fg=([\w.\-]+)");
+        return m.Groups[1].Value.StartsWith("off") && other.Success ? other.Groups[1].Value : fg;
+    }
 
     // ---- publishing ----
     static void Pub(string sub, string value, bool force = false)
@@ -251,7 +267,7 @@ static class Bridge
         int src = SourceId(VStr("memory/eden/source/current_source"));
         string input = ins.Where(i => i.Type == src).Select(i => i.Name).FirstOrDefault() ?? "Other";
         Pub("input", input, force);
-        Pub("app", AppName(VStr("memory/appfw/current_fullscreen_appid"), input), force);
+        Pub("app", AppName(OnScreenApp(VStr("memory/appfw/current_fullscreen_appid")), input), force);
         foreach (var i in ins.Where(i => i.Type >= 13)) {
             Pub("hdmi" + (i.Type - 12) + "_name", i.Edit, force);
             Pub("hdmi" + (i.Type - 12) + "_attr", "{\"detected_name\":\"" + J(i.Detected) + "\",\"shown_as\":\"" + J(i.Name) + "\",\"connected\":" + (i.Connected ? "true" : "false") + "}", force);
@@ -261,6 +277,7 @@ static class Bridge
         if (vol >= 0) Pub("volume", vol.ToString(), force);
         if (mute >= 0) Pub("mute", mute == 1 ? "ON" : "OFF", force);
         if (ThreadInstalled) Pub("thread_switch", ThreadWanted ? "ON" : "OFF", force);
+        Pub("notifications", NoticesOn ? "ON" : "OFF", force);
     }
     static void PublishSlow(bool force)
     {
@@ -273,7 +290,7 @@ static class Bridge
         Pub("sound_mode", OptionName(Options("external-sound-mode"), Setting("external-sound-mode")), force);
         Pub("sound_output", OptionName(Outputs.ToList(), Setting("soundoutput")) is var o && o.Length > 0 ? o : "Other", force);
         Pub("sleep_timer", OptionName(Options("sleeptimer"), Setting("sleeptimer")), force);
-        Pub("game_mode", Setting("game-mode") == "1" ? "ON" : "OFF", force);
+        Pub("game_mode", OptionName(GameOptions(), Setting("game-mode-auto")), force);
     }
     // discovery depends on what the TV currently offers (input names, picture/sound modes)
     static string Signature(List<Input> ins) => string.Join("|", ins.Select(i => i.Name)) + "#" + string.Join("|", Options("picturemode").Select(o => o.name)) +
@@ -304,7 +321,9 @@ static class Bridge
         cfg("select", "sound_mode", common("sound_mode", "Sound mode", "mdi:surround-sound") + st("sound_mode") + ",\"options\":" + List(Options("external-sound-mode").Select(o => o.name).DefaultIfEmpty("Unavailable")));
         cfg("select", "sound_output", common("sound_output", "Sound output", "mdi:speaker") + st("sound_output") + ",\"options\":" + List(Outputs.Select(o => o.name).Append("Other")));
         cfg("select", "sleep_timer", common("sleep_timer", "Sleep timer", "mdi:timer-sand") + st("sleep_timer") + ",\"options\":" + List(Options("sleeptimer").Select(o => o.name).DefaultIfEmpty("Off")));
-        cfg("switch", "game_mode", common("game_mode", "Game mode", "mdi:controller", config: true) + st("game_mode"));
+        cfg("switch", "game_mode", null);  // v2.0/2.1 switch drove the mirror value; replaced by the three-way select
+        cfg("select", "game_mode_select", common("game_mode", "Game mode", "mdi:controller", config: true) + st("game_mode") + ",\"options\":" + List(GameOptions().Select(o => o.name).DefaultIfEmpty("Unavailable")));
+        cfg("switch", "notifications", common("notifications", "Notifications", "mdi:message-badge", config: true) + st("notifications"));
         cfg("button", "home", common("home", "Home", "mdi:home") + ",\"command_topic\":\"" + Base + "/home/press\"");
         cfg("button", "ambient", common("ambient", "Ambient", "mdi:image-frame") + ",\"command_topic\":\"" + Base + "/ambient/press\"");
         cfg("button", "resync", common("resync", "Resync input names", "mdi:refresh", config: true) + ",\"command_topic\":\"" + Base + "/resync/press\"");
@@ -356,7 +375,10 @@ static class Bridge
             case "sound_mode/set": SetOption("external-sound-mode", Options("external-sound-mode"), payload); break;
             case "sleep_timer/set": SetOption("sleeptimer", Options("sleeptimer"), payload); break;
             case "sound_output/set": SetOption("soundoutput", Outputs.ToList(), payload); break;
-            case "game_mode/set" when payload == "ON" || payload == "OFF": SetSetting("game-mode", payload == "ON" ? "1" : "0"); break;
+            case "game_mode/set": SetOption("game-mode-auto", GameOptions(), payload); break;
+            case "notifications/set" when payload == "ON" || payload == "OFF":
+                if (payload == "OFF") File.WriteAllText(Data + "/notify-off", ""); else File.Delete(Data + "/notify-off");
+                slow = false; break;
             default: {
                 var m = Regex.Match(cmd, "^hdmi([1-4])_name/set$");
                 if (m.Success) {
@@ -379,6 +401,141 @@ static class Bridge
 
     static void Resync() { Discovery(); PublishFast(true); PublishSlow(true); }
 
+    // ---- notifications: the "Notifications for Android TV" protocol (Home Assistant nfandroidtv, library 0.1.5):
+    // GET / is the connection check; POST / is multipart/form-data with msg, title, duration (s), fontsize (1 small,
+    // 0 medium, 2 large, 3 max), position (0 bottom-right, 1 bottom-left, 2 top-right, 3 top-left, 4 center),
+    // transparency, bkgcolor, interrupt, filename (icon) and filename2 (image). Shown by SilentGlass as a banner. ----
+    const int NoticePort = 7676, NoticeMaxBody = 12 << 20;
+    static readonly object noticeGate = new();
+    static long noticeSeq;
+    static bool NoticesOn => !File.Exists(Data + "/notify-off");
+    static bool NoticeAllowed(IPAddress peer)
+    {
+        if (IPAddress.IsLoopback(peer)) return true;
+        foreach (var h in (conf.GetValueOrDefault("host", "") + "," + conf.GetValueOrDefault("notify_from", "")).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            try { if (IPAddress.TryParse(h, out var ip) ? ip.Equals(peer) : Dns.GetHostAddresses(h).Any(a => a.Equals(peer))) return true; } catch { }
+        return false;
+    }
+    static void StartNoticeServer() => new Thread(() => {
+        while (true) {
+            TcpListener l = null;
+            try {
+                l = new TcpListener(IPAddress.Any, NoticePort); l.Start(); Log("notifications: listening on " + NoticePort);
+                while (true) { var c = l.AcceptTcpClient(); ThreadPool.QueueUserWorkItem(_ => ServeNotice(c)); }
+            } catch (Exception e) { Log("notifications: listener " + e.GetType().Name + ": " + e.Message); }
+            try { l?.Stop(); } catch { }
+            Thread.Sleep(30000);
+        }
+    }) { IsBackground = true, Name = "notices" }.Start();
+    static void ServeNotice(TcpClient c)
+    {
+        using (c) try {
+            var peer = ((IPEndPoint)c.Client.RemoteEndPoint).Address; if (peer.IsIPv4MappedToIPv6) peer = peer.MapToIPv4();
+            if (!NoticeAllowed(peer)) { Log("notifications: refused " + peer); return; }
+            var s = c.GetStream(); s.ReadTimeout = 10000; s.WriteTimeout = 5000;
+            var req = HttpRequest.Read(s, NoticeMaxBody);
+            if (req == null) return;
+            HttpRequest.Respond(s, req.Method == "GET" || req.Method == "POST" ? 200 : 405);
+            if (req.Method == "POST") lock (noticeGate) HandleNotice(BuildNotice(ParseMultipart(req.Body, req.Boundary)));
+        } catch (Exception e) { Log("notifications: " + e.GetType().Name + ": " + e.Message); }
+    }
+    public sealed class NoticeData { public string Title = "", Message = "", Size = "large", Position = "bottom-right", Ext = ""; public int Duration = 5, W, H; public byte[] Image; }
+    public static NoticeData BuildNotice(Dictionary<string, byte[]> parts)
+    {
+        string T(string k, int max) { if (!parts.TryGetValue(k, out var b)) return ""; var s = Regex.Replace(Encoding.UTF8.GetString(b), @"[\x00-\x08\x0b-\x1f\x7f]", "").Trim(); return s.Length > max ? s.Substring(0, max) : s; }
+        int N(string k, int d) => int.TryParse(T(k, 6), out var v) ? v : d;
+        var n = new NoticeData { Title = T("title", 120), Message = T("msg", 400), Duration = Math.Clamp(N("duration", 5), 1, 300) };
+        n.Size = N("fontsize", 2) switch { 1 => "small", 0 => "medium", 3 => "max", _ => "large" };
+        n.Position = N("position", 0) switch { 1 => "bottom-left", 2 => "top-right", 3 => "top-left", 4 => "center", _ => "bottom-right" };
+        // the image; the icon only when it is a real picture (the library always sends a 1x1 placeholder)
+        foreach (var k in new[] { "filename2", "filename" })
+            if (parts.TryGetValue(k, out var img) && img.Length > 512 && ImageType(img) is var ext && ext != null) {
+                n.Image = img; n.Ext = ext; (n.W, n.H) = ImageSize(img); break;
+            }
+        return n.Title.Length > 0 || n.Message.Length > 0 || n.Image != null ? n : null;
+    }
+    public static string ImageType(byte[] b) =>
+        b.Length > 12 && b[0] == 0xFF && b[1] == 0xD8 ? "jpg" : b.Length > 24 && b[0] == 0x89 && b[1] == (byte)'P' && b[2] == (byte)'N' && b[3] == (byte)'G' ? "png" :
+        b.Length > 10 && b[0] == (byte)'G' && b[1] == (byte)'I' && b[2] == (byte)'F' ? "gif" :
+        b.Length > 12 && Encoding.ASCII.GetString(b, 0, 4) == "RIFF" && Encoding.ASCII.GetString(b, 8, 4) == "WEBP" ? "webp" : null;
+    // pixel size from the header (JPEG SOFn, PNG IHDR, GIF screen); (0,0) when unknown
+    public static (int w, int h) ImageSize(byte[] b)
+    {
+        try {
+            switch (ImageType(b)) {
+                case "png": return ((b[16] << 24) | (b[17] << 16) | (b[18] << 8) | b[19], (b[20] << 24) | (b[21] << 16) | (b[22] << 8) | b[23]);
+                case "gif": return (b[6] | (b[7] << 8), b[8] | (b[9] << 8));
+                case "jpg":
+                    for (int i = 2; i + 9 < b.Length;) {
+                        if (b[i] != 0xFF) { i++; continue; }
+                        int m = b[i + 1];
+                        if (m == 0xFF) { i++; continue; }
+                        if (m == 0xD8 || m == 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }
+                        int len = (b[i + 2] << 8) | b[i + 3];
+                        if (m >= 0xC0 && m <= 0xCF && m != 0xC4 && m != 0xC8 && m != 0xCC) return ((b[i + 7] << 8) | b[i + 8], (b[i + 5] << 8) | b[i + 6]);
+                        i += 2 + len;
+                    }
+                    break;
+            }
+        } catch { }
+        return (0, 0);
+    }
+    static bool IsAmbient(string app) => app is ArtApp or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
+    // hand the notice to SilentGlass: data/notice.json (+ image). Taking the file is its acknowledgement.
+    static void HandleNotice(NoticeData n)
+    {
+        if (n == null) { Log("notifications: empty request"); return; }
+        string fg = VStr("memory/appfw/current_fullscreen_appid"), what = "'" + (n.Title.Length > 0 ? n.Title : n.Message.Length > 40 ? n.Message.Substring(0, 40) : n.Message) + "'";
+        string why = !NoticesOn ? "notifications are off" : !ScreenOn ? "screen off" : IsAmbient(fg) ? "Ambient" : null;
+        if (why != null) { Log("notifications: " + what + " not shown (" + why + ")"); return; }
+        foreach (var f in Directory.GetFiles(Data, "notice-*")) try { File.Delete(f); } catch { }
+        long id = ++noticeSeq; string image = n.Image != null ? "notice-" + id + "." + n.Ext : "";
+        if (image.Length > 0) File.WriteAllBytes(Data + "/" + image, n.Image);
+        var json = JsonSerializer.Serialize(new Dictionary<string, object> {
+            ["title"] = n.Title, ["message"] = n.Message, ["size"] = n.Size, ["position"] = n.Position, ["duration"] = n.Duration,
+            ["image"] = image, ["w"] = n.W, ["h"] = n.H, ["at"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+        string file = Data + "/notice.json";
+        File.WriteAllText(file + ".tmp", json); File.Move(file + ".tmp", file, true);
+        bool Taken(int ms) { for (int i = 0; i < ms / 100 && File.Exists(file); i++) Thread.Sleep(100); return !File.Exists(file); }
+        if (Taken(1500)) { Log("notifications: " + what + " shown"); return; }
+        // SilentGlass is not running (it is closed in standby): start it for the notice - only over the TV viewer,
+        // where starting it hidden is invisible; over another app it would send that app to the background
+        string onScreen = OnScreenApp(fg);
+        if (onScreen != "org.tizen.tv-viewer" && fg != Launcher) { File.Delete(file); Log("notifications: " + what + " not shown (SilentGlass not running over " + onScreen + ")"); return; }
+        LaunchApp(Launcher, "quiet_notice", "1");
+        Log("notifications: " + what + (Taken(8000) ? " shown (started SilentGlass)" : " NOT taken"));
+        if (File.Exists(file)) File.Delete(file);
+    }
+    // multipart/form-data body -> field name -> bytes
+    public static Dictionary<string, byte[]> ParseMultipart(byte[] body, string boundary)
+    {
+        var parts = new Dictionary<string, byte[]>();
+        if (body == null || string.IsNullOrEmpty(boundary)) return parts;
+        var delim = Encoding.ASCII.GetBytes("--" + boundary);
+        int at = IndexOf(body, delim, 0);
+        while (at >= 0) {
+            int start = at + delim.Length;
+            if (start + 1 < body.Length && body[start] == '-' && body[start + 1] == '-') break;  // closing delimiter
+            int head = IndexOf(body, Encoding.ASCII.GetBytes("\r\n\r\n"), start);
+            if (head < 0) break;
+            int next = IndexOf(body, Encoding.ASCII.GetBytes("\r\n--" + boundary), head + 4);
+            if (next < 0) break;
+            var headers = Encoding.UTF8.GetString(body, start, head - start);
+            var name = Regex.Match(headers, "name=\"([^\"]*)\"");
+            if (name.Success) parts[name.Groups[1].Value] = body[(head + 4)..next];
+            at = next + 2;
+        }
+        return parts;
+    }
+    static int IndexOf(byte[] hay, byte[] needle, int from)
+    {
+        for (int i = Math.Max(0, from); i <= hay.Length - needle.Length; i++) {
+            int j = 0; while (j < needle.Length && hay[i + j] == needle[j]) j++;
+            if (j == needle.Length) return i;
+        }
+        return -1;
+    }
+
     static int Main()
     {
         conf = File.ReadAllLines("/opt/usr/home/owner/.config/silentglass-ha.conf").Select(l => l.Trim())
@@ -386,6 +543,7 @@ static class Bridge
         Log("start " + Version);
         StartSourceWatch();
         OpenPowerKey();
+        StartNoticeServer();
         int backoff = 5;
         while (true) {
             try {
@@ -407,6 +565,40 @@ static class Bridge
             try { mqtt?.Close(); } catch { }
             Thread.Sleep(backoff * 1000); backoff = Math.Min(backoff * 2, 60);
         }
+    }
+}
+
+// Minimal HTTP/1.1 request reader for the notification endpoint: one request per connection, Content-Length bodies.
+sealed class HttpRequest
+{
+    public string Method = "", Boundary = ""; public byte[] Body = Array.Empty<byte>();
+    public static HttpRequest Read(Stream s, int maxBody)
+    {
+        var buf = new byte[65536]; int got = 0, end = -1;
+        while (end < 0) {
+            if (got == buf.Length) return null;  // headers too large
+            int n = s.Read(buf, got, buf.Length - got); if (n <= 0) return null; got += n;
+            for (int i = Math.Max(0, got - n - 3); i + 3 < got; i++) if (buf[i] == 13 && buf[i + 1] == 10 && buf[i + 2] == 13 && buf[i + 3] == 10) { end = i; break; }
+        }
+        var lines = Encoding.ASCII.GetString(buf, 0, end).Split("\r\n");
+        var r = new HttpRequest { Method = lines[0].Split(' ')[0] };
+        int length = 0;
+        foreach (var l in lines.Skip(1)) {
+            int c = l.IndexOf(':'); if (c < 0) continue;
+            string k = l.Substring(0, c).Trim().ToLowerInvariant(), v = l.Substring(c + 1).Trim();
+            if (k == "content-length" && !int.TryParse(v, out length)) return null;
+            if (k == "content-type") { var m = Regex.Match(v, "boundary=\"?([^\";]+)\"?"); if (m.Success) r.Boundary = m.Groups[1].Value; }
+        }
+        if (length < 0 || length > maxBody) return null;
+        r.Body = new byte[length]; int have = Math.Min(length, got - end - 4);
+        Array.Copy(buf, end + 4, r.Body, 0, have);
+        while (have < length) { int n = s.Read(r.Body, have, length - have); if (n <= 0) return null; have += n; }
+        return r;
+    }
+    public static void Respond(Stream s, int code)
+    {
+        var b = Encoding.ASCII.GetBytes("HTTP/1.1 " + code + (code == 200 ? " OK" : " Method Not Allowed") + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK");
+        s.Write(b, 0, b.Length); s.Flush();
     }
 }
 

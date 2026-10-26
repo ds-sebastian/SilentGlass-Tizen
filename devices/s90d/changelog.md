@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v32a** (+ HA bridge 2.2): **notifications on any input**. The bridge accepts Home Assistant's *Notifications for
+  Android TV* protocol (port 7676, from the broker host only) and hands each notification to SilentGlass Home, which
+  shows a tvOS-style banner in its own non-focusable notification window (image, title, message; position, size and
+  duration from the request). Never wakes the TV; dropped in Ambient or when switched off. A cold SilentGlass is
+  started hidden for it. Also: Game Mode is a three-way select in Home Assistant; the app sensor no longer reports
+  SilentGlass while it only shows a banner or nothing over the picture; Game Mode's cycle ignores the hidden-item flag.
 - **v31c**: Game Mode is one three-way control (Automatic / Always / Never) on the TV's real setting
   (`game-mode-auto`, Off / On / Auto). The old on/off switch drove `game-mode`, which only mirrors whether Game Mode
   is engaged, so it disagreed with Auto. The full-screen Controls page drops the duplicate "Auto Game Mode" tile and

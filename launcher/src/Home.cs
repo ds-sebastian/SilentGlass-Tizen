@@ -56,6 +56,8 @@ public sealed partial class QuietHome : NUIApplication
  {
   base.OnCreate();
   ui=SynchronizationContext.Current;
+  // started by the HA bridge only to show a notification: stay hidden, the picture stays in front
+  bool forNotice=NoticePending();if(forNotice){try{Window.Default.Hide();}catch{}mainHidden=true;}
   try{fontLoaded=FontClient.Instance.AddCustomFontDirectory(Root+"fonts");}catch{fontLoaded=false;}
   try{library=AppLibrary.Load(Root+"apps.json");}catch(Exception ex){libraryError=ex.Message;}
   // Samsung Home lives on the Apps page (not on Home); keep it before the "Get more apps" utility.
@@ -69,10 +71,14 @@ public sealed partial class QuietHome : NUIApplication
   try{NoteForeground(vconf_get_str(ForegroundKey));}catch{}
   clockTimer=new Tizen.NUI.Timer(30000);
   clockTimer.Tick+=(s,e)=>{clock.Text=Clock();CheckWallpaper();IdleTick();if(visible&&page==0&&inputsLayer==null)OnInputsChanged(false);return true;};clockTimer.Start();
-  visible=true;MarkState("created");
+  WatchNotices();
+  visible=!forNotice;MarkState(forNotice?"created_hidden":"created");
+  if(forNotice)TakeNotice("start");
  }
  protected override void OnResume(){base.OnResume();if(mainHidden){MarkState("resumed_overlay");return;} /* only the overlay window is up */ visible=true;styledAll=false;UpdateFocus(false); /* restyle everything after a pause */ BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);Wake(false);string requested;
+  // Home Assistant bridge: a notification is waiting (we were not running, or the watcher was asleep)
+  if(e.ReceivedAppControl.ExtraData.TryGet("quiet_notice",out string _)){TakeNotice("launch");return;}
   // Home Assistant bridge: switch input the same way the cards do (only to an input the TV lists)
   if(e.ReceivedAppControl.ExtraData.TryGet("quiet_source",out string req)&&int.TryParse(req,out int src)&&inputs.Exists(i=>i.Type==src)){SelectSource(src);MarkState("ha_source:"+src);return;}
   if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){HideOverlay(null);ShowMain();page=1;area=1;selected=0;BuildPage(false);}else if(requested=="info"){HideOverlay(null);ShowMain();page=3;area=1;selected=0;BuildPage(false);}else Home("home_request");}

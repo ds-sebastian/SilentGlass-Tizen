@@ -15,7 +15,7 @@ class HaBridgeTests(unittest.TestCase):
         cases = {c for line in re.findall(r"case ([^:]+?)(?: when |:)", handler) for c in re.findall(r'"([a-z_0-9/]+)"', line)}
         self.assertEqual(cases, {"input/set", "home/press", "ambient/press", "resync/press", "thread_switch/set", "volume/set", "mute/set",
                                  "brightness/set", "contrast/set", "power/set", "picture_mode/set", "sound_mode/set", "sleep_timer/set",
-                                 "sound_output/set", "game_mode/set"})
+                                 "sound_output/set", "game_mode/set", "notifications/set"})
         self.assertIn('Regex.Match(cmd, "^hdmi([1-4])_name/set$")', handler)  # the only other command: renaming a port
         self.assertNotIn("/bin/sh", SRC)  # no shell: launch_app, dbus-send and ot-ctl run directly
         # input requests only for an input the TV lists, by exact name; options only from the TV's own lists
