@@ -25,6 +25,22 @@ public sealed partial class QuietHome
   SavePrefs();ResolveHeroPorts();RefreshTileValues();
   MarkState("heroport:"+(watch?"watch":"play")+":"+(watch?prefs.WatchPort:prefs.PlayPort));
  }
+ // Info page switch: the Thread border router (devices/s90d/thread-border-router.md). The owner's systemd units skip
+ // starting while the thread-off marker exists (so the choice survives reboots), and a path unit applies a flip at once
+ // when thread-switch is rewritten. Both live in this app's data directory, which the owner's systemd may read.
+ const string ThreadUnits="/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
+ static string DataFile(string name)=>System.IO.Path.Combine(Tizen.Applications.Application.Current.DirectoryInfo.Data,name);
+ static bool ThreadSwitchable()=>File.Exists(ThreadUnits); // other TVs (no border router installed) get no switch
+ static bool ThreadWanted()=>!File.Exists(DataFile("thread-off"));
+ void ToggleThread()
+ {
+  bool on=!ThreadWanted();
+  try{
+   if(on)File.Delete(DataFile("thread-off"));else File.WriteAllText(DataFile("thread-off"),"");
+   File.WriteAllText(DataFile("thread-switch"),DateTime.UtcNow.ToString("o")+(on?" on\n":" off\n"));
+  }catch(Exception ex){ShowError("Could not switch: "+ex.GetType().Name);}
+  BuildPage(false);MarkState("thread:"+(on?"on":"off"));
+ }
  // Info page switch: TV apps are backups (the SHIELD has the real ones), so the Apps tab can be hidden
  bool TabShown(int i)=>i!=1||!prefs.HideApps;
  void ToggleAppsTab()

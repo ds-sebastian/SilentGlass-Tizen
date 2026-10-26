@@ -406,8 +406,8 @@ class S90dPortTests(unittest.TestCase):
     def test_apps_tab_can_be_hidden_from_info(self):
         src = launcher()
         # switch row on Info (its own focus row below the panels); saved with the Watch/Play choice
-        self.assertIn("AppsTabSwitch(100,900);", body(src, "void BuildInfo()"))
-        self.assertIn('Action="toggle:apps",Row=2', src)
+        self.assertIn('SwitchRow(100,"Show Apps tab",!prefs.HideApps,"toggle:apps");', body(src, "void BuildInfo()"))
+        self.assertIn("Action=action,Row=2", body(src, "void SwitchRow("))
         self.assertIn('if(a=="toggle:apps"){ToggleAppsTab();return;}', body(src, "void Activate()"))
         self.assertIn("SavePrefs();BuildTabs();", body(src, "void ToggleAppsTab()"))
         # the tab bar is rebuilt inside its own layer, so it stays under the sheet, toast and OLED dim
@@ -417,6 +417,22 @@ class S90dPortTests(unittest.TestCase):
         # panels shrank to make room: the switch row ends above the notice line
         self.assertIn("InfoPanel(970,540,850,330,", src)
         self.assertLessEqual(900 + 72, 1000)
+
+    def test_thread_switch_on_info(self):
+        src = launcher()
+        info = body(src, "void BuildInfo()")
+        # only TVs with the switchable border router units get the switch
+        self.assertIn('if(ThreadSwitchable())SwitchRow(690,"Thread border router",threadWanted,"toggle:thread");', info)
+        self.assertIn('if(a=="toggle:thread"){ToggleThread();return;}', body(src, "void Activate()"))
+        toggle = body(src, "void ToggleThread()")
+        # the marker decides (also at boot); thread-switch only wakes the path unit, so it is written last
+        self.assertLess(toggle.index('DataFile("thread-off")'), toggle.index('DataFile("thread-switch")'))
+        self.assertIn("DirectoryInfo.Data", body(src, "static string DataFile("))
+        # the panel follows the daemons after a flip
+        self.assertIn("UpdateThread(all);", body(src, "void InfoTick()"))
+        # the marker and the units agree on the path
+        unit = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-cpcd.service").read_text()
+        self.assertIn("com.samsung.tv.bixby-promotion/data/thread-off", unit)
 
     def test_tab_bar_select_enters_at_the_current_input(self):
         key = body(launcher(), "void HandleKey(")

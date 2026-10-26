@@ -19,10 +19,12 @@ public sealed partial class QuietHome
   double peak=50000;foreach(var v in sparkValues)peak=Math.Max(peak,v);
   for(int i=0;i<spark.Count;i++){int h=Math.Max(3,(int)(150*sparkValues[i]/peak));spark[i].Size2D=new Size2D(14,h);spark[i].Position2D=new Position2D(30+i*22,SparkBase-h);}
  }
+ readonly Color good=new Color(.45f,.88f,.58f,1),warn=new Color(1f,.74f,.36f,1);
+ View panelDot; // the status dot of the panel built last
  View InfoPanel(int x,int y,int w,int h,string title,Color dot,int row)
  {
   var card=Card(x,y,w,h,clear,30);var glass=AddGlass(card,0,x,y,30,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);
-  card.Add(new View{Position2D=new Position2D(30,39),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)});
+  panelDot=new View{Position2D=new Position2D(30,39),Size2D=new Size2D(14,14),BackgroundColor=dot,CornerRadius=new Vector4(7,7,7,7)};card.Add(panelDot);
   card.Add(Label(title,56,24,w-86,44,29,white,"Semibold"));
   slots.Add(new Slot{Card=card,Glass=glass,Name=title,Action="info",Row=row,X=x,Y=y,W=w,H=h});
   return card;
@@ -38,7 +40,6 @@ public sealed partial class QuietHome
  string infoThread="";
  void BuildInfo()
  {
-  var good=new Color(.45f,.88f,.58f,1);var warn=new Color(1f,.74f,.36f,1);
   string route=InfoStats.DefaultInterface();infoIface=route??"eth0";
   var netdev=InfoStats.NetDev();
   var tv=InfoPanel(100,140,540,370,"This TV",new Color(.56f,.66f,1f,1),0);
@@ -66,17 +67,12 @@ public sealed partial class QuietHome
   bool sdb=InfoStats.SdbListening();
   InfoRow(pv,540,2,"Developer access",sdb?"SDB on":"SDB off",sdb?good:muted);
 
-  // Thread border router: role from wpan0's RLOC/ALOC addresses, home reach from forwarding + an off-mesh address.
-  var th=InfoStats.Thread();bool fwd=InfoStats.Ipv6Forwarding();
-  bool routing=th.present&&th.rloc16>=0&&(th.rloc16&0x1ff)==0;
-  string status=!th.present?"Off":th.rloc16<0?"Starting…":routing?"Online · Router "+(th.rloc16>>10)+(th.leader?" · Leader":""):"Online · Child";
-  string home=!th.present?null:!fwd?"Forwarding off":th.homeRoute?"Connected":"Waiting for route";
-  var tr=InfoPanel(100,540,830,330,"Thread border router",routing?good:th.present?warn:muted,1);
-  InfoRow(tr,830,0,"Status",status,routing?good:th.present?warn:muted);
-  InfoRow(tr,830,1,"Home network",home,home=="Connected"?good:home==null?null:warn);
-  InfoRow(tr,830,2,"Thread traffic",netdev.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):null);
-  InfoRow(tr,830,3,"Interface",th.present?"wpan0 · "+th.addresses+" addresses":"Not running");
-  infoThread=status+" | "+(home??"-")+" | fwd="+fwd;
+  // Thread border router: role from wpan0's RLOC/ALOC addresses, home reach from forwarding + an off-mesh address
+  bool threadWanted=ThreadWanted(); // for the switch row below
+  var tr=InfoPanel(100,540,830,330,"Thread border router",muted,1);
+  threadStatus=InfoRow(tr,830,0,"Status","",muted);threadHome=InfoRow(tr,830,1,"Home network","",muted);
+  threadTraffic=InfoRow(tr,830,2,"Thread traffic","");threadIface=InfoRow(tr,830,3,"Interface","");
+  threadDot=panelDot;UpdateThread(netdev);
 
   var live=InfoPanel(970,540,850,330,"Live · TV network",new Color(.4f,.78f,1f,1),1);
   bool fresh=Environment.TickCount64-lastNetAt>10000;
@@ -86,27 +82,45 @@ public sealed partial class QuietHome
   spark.Clear();
   for(int i=0;i<sparkValues.Length;i++){var b=new View{Position2D=new Position2D(30+i*22,SparkBase),Size2D=new Size2D(14,3),BackgroundColor=new Color(.4f,.78f,1f,.85f),CornerRadius=new Vector4(4,4,4,4)};spark.Add(b);live.Add(b);}
   DrawSpark();
-  AppsTabSwitch(100,900);
+  SwitchRow(100,"Show Apps tab",!prefs.HideApps,"toggle:apps");
+  if(ThreadSwitchable())SwitchRow(690,"Thread border router",threadWanted,"toggle:thread");
   if(fresh)InfoTick();
   if(infoTimer==null){infoTimer=new Tizen.NUI.Timer(2000);infoTimer.Tick+=(s,e)=>{if(page!=3)return false;InfoTick();return true;};}
   infoTimer.Start();
  }
- // an Apple-style switch row (one word and a switch: green = Apps tab shown)
- void AppsTabSwitch(int x,int y)
+ // Apple-style switch rows under the panels: one phrase and a switch (green = on); Select flips it
+ void SwitchRow(int x,string name,bool on,string action)
  {
-  const int W=540,H=72;bool on=!prefs.HideApps;
-  var card=Card(x,y,W,H,clear,H/2);var glass=AddGlass(card,0,x,y,H/2,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);
-  card.Add(Label("Show Apps tab",32,0,W-160,H,28,white,"Semibold"));
+  const int Y=900,W=540,H=72;
+  var card=Card(x,Y,W,H,clear,H/2);var glass=AddGlass(card,0,x,Y,H/2,tint:.06f,shadow:.08f,shadowY:5,blur:16,focusShadow:.08f);
+  card.Add(Label(name,32,0,W-160,H,28,white,"Semibold"));
   var track=new View{Position2D=new Position2D(W-32-76,18),Size2D=new Size2D(76,36),CornerRadius=new Vector4(18,18,18,18),BackgroundColor=on?onNowGreen:new Color(1,1,1,.22f)};
   track.Add(new View{Position2D=new Position2D(on?44:4,4),Size2D=new Size2D(28,28),CornerRadius=new Vector4(14,14,14,14),BackgroundColor=white});
   card.Add(track);
-  slots.Add(new Slot{Card=card,Glass=glass,Name="Show Apps tab",Action="toggle:apps",Row=2,X=x,Y=y,W=W,H=H});
+  slots.Add(new Slot{Card=card,Glass=glass,Name=name,Action=action,Row=2,X=x,Y=Y,W=W,H=H});
+ }
+ TextLabel threadStatus,threadHome,threadTraffic,threadIface;View threadDot;
+ // also called from InfoTick, so the panel follows the border router starting or stopping after a flip of the switch
+ void UpdateThread(Dictionary<string,(long rx,long tx)> netdev)
+ {
+  if(threadStatus==null)return;
+  var th=InfoStats.Thread();bool fwd=InfoStats.Ipv6Forwarding(),wanted=ThreadWanted();
+  bool routing=th.present&&th.rloc16>=0&&(th.rloc16&0x1ff)==0;
+  string status=!th.present?(wanted?"Not running":"Paused"):!wanted?"Stopping…":th.rloc16<0?"Starting…":routing?"Online · Router "+(th.rloc16>>10)+(th.leader?" · Leader":""):"Online · Child";
+  string home=!th.present?"—":!fwd?"Forwarding off":th.homeRoute?"Connected":"Waiting for route";
+  var c=routing&&wanted?good:th.present?warn:muted;
+  threadStatus.Text=status;threadStatus.TextColor=c;threadDot.BackgroundColor=c;
+  threadHome.Text=home;threadHome.TextColor=home=="Connected"?good:home=="—"?muted:warn;
+  threadTraffic.Text=netdev.TryGetValue("wpan0",out var w0)?"↓ "+InfoStats.Bytes(w0.rx)+"  ↑ "+InfoStats.Bytes(w0.tx):"—";
+  threadIface.Text=th.present?"wpan0 · "+th.addresses+" addresses":"—";
+  infoThread=status+" | "+home+" | fwd="+fwd;
  }
  void InfoTick()
  {
   try{
    long now=Environment.TickCount64;
    var all=InfoStats.NetDev();
+   UpdateThread(all);
    if(all.TryGetValue(infoIface,out var cur)){
     if(liveTotal!=null)liveTotal.Text=TotalsText(all);
     if(lastNet.HasValue&&now>lastNetAt){

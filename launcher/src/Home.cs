@@ -446,6 +446,7 @@ public sealed partial class QuietHome : NUIApplication
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
   if(a.StartsWith("heroport:")){CycleHeroPort(a.Substring(9)=="watch");return;}
   if(a=="toggle:apps"){ToggleAppsTab();return;}
+  if(a=="toggle:thread"){ToggleThread();return;}
   if(a=="volume"||a=="brightness"){RefreshSettings();RefreshTileValues();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a.StartsWith("cycle:")){CycleSetting(a.Substring(6));return;}

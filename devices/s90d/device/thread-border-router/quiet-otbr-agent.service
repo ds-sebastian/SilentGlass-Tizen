@@ -1,12 +1,14 @@
 [Unit]
-Description=Quiet Home: standalone OpenThread border router on eth0 (home Thread network)
+Description=Quiet Home: standalone OpenThread border router (joins the saved Thread network)
 Wants=quiet-otbr-cpcd.service
 After=quiet-otbr-cpcd.service
 StartLimitIntervalSec=0
+# Quiet Home's Info switch: this marker in the launcher's data directory keeps the border router off (also at boot)
+ConditionPathExists=!/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data/thread-off
 
 [Service]
 Type=simple
-ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; i=0; until [ -S /dev/shm/cpcd/cpcd_0/ctrl.cpcd.sock ]; do i=$$((i+1)); [ $$i -gt 1200 ] && exit 1; sleep 1; done; sleep 3; echo "$$(date +%%T) agent start"; exec /opt/usr/share/quiet-otbr/otbr-agent -s -B eth0 -d 4 "spinel+cpc://cpcd_0?iid=2"'
+ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; i=0; until [ -S /dev/shm/cpcd/cpcd_0/ctrl.cpcd.sock ]; do i=$$((i+1)); [ $$i -gt 1200 ] && exit 1; sleep 1; done; sleep 3; b=; i=0; while [ -z "$$b" ] && [ $$i -lt 120 ]; do set -- $$(ip route show default 2>/dev/null); while [ $$# -gt 1 ] && [ "$$1" != dev ]; do shift; done; [ $$# -gt 1 ] && b=$$2; [ -n "$$b" ] || { i=$$((i+1)); sleep 1; }; done; b=$${b:-eth0}; echo "$$(date +%%T) agent start backbone=$$b"; exec /opt/usr/share/quiet-otbr/otbr-agent -s -B "$$b" -d 4 "spinel+cpc://cpcd_0?iid=2"'
 Restart=always
 RestartSec=10
 TimeoutStopSec=5

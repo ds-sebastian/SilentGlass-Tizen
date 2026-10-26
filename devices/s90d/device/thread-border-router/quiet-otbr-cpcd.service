@@ -1,6 +1,8 @@
 [Unit]
 Description=Quiet Home: Thread radio daemon (CPC) for the standalone border router
 StartLimitIntervalSec=0
+# Quiet Home's Info switch: this marker in the launcher's data directory keeps the border router off (also at boot)
+ConditionPathExists=!/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data/thread-off
 
 [Service]
 Type=simple

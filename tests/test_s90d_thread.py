@@ -8,7 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIR = ROOT / "devices/s90d/device/thread-border-router"
-UNITS = sorted(p.name for p in DIR.glob("*.service"))
+UNITS = sorted(p.name for p in DIR.glob("quiet-otbr-*") if p.suffix in (".service", ".path"))
+DATA = "/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data"
 
 
 def embedded_units(install):
@@ -22,7 +23,7 @@ def embedded_units(install):
 
 class ThreadBorderRouterRecipe(unittest.TestCase):
     def test_scripts_parse(self):
-        for name in ("otbr-install.sh", "otbr-restore.sh"):
+        for name in ("otbr-install.sh", "otbr-restore.sh", "otbr-switch-update.sh", "otbr-switch-restore.sh", "otbr-join.sh"):
             subprocess.run(["sh", "-n", str(DIR / name)], check=True, capture_output=True)
 
     def test_installer_embeds_the_published_units(self):
@@ -37,12 +38,59 @@ class ThreadBorderRouterRecipe(unittest.TestCase):
         install = (DIR / "otbr-install.sh").read_text()
         restore = (DIR / "otbr-restore.sh").read_text()
         for name in UNITS:
-            self.assertIn(f'"$UD/default.target.wants/{name}"', install)
+            if name != "quiet-otbr-switch.service":  # started only by its path unit
+                self.assertIn(f'"$UD/default.target.wants/{name}"', install)
             self.assertIn(name, restore)
         self.assertIn('rm -f "$UD/default.target.wants/$n" "$UD/$n"', restore)
 
+    def test_switch_update_ships_the_same_units_and_restore_ships_the_merged_ones(self):
+        update = embedded_units((DIR / "otbr-switch-update.sh").read_text())
+        self.assertEqual(sorted(update), UNITS)
+        for name, (data, sha) in update.items():
+            self.assertEqual(data, (DIR / name).read_bytes(), name)
+        back = embedded_units((DIR / "otbr-switch-restore.sh").read_text())
+        self.assertEqual(sorted(back), ["quiet-otbr-agent.service", "quiet-otbr-cpcd.service", "quiet-otbr-forward.service"])
+        for name, (data, sha) in back.items():
+            self.assertEqual(hashlib.sha256(data).hexdigest(), sha, name)
+            self.assertNotIn(b"thread-off", data)  # the always-on units
+
+    def test_info_switch_gates_every_daemon_and_survives_reboots(self):
+        # boot and manual starts both skip while the marker exists; conditions never trigger Restart=
+        for name in ("quiet-otbr-cpcd.service", "quiet-otbr-agent.service", "quiet-otbr-forward.service"):
+            self.assertIn(f"ConditionPathExists=!{DATA}/thread-off", (DIR / name).read_text(), name)
+        path = (DIR / "quiet-otbr-switch.path").read_text()
+        self.assertIn(f"PathChanged={DATA}/thread-switch", path)
+        self.assertIn("WantedBy=default.target", path)
+        switch = (DIR / "quiet-otbr-switch.service").read_text()
+        self.assertIn("Type=oneshot", switch)
+        # off: agent stops before the radio daemon (it hangs once CPC is gone)
+        self.assertIn("stop quiet-otbr-forward.service quiet-otbr-agent.service quiet-otbr-cpcd.service", switch)
+        install = (DIR / "otbr-install.sh").read_text()
+        self.assertIn('"$UD/default.target.wants/quiet-otbr-switch.path"', install)
+        self.assertNotIn('"$UD/default.target.wants/quiet-otbr-switch.service"', install)  # only the path unit starts it
+        restore = (DIR / "otbr-restore.sh").read_text()
+        self.assertIn("thread-off", restore)
+
+    def test_agent_backbone_follows_the_default_route(self):
+        agent = (DIR / "quiet-otbr-agent.service").read_text()
+        self.assertNotIn("-B eth0", agent)  # Wi-Fi TVs route through wlan0
+        self.assertIn('ip route show default', agent)
+        self.assertIn('-B "$$b"', agent)
+
+    def test_join_never_echoes_the_dataset_and_refuses_to_replace_a_network(self):
+        join = (DIR / "otbr-join.sh").read_text()
+        self.assertNotRegex(join, r'echo[^\n]*\$\{?DATASET')
+        self.assertIn("FORCE=1 replaces the saved network", join)
+        self.assertIn("dataset init tlvs", join)
+        self.assertIn("dataset init new", join)
+        pi = (ROOT / "devices/s90d/pi/thread_dataset.py").read_text()
+        self.assertIn("0o600", pi)
+        self.assertNotRegex(pi, r"print\([^)]*tlv")
+
     def test_units_wait_inside_execstart_and_never_flash(self):
         for name in UNITS:
+            if not name.endswith(".service") or name == "quiet-otbr-switch.service":
+                continue
             text = (DIR / name).read_text()
             self.assertIn("Type=simple", text, name)
             self.assertNotRegex(text, r"(?m)^ExecStartPre=", name)
@@ -52,7 +100,8 @@ class ThreadBorderRouterRecipe(unittest.TestCase):
         import json
         expected = json.loads((ROOT / "devices/s90d/pi/s90d_expected.json").read_text())
         for name in UNITS:
-            self.assertIn(name, expected["user_units"])
+            if name != "quiet-otbr-switch.service":  # started only by its path unit
+                self.assertIn(name, expected["user_units"])
 
 
 if __name__ == "__main__":

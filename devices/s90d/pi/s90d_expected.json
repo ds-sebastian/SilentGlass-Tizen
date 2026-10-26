@@ -51,6 +51,7 @@
     "quiet-recog-off.service",
     "quiet-otbr-cpcd.service",
     "quiet-otbr-agent.service",
-    "quiet-otbr-forward.service"
+    "quiet-otbr-forward.service",
+    "quiet-otbr-switch.path"
   ]
 }

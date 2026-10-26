@@ -1,0 +1,10 @@
+[Unit]
+Description=Quiet Home: apply the Info page's Thread border router switch
+
+[Path]
+# Quiet Home rewrites this file after every flip of the switch (the decision itself is the thread-off marker)
+PathChanged=/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data/thread-switch
+Unit=quiet-otbr-switch.service
+
+[Install]
+WantedBy=default.target

@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## Quiet Home on the S90D (v23a)
+## Quiet Home on the S90D (v24a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -37,6 +37,8 @@ Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as
   (`memory/tv-viewer/mainscreen_signal_state`, debounced 800 ms), empty ring = unplugged; other inputs get no dot
   (CEC reports power per TV port only, port 3 answers as the soundbar; the Switch dock is not on CEC). The Inputs
   list marks the selected input with a separate checkmark.
+- **v24a**: Info switch "Thread border router" (only where the switchable units are installed); the Thread panel
+  now refreshes every 2 s, so it follows the daemons stopping and starting. See thread-border-router.md section 5.
 - **v23a**: Info page switch "Show Apps tab" (own focus row under the panels; panels 370/330 tall to make room).
   Hidden = the tab bar is rebuilt without Apps and Left/Right skips it (`HomeLogic.NextTab`); saved as `hideapps=`
   in `quiet-home-prefs.txt`. TV apps stay installed; Samsung Home is only reachable from the Apps tab.
@@ -130,7 +132,7 @@ verifies every file) and `restore-v(N-1).sh`. Build with `python3 tools/build.py
 | boot-units/quiet-recog-off | owner user-systemd watcher stopping content recognition (later boot targets restart it) | recog-boot-restore.sh |
 | cleanup/batchd | SHIELD does everything: Prime Video, Apple TV, web browser **uninstalled**; TV YouTube and Samsung Home media rows disabled (cast to SHIELD's Chromecast; AirPlay unaffected); janitor unit removed | batchd-restore.sh (store apps: reinstall from Samsung Apps) |
 | boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background | batchd-restore.sh |
-| thread-border-router/ | standalone Thread border router on the home network: owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on eth0, hub stays off; radio on the hub image ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg) |
+| thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; Quiet Home Info switch ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
 
 Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
@@ -146,6 +148,8 @@ SmartThings/OTBR components are kept (the TV is a Thread border router on the ho
 `s90d_drift_check.py` + `s90d_expected.json` (set `tv`): weekly read-only check of firmware, Home/startup apps,
 vendor markers, disabled apps, Quiet Home DLL hash, boot units and recognition. Prints nothing when all is well
 (cron watchdog pattern); reports only after 3 consecutive unreachable runs.
+
+`thread_dataset.py`: saves Home Assistant's preferred Thread dataset to a private file for `otbr-join.sh`.
 
 `probe_forwarding.py`: one-packet proof that LAN -> Thread traffic is routed through the TV (see thread-border-router.md).
 

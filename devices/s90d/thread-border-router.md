@@ -7,11 +7,15 @@ the radio daemon and the border router, joins the **existing** home Thread netwo
 Samsung's system files are not changed; everything lives on the writable `/opt` volume and is undone by
 `device/thread-border-router/otbr-restore.sh`.
 
+It works with any Thread network: join the one you have (Home Assistant, Apple, Google, another OTBR - step 3),
+or let the TV form a new one if you have none. Samsung's own SmartThings hub can only create its own network.
+
 Status on the tested TV (firmware in [README.md](README.md)): router in the home partition beside an
 upstream OTBR, LAN -> Thread forwarding proven with a real packet, survives reboots (verified across
 several owner reboots). Standby/wake is not yet confirmed: a 45-minute watch saw it keep routing and the kernel
 never suspend, but whether the TV was switched off during it was not recorded. Thread status
-is on Quiet Home's **Info** tab ("Home network: Connected / Forwarding off").
+is on Quiet Home's **Info** tab ("Home network: Connected / Forwarding off"), with a switch to stop and start it
+(section 5).
 
 ## 1. Radio firmware (once, owner approval)
 
@@ -62,8 +66,9 @@ iptables) and then:
 | Unit | Does |
 |---|---|
 | `quiet-otbr-cpcd` | waits until Samsung's boot-time `iot-hub-control-setup.service` has run and finished, recreates `/tmp/iot_factory_data`, runs the hub `cpcd` (921600, socket `/dev/shm/cpcd/cpcd_0`) |
-| `quiet-otbr-agent` | waits for the cpcd socket, runs the private agent `-s -B eth0 -d 4 "spinel+cpc://cpcd_0?iid=2"` (auto-attaches to the saved network) |
+| `quiet-otbr-agent` | waits for the cpcd socket, runs the private agent `-s -B <backbone> -d 4 "spinel+cpc://cpcd_0?iid=2"` (auto-attaches to the saved network); the backbone is the default-route interface (`eth0` wired, `wlan0` Wi-Fi), waited for up to 2 min |
 | `quiet-otbr-forward` | waits for `wpan0` and Samsung's `matter-setup.path`, then touches `/tmp/matter_setup` every 10 s until IPv6 forwarding is on |
+| `quiet-otbr-switch.path` / `.service` | Quiet Home's Info switch (section 5): applies a flip at once |
 
 Why each wait exists:
 
@@ -80,22 +85,24 @@ Why each wait exists:
 Log: `/run/user/5001/quiet-otbr.log`. Typical boot: cpcd ~15 s, agent ~19 s, router within ~2 min,
 forwarding once Samsung's watcher is up.
 
-## 3. Join the home network (once)
+## 3. Join a network (once)
 
-Take the active dataset from the existing border router into a private file (never print it):
+`device/thread-border-router/otbr-join.sh`, fed to `/bin/sh` on stdin as root, with the choice on its first line
+from a private file (never commit or print a dataset - it is the network key):
+
+| First line | Use when |
+|---|---|
+| `DATASET=<hex>` | you have a Thread network. From Home Assistant: `HA_URL=... HA_TOKEN=... python3 pi/thread_dataset.py ~/.config/quiet-tizen/thread.env` saves HA's preferred network (mode 600). From any OTBR: `ot-ctl dataset active -x`. |
+| `NEW=1` | you have none: the TV forms one. Add it to Home Assistant afterwards (Thread integration). |
+| `FORCE=1` (extra line) | the TV is already attached and you want to replace that network |
 
 ```sh
-ot-ctl dataset active -x          # on the existing OTBR
+cat ~/.config/quiet-tizen/thread.env device/thread-border-router/otbr-join.sh | <root shell on the TV>
 ```
 
-On the TV (`ot-ctl` = `/opt/usr/apps/com.samsung.tizen.smartthings-hub/bin/ot-ctl`), with the units running:
-
-```sh
-ot-ctl dataset set active <hex>; ot-ctl dataset commit active; ot-ctl ifconfig up; ot-ctl thread start
-```
-
-Do not add a prefix: the TV favors the existing OMR prefix. It attaches as a child and becomes a router within
-~2 minutes. The network is saved in `/opt/var/lib/thread`, so later starts rejoin by themselves.
+It refuses to replace an attached network without `FORCE=1` and never echoes the dataset. Do not add a prefix:
+the TV favors the existing OMR prefix. It attaches as a child and becomes a router within ~2 minutes. The network
+is saved in `/opt/var/lib/thread`, so every later start (boot or the Info switch) rejoins by itself.
 
 ## 4. Verify (mesh membership is not border routing)
 
@@ -105,6 +112,24 @@ Do not add a prefix: the TV favors the existing OMR prefix. It attaches as a chi
   destination a Thread address of the other border router) and watch the TV's
   `ip6tables -nvx -L OTBR_FORWARD_CHAIN` eth0 -> wpan0 counter rise. `ot-ctl ping` from the TV only proves
   mesh reachability.
+
+## 5. Info page switch (Quiet Home)
+
+Quiet Home's Info page shows **Thread border router** with a switch, only on TVs where these units are installed.
+
+- Off: Quiet Home creates `thread-off` in its own data directory
+  (`/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data`, persistent; the owner's systemd may read it)
+  and rewrites `thread-switch`. `quiet-otbr-switch.path` sees the rewrite and stops forward, agent, then cpcd
+  (under 2 s). The TV leaves the mesh as a router; other border routers carry it.
+- On: Quiet Home deletes the marker and rewrites `thread-switch`; the units start and rejoin the saved network
+  (router again in ~10 s when the mesh still remembers it, up to ~2 min otherwise).
+- Reboots: every daemon has `ConditionPathExists=!.../thread-off`, so the choice holds at boot and a manual
+  start while off is skipped (a skipped condition never triggers `Restart=`).
+- Off leaves IPv6 forwarding on until the next reboot (Samsung's root script set it; with no `wpan0` nothing is
+  routed).
+
+Upgrading an older install of this recipe: `otbr-switch-update.sh` (keeps the previous units in the backup folder;
+running daemons are not restarted); inverse `otbr-switch-restore.sh` (always-on units, border router running).
 
 ## Pitfalls
 
@@ -120,7 +145,7 @@ Do not add a prefix: the TV favors the existing OMR prefix. It attaches as a chi
 
 ## Undo
 
-`device/thread-border-router/otbr-restore.sh`: removes the units and the private agent, kills only their
+`device/thread-border-router/otbr-restore.sh`: removes the units (including the switch) and the private agent, kills only their
 processes, resets forwarding and `OTBR_FORWARD_CHAIN`, and restores Samsung's labels/owners on the saved network
 and the vendor agent's `=ei`. It keeps the saved network and the radio firmware (see step 1 for stock firmware).
 Tested as a full uninstall/reinstall round trip on the TV.
