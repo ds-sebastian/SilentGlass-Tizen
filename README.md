@@ -5,6 +5,25 @@
 > Start with [devices/s90d/README.md](devices/s90d/README.md). The original U8000F case study below is kept
 > as the reference framework.
 
+## Start here: agent maintenance guide
+
+- [Agent walkthrough](docs/10-agent-workflow.md): choose the S90D/U8000F track,
+  inventory, prepare rollback, apply once, verify normal use and boot behavior.
+- [Access and persistence](docs/11-access-and-persistence.md): compare on-demand
+  access, owner boot tasks, host controllers and Couchroot administration.
+- [Upstream notes](docs/12-upstream-notes.md): pinned sources, useful tips,
+  compatibility limits and reported versus locally verified results.
+- [Phase record template](docs/templates/maintenance-phase.md): private evidence,
+  expected diff, inverse, unknown-outcome handling and acceptance checklist.
+
+This is owner-authorized maintenance of a local TV. Administrative commands can
+run as UID 0 (root); they do not remove SMACK or firmware restrictions. These guides
+use plain language without hiding the access mechanism or changing security boundaries.
+**The bundled `tools/tv.py` remains U8000F-gated.** The S90D track uses a separately
+reviewed external `tv-access`; do not reuse another model's identity to pass a check.
+
+## Original U8000F case study
+
 A practical, agent-readable guide to making a Samsung Tizen TV quieter and
 more useful as an HDMI display.
 
@@ -23,7 +42,16 @@ installer or a replacement operating system.**
 
 ## Give this repository to your coding agent
 
-Clone the repository, open it in Codex, and use:
+Clone the repository, open it in your coding assistant, and use:
+
+> Read AGENTS.md and docs/10-agent-workflow.md. Work only on the local TV I identify.
+> Select the correct device record and compatible helper before contacting it.
+> Inventory first, preserve the features I use, and prepare a narrow inverse before
+> changing anything. Distinguish stored settings, boot tasks and root reacquisition.
+> Use the pinned upstream notes as references, not automatic installation recipes.
+> Report actual readbacks and separately mark reboot, standby and recovery tests.
+
+For reproducing the original U8000F case study, the more specific prompt is:
 
 > Read README.md and AGENTS.md, then inspect the documentation before touching
 > my TV. Help me reproduce Quiet Tizen on a TV I own. First identify its exact
@@ -109,9 +137,12 @@ python3 tools/build.py payloads
 python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
-GitHub Actions runs the offline tests and builds the open-source access
-components and app-catalog tests. The NUI launcher build needs Samsung reference
-assemblies and is deliberately not built from redistributed SDK files.
+The included GitHub Actions workflow defines offline tests, open-source access
+component builds and app-catalog checks; its presence does not prove checks ran
+on a particular fork or commit. Two device-specific tests skip when their ignored
+private inputs are absent; public catalog and offline logic checks still run.
+The NUI launcher build needs matching Samsung reference assemblies and is
+not built from redistributed SDK files.
 
 ## Credits
 

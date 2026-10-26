@@ -1,12 +1,28 @@
 # Samsung QN65S90DAFXZA (S90D, 2024 OLED)
 
 This fork's working target. Owner setup: **SHIELD TV Pro** (via the Q990D soundbar, HDMI 3) is the main
-device, **Nintendo Switch** on HDMI 1; the TV's own apps are backups. Every change below was applied with a
-backup, a guarded inverse and hash verification, and re-checked after reboots.
+device, **Nintendo Switch** on HDMI 1; the TV's own apps are backups. The phases below carry backups,
+guarded inverses and hash checks. Recorded reboot checks apply to their tested phase/version;
+newer edits still need their own acceptance rather than inheriting a blanket reboot guarantee.
 
 - Firmware: `T-PTMDAKUC-0090-REL-202605141701` (system build string `TIZEN-TRUNK2025-PontusM-OSU-2024-HOTFIX-RELEASE_20260514.3`)
-- Admin access: per-command uid-0 sessions over SDB (see `docs/02-access.md`); scripts are fed to `/bin/sh` on
-  **stdin** - unsigned script files cannot be executed under UEP.
+- Admin access: per-command UID-0 (root) sessions through the separately reviewed external
+  `s90c-tools` `tv-access` helper, not the U8000F-gated `tools/tv.py` bundled here.
+  Scripts in this device workflow are fed to `/bin/sh` on **stdin**; direct unsigned-script
+  execution is restricted by UEP. The helper automates acquisition per command; it does not
+  install permanent root or remove SMACK restrictions.
+
+## Agent reading order and evidence scope
+
+Start with the [agent walkthrough](../../docs/10-agent-workflow.md), then the relevant
+scripts and inverse below. Read [access/persistence](../../docs/11-access-and-persistence.md)
+and [upstream notes](../../docs/12-upstream-notes.md) before proposing another boot mechanism.
+The [original access guide](../../docs/02-access.md) documents the U8000F track, not
+an S90D installation command. Phase scripts and benchmark records are dated evidence,
+not proof that every historical phase remains active or passed every boot scenario.
+Re-read current device state and exact hashes before acting; never run every saved
+installer merely because it exists.
+
 
 ## Quiet Home on the S90D (v20d)
 

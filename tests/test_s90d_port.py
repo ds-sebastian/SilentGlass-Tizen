@@ -74,6 +74,8 @@ class S90dPortTests(unittest.TestCase):
             self.assertNotIn(noisy, src)
 
     def test_catalog_only_has_installed_enabled_apps(self):
+        if not INVENTORY.is_file():
+            self.skipTest("private device inventory is not included in a clean checkout")
         rows = list(csv.DictReader(INVENTORY.read_text().splitlines()))
         enabled = {row["app_id"] for row in rows if row["app_disable"] == "false"}
         local = ASSETS / "apps.local.json"

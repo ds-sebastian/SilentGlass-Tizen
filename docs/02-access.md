@@ -1,4 +1,13 @@
-# Developer Mode and temporary root
+# Developer Mode and temporary administrative access
+
+Administrative access in this guide means temporary UID-0 (root) execution through
+the documented access mechanism, not an unrestricted Developer Mode shell.
+
+**Track selection:** the commands below use the original U8000F helper. This fork's
+S90D uses a separately reviewed external `s90c-tools` helper; start with the
+[agent walkthrough](10-agent-workflow.md) and [S90D record](../devices/s90d/README.md).
+Do not substitute the U8000F firmware string on another TV to pass its identity gate.
+For boot-time options and limitations, read [access and persistence](11-access-and-persistence.md).
 
 ## Prepare the computer
 

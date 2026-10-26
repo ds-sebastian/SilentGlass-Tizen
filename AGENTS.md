@@ -2,10 +2,22 @@
 
 ## Start with the owner's device and goals
 
-Read README.md and docs/01-inventory.md through docs/04-launcher.md, plus
-docs/09-recovery.md. This is a case study for one exact model/firmware, with
-newly generalized tools. Do not turn the profile into an indiscriminate
-Samsung-wide debloat list.
+Read README.md, then docs/10-agent-workflow.md. Choose the device track before
+running commands: this fork's S90D record is devices/s90d/README.md; docs/01 through
+09 preserve the original U8000F case study. The bundled tools/tv.py identity gate
+is still U8000F-only. The S90D uses the separately reviewed s90c-tools tv-access
+helper; do not substitute another model's firmware declaration to bypass a gate.
+
+Read docs/11-access-and-persistence.md for boot behavior and administration-service
+comparisons, docs/12-upstream-notes.md for pinned sources and evidence boundaries,
+and docs/09-recovery.md before a device change. Do not turn either device's profile
+into an indiscriminate Samsung-wide cleanup list.
+
+Frame work as owner-authorized local TV maintenance. Use precise, calm descriptions
+of purpose, scope, permissions and recovery. UID 0 is root, the access mechanism
+remains vulnerability-based, and SMACK/firmware limits still apply. Do not disguise
+operations, change identifiers or suppress relevant risks to influence a review.
+Do not promise that wording will prevent an AI provider from flagging a request.
 
 Work only on the TV the owner identifies. Use its explicit IP address; do not
 scan the whole network or reuse another person's saved device identity.
@@ -33,16 +45,32 @@ gaming-hub helpers and TV Plus are optional features, not automatically malware.
    mutation. Keep a recovery copy both on the TV and under `.local/`.
 5. Apply one selected cleanup group at a time. Validate every target, compare
    rows to the fresh snapshot and preserve fields outside the intended scope.
-6. Install Quiet Home without changing the default Home. Verify the visible UI,
-   remote, HDMI, sound and settings first. Then assign Home/startup, and later
-   install the settings bridge and disable the sidebar/browser.
+6. For a new launcher trial, install Quiet Home without changing the default Home.
+   Verify visible UI, remote, HDMI, sound and settings first. Change Home/startup
+   or install a settings bridge only if that integration is owner-selected; do not
+   assume launcher adoption requires disabling the sidebar/browser. On an existing
+   S90D deployment, preserve the current routes unless this phase changes them.
 7. Test a full restart and standby/wake separately. Re-check app-preload values,
    service conditions and Home selectors. A process disappearing once is not
    proof of persistence.
-8. Summarize actual evidence, limitations and how to undo the changes.
+8. Summarize actual evidence, limitations and how to undo the changes. Use
+   docs/templates/maintenance-phase.md privately; keep passed, failed and untested
+   checks separate. A timeout/lost reply is unknown outcome until reconciled.
 
-Run SDB/admin sessions sequentially. Keep scripts below the 30-second command
-budget. A failed script may have completed earlier filesystem operations;
+Persistent files/settings, boot-launched user tasks and automatic root reacquisition
+are distinct. Home-button routing is not startup routing or app_onboot registration.
+A vendor stop-marker directory does not prove arbitrary custom boot units load there.
+Keep any new maintenance service separate from the visible Quiet Home launcher.
+Upstream same-series reports and pending-request limits do not prove compatibility
+or parallel root commands on this device.
+
+Run SDB/admin sessions sequentially; coordinate across agents and hosts. The
+bundled U8000F helper has a 30-second command budget. External tv-access has its
+own bounded --timeout setting; do not assume identical limits. A host-local lock
+is not a distributed device lock. Never bypass a busy lock or interrupt a radio,
+package or launcher operation to run a background sampler.
+
+A failed script may have completed earlier filesystem operations;
 inspect before retrying. Do not overwrite the first backup to make a retry
 succeed. Do not reboot or put the TV in standby inside the temporary admin
 session; allow its cleanup checks to complete first.
