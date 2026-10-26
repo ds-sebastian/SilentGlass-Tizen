@@ -36,7 +36,7 @@ public static class HomeLogic
  public sealed class Prefs
  {
   public int Watch,Play;          // 0 = Automatic
-  public bool HideApps,Live=true,Dim=true;
+  public bool HideApps,Live=true,Dim=true,Overlay=true;
   public string Wall="auto";      // auto (sunrise/sunset) | day | night
  }
  public static readonly string[] WallModes={"auto","day","night"};
@@ -44,10 +44,10 @@ public static class HomeLogic
  {
   var c=ParseConf(text);
   int Port(string k)=>c.TryGetValue(k,out var v)&&int.TryParse(v,out int n)&&(n==0||IsHdmi(n))?n:0;
-  return new Prefs{Watch=Port("watch"),Play=Port("play"),HideApps=Flag(c,"hideapps",false),Live=Flag(c,"live",true),Dim=Flag(c,"dim",true),Wall=Pick(c,"wall","auto",WallModes)};
+  return new Prefs{Watch=Port("watch"),Play=Port("play"),HideApps=Flag(c,"hideapps",false),Live=Flag(c,"live",true),Overlay=Flag(c,"overlay",true),Dim=Flag(c,"dim",true),Wall=Pick(c,"wall","auto",WallModes)};
  }
  public static string FormatPrefs(Prefs p)=>
-  "watch="+p.Watch+"\nplay="+p.Play+"\nhideapps="+(p.HideApps?1:0)+"\nlive="+(p.Live?1:0)+"\ndim="+(p.Dim?1:0)+"\nwall="+p.Wall+"\n";
+  "watch="+p.Watch+"\nplay="+p.Play+"\nhideapps="+(p.HideApps?1:0)+"\nlive="+(p.Live?1:0)+"\noverlay="+(p.Overlay?1:0)+"\ndim="+(p.Dim?1:0)+"\nwall="+p.Wall+"\n";
  public static string NextWall(string mode)=>WallModes[(Array.IndexOf(WallModes,mode)+1)%WallModes.Length];
  // tab bar Left/Right over Home 0, Apps 1, Controls 2, Info 3: a hidden Apps tab is skipped, the ends stop
  public static int NextTab(int page,int d,bool hideApps){int n=page+d;if(hideApps&&n==1)n+=d;return n<0||n>3?page:n;}

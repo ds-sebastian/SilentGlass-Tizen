@@ -19,7 +19,7 @@ public sealed partial class QuietHome
   if(stateTimer==null){stateTimer=new Tizen.NUI.Timer(600);stateTimer.Tick+=(s,e)=>{WriteState(stateActivity);return false;};}
   if(!stateTimer.IsRunning())stateTimer.Start();
  }
- const string StyleVersion="liquid-v29b";
+ const string StyleVersion="liquid-v30c";
  void WriteState(string activity)
  {
   stateTimer?.Stop();
@@ -42,7 +42,7 @@ public sealed partial class QuietHome
   Put("foreground",lastForeground);Put("foreground_watch",foregroundWatch);Put("ambient_returns",ambientReturns);
   Put("signal",signal);Put("signal_events",signalEvents);Put("style_conf",StyleName+"("+style.Source+")");Put("blur_created",blurSurfaces);
   Put("bench_s",style.Bench);Put("build_ms_by_page",BuildStats());Put("live",liveState);Put("live_geometry",liveGeometry);Put("live_unmute",liveUnmute);
-  Put("dimmed",dimmed);Put("idle_s",(Environment.TickCount64-lastActivity)/1000);
+  Put("overlay",(over?"on":"off")+":"+overState+":veil"+veilKind);Put("contrast",SettingValue("contrast"));Put("dimmed",dimmed);Put("idle_s",(Environment.TickCount64-lastActivity)/1000);
   b.Append('\n');
   try{File.WriteAllText(StateFile,b.ToString());}catch{}
  }

@@ -6,7 +6,7 @@ using Tizen.NUI.BaseComponents;
 
 // Look and measurement tunables, read once at start from /tmp/quiet-home-live.conf (never on the key path):
 //  squircle=0|1  continuous (Apple) corners          vsync=N  render every Nth vsync (1 = 60 fps; DALi's default here is 2)
-//  herofade=1    unfocused heroes fade instead of darkening
+//  herofade=1    unfocused heroes fade instead of darkening   overlay=0  Home never draws over the picture
 //  wall=photo|gradient  wallmode=auto|day|night  lat= lon=   (Home.Wallpaper.cs)
 //  bench=N       keep redrawing every frame for N s after start/resume: the worst case, for GPU/fps measurements
 // Measured on the S90D while redrawing every frame (devices/s90d/bench/): flat UI 14% GPU @30 fps, 35% @60;
@@ -14,13 +14,13 @@ using Tizen.NUI.BaseComponents;
 // Real backdrop blur is used only where the backdrop moves (Inputs sheet, toast); shadows stay small (Apple-style).
 public sealed partial class QuietHome
 {
- sealed class StyleConf { public int Bench,Vsync=1; public bool Squircle=true,HeroFade; public string Wall="photo",WallMode="auto",Source="default"; public double Lat=40.7,Lon=-74.0; }
+ sealed class StyleConf { public int Bench,Vsync=1; public bool Squircle=true,HeroFade,Overlay=true; public string Wall="photo",WallMode="auto",Source="default"; public double Lat=40.7,Lon=-74.0; }
  StyleConf style=new StyleConf();
  static StyleConf ReadStyleConf()
  {
   var c=HomeLogic.ReadConf(LiveConfPath);
   return new StyleConf{
-   Source=c.Count>0?"file":"default",Squircle=HomeLogic.Flag(c,"squircle",true),HeroFade=HomeLogic.Flag(c,"herofade",false),
+   Source=c.Count>0?"file":"default",Squircle=HomeLogic.Flag(c,"squircle",true),HeroFade=HomeLogic.Flag(c,"herofade",false),Overlay=HomeLogic.Flag(c,"overlay",true),
    Vsync=HomeLogic.Int(c,"vsync",1,1,4),Bench=HomeLogic.Int(c,"bench",0,0,120),
    Wall=HomeLogic.Pick(c,"wall","photo","photo","gradient"),WallMode=HomeLogic.Pick(c,"wallmode","auto","auto","day","night"),
    Lat=HomeLogic.Num(c,"lat",40.7),Lon=HomeLogic.Num(c,"lon",-74.0)};

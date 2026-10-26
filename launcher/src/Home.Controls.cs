@@ -12,7 +12,9 @@ public sealed partial class QuietHome
  readonly Dictionary<string,string> settingValues=new Dictionary<string,string>();
  readonly Dictionary<string,string> settingNames=new Dictionary<string,string>();
  readonly Dictionary<string,bool> settingEnabled=new Dictionary<string,bool>();
- double brightnessMin,brightnessMax=50,brightnessStep=1;
+ // picture levels the TV reports a range for (brightness, contrast): min, max, step
+ readonly Dictionary<string,(double min,double max,double step)> ranges=new Dictionary<string,(double,double,double)>();
+ (double min,double max,double step) Range(string id)=>ranges.TryGetValue(id,out var r)?r:(0,50,1);
  [return: MarshalAs(UnmanagedType.U1)][DllImport("/usr/lib/libsource-api.so")] static extern bool connect_source(int sourceType);
  [DllImport("libvconf.so.0")] static extern int vconf_get_int(string key,out int value);
  [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_create(out IntPtr app);
@@ -37,7 +39,8 @@ public sealed partial class QuietHome
   if(page==2){
    currentVolume=sound_manager_get_master_volume(out var v)==0?v:-1;
    currentMute=sound_manager_get_master_mute(out var m)==0?m:-1;
-   try{if(!CSharpGetItemMinMaxStepValue("brightness",out brightnessMin,out brightnessMax,out brightnessStep)||brightnessStep<=0){brightnessMin=0;brightnessMax=50;brightnessStep=1;}}catch{}
+   foreach(var id in new[]{"brightness","contrast"})
+    try{if(CSharpGetItemMinMaxStepValue(id,out var mn,out var mx,out var st)&&st>0&&mx>mn)ranges[id]=(mn,mx,st);}catch{}
   }
   foreach(var id in ids){
    try{if(CSharpGetItemValue(id,out var name,out var value)&&!string.IsNullOrEmpty(value)){settingValues[id]=value;settingNames[id]=name;}else{settingValues.Remove(id);settingNames.Remove(id);}
@@ -45,8 +48,16 @@ public sealed partial class QuietHome
    }catch{settingValues.Remove(id);settingNames.Remove(id);settingEnabled[id]=false;}
   }
  }
- void RefreshTileValues(){foreach(var s in slots)if(s.Kind==2&&s.Label!=null){var v=TileValue(s.Action);if(s.Label.Text!=v)s.Label.Text=v;}}
- static readonly string[] SettingIds={"brightness","game-mode","sleeptimer","external-sound-mode","soundoutput","picturemode","game-mode-auto","pixel-shift-menu"};
+ void RefreshTileValues()
+ {
+  foreach(var s in slots){
+   if((s.Kind!=2&&s.Kind!=5)||s.Label==null)continue;
+   var v=TileValue(s.Action);if(over&&editing==s.Action)v="‹  "+v+"  ›"; // adjusting: Left / Right
+   if(s.Label.Text!=v)s.Label.Text=v;
+   if(s.Bar!=null){float l=TileLevel(s.Action);s.Bar.Size2D=new Size2D(l<0?0:(int)(s.BarW*Math.Clamp(l,0f,1f)),8);}
+  }
+ }
+ static readonly string[] SettingIds={"brightness","contrast","game-mode","sleeptimer","external-sound-mode","soundoutput","picturemode","game-mode-auto","pixel-shift-menu"};
  static readonly string[] HomeSettingIds={"sleeptimer","soundoutput"};
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemDataList(string id,System.Text.StringBuilder list);
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemDataListEnable(string id,string value,out bool enabled);
@@ -71,6 +82,8 @@ public sealed partial class QuietHome
  string TileValue(string action){
   switch(action){
    case "volume":return currentVolume<0?"Unavailable":currentVolume.ToString();
+   case "brightness":case "contrast":return SettingValue(action)!=""?SettingValue(action):"Unavailable";
+   case "full:2":return "All controls";
    case "mute":return currentMute<0?"Unavailable":currentMute==1?"Muted":"Sound on";
    case "output":return SettingValue("soundoutput")=="2"?"Soundbar":SettingValue("soundoutput")=="0"?"TV Speaker":SettingName("soundoutput");
    case "network":return "Connections";
@@ -95,7 +108,7 @@ public sealed partial class QuietHome
   if(!verified)ShowError("The TV could not apply this setting. Try Advanced settings.");
   MarkState("setting:"+id+":"+value+":"+verified);
  }
- void ChangeBrightness(int delta){double n;if(double.TryParse(SettingValue("brightness"),NumberStyles.Float,CultureInfo.InvariantCulture,out n))SetSetting("brightness",Math.Max(brightnessMin,Math.Min(brightnessMax,n+delta*brightnessStep)).ToString(CultureInfo.InvariantCulture));}
+ void ChangeLevel(string id,int delta){var (mn,mx,st)=Range(id);if(double.TryParse(SettingValue(id),NumberStyles.Float,CultureInfo.InvariantCulture,out double n))SetSetting(id,Math.Max(mn,Math.Min(mx,n+delta*st)).ToString(CultureInfo.InvariantCulture));}
  void ChangeVolume(int delta){int n;int r=sound_manager_get_master_volume(out n);if(r==0)r=sound_manager_set_master_volume(Math.Max(0,Math.Min(100,n+delta)));if(r!=0)ShowError("Use the remote's volume buttons.");RefreshSettings();RefreshTileValues();MarkState("volume_changed");}
  // connect_source returns a C bool; the result is recorded, the viewer is opened either way (unchanged behaviour)
  void SelectSource(int source){bool ok=false;try{ok=connect_source(source);}catch{}lastSource=source;MarkState("source:"+source+":"+ok);Launch("org.tizen.tv-viewer");}

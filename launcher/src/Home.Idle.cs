@@ -13,6 +13,8 @@ public sealed partial class QuietHome
  void IdleTick()
  {
   if(dimmed){MoveDimClock();return;}
+  // over the picture nothing is dimmed: the controls step aside after two idle minutes
+  if(over){if(visible&&editing==""&&inputsLayer==null&&Environment.TickCount64-lastActivity>=120000)Dismiss();return;}
   if(prefs.Dim&&editing==""&&Environment.TickCount64-lastActivity>=IdleMs)Dim();
  }
  void Dim()

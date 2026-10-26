@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v30c**: **Home over the picture** (tvOS 26 direction). With a picture on screen, Home no longer covers it: a Liquid
+  Glass dock (inputs, Inputs, Controls, Info, optional apps row), a Control Center column on the right (brightness,
+  contrast and volume as level tiles - the effect is visible on the picture as it changes), and Info over the
+  wallpaper at 92%. Full-screen 1920x1080 `VideoCanvasView` behind a transparent window; verified on the TV that the
+  plane stays full screen and source/signal never change. Contrast added to the settings. v30a/v30b were trials (a
+  clipped Picture Mode value; the Inputs sheet overlapping the apps row).
 - **v29b**: the Watch/Play cards show the TV's own input names (no more built-in "SHIELD" / "Nintendo Switch"), and
   re-read them on Home, on resume and every 30 s while Home is shown (renames fire no source-list event).
 - **v28a**: accepts `quiet_source=<id>` app-control requests (from the Home Assistant bridge) and switches input exactly

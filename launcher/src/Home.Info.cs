@@ -116,12 +116,13 @@ public sealed partial class QuietHome
   Text("SilentGlass Home",108,SetY-50,600,40,26,muted,"Semibold");
   int n=0;
   SettingTile(n++,"Apps tab","Samsung apps and Home","apps","toggle:apps",!prefs.HideApps);
+  SettingTile(n++,"Home over video","The picture keeps playing","picture","toggle:overlay",prefs.Overlay);
   SettingTile(n++,"Live preview","Video in the input card","picture","toggle:live",prefs.Live);
   SettingTile(n++,"Dim when idle","Black after 5 minutes","sleep","toggle:dim",prefs.Dim);
   if(wallpaper!=null)SettingTile(n++,"Wallpaper",prefs.Wall=="auto"?"Follows sunset":prefs.Wall=="day"?"Always day":"Always night","wallpaper","toggle:wall",null,
    prefs.Wall=="auto"?"Auto":prefs.Wall=="day"?"Day":"Night");
   if(ThreadSwitchable())SettingTile(n++,"Thread border router","Smart-home mesh","thread","toggle:thread",ThreadWanted());
-  if(n<6)AboutTile(n);
+  if(n%3!=0||n<9)AboutTile(n);
 
   if(fresh)InfoTick();
   if(infoTimer==null){infoTimer=new Tizen.NUI.Timer(2000);infoTimer.Tick+=(s,e)=>{if(page!=3)return false;InfoTick();return true;};}

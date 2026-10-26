@@ -24,7 +24,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## SilentGlass Home (v29b)
+## SilentGlass Home (v30c)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -44,6 +44,28 @@ LAN address blurred.*
 
 ### Pages
 
+**Over the picture** (v30c, default): when Home is pressed while an input has a picture, the picture keeps playing full
+screen and only the following is drawn over it ([`Home.Overlay.cs`](../../launcher/src/Home.Overlay.cs)):
+
+- **Dock**: one glass tray at the bottom - Watch and Play (the TV's input names, status dot), Inputs, Controls, Info;
+  with the Apps tab on, a second smaller row of the TV's apps and Samsung Home in the same tray.
+- **Controls**: a Control Center column on the right: Brightness, Contrast and Volume as level tiles (Select, then
+  Left/Right; the bar and value follow), Picture Mode, Game Mode, Sound output and mode, Sleep Timer, Mute, then
+  Ambient, Inputs, All Controls (the full-screen page) and Samsung's settings.
+- **Info**: the full Info page over the photo wallpaper at 92% - text-heavy, so nearly opaque.
+- Keys: Back closes Controls/Info to the dock and the dock to the picture; Home on the dock also returns to the
+  picture; choosing the input already on screen just closes the dock (no re-sync). The dock steps aside after two idle
+  minutes; nothing is ever dimmed over the picture.
+- How: the window stays an ordinary app window, transparent with the `wm.tvs.win.use.tvs` hint, with a full-screen
+  FLUX `VideoCanvasView` at the very back (the live-preview mechanism at 1920x1080). Checked on the TV: the video plane
+  stays at 1920x1080 and the source and signal never change while the dock, Controls and Info open and close. The plane
+  cannot be blurred, so glass over it is a dark tint plus the rim shader, with a soft dimming band behind text (Apple's
+  guidance for clear glass over bright media).
+- Off: the Info tile *Home over video*, or `overlay=0` in `/tmp/quiet-home-live.conf`. Without a picture, or if the
+  video cannot be attached, Home is the full-screen launcher.
+
+**Full screen** (no picture, or *Home over video* off):
+
 - **Home**: *Watch* (SHIELD) and *Play* (Switch) hero cards; the current input's card is wide and shows live video.
   Below: Inputs (sheet of HDMI 1-4 + Live TV), Ambient, Sleep Timer, Sound, More (opens Controls).
 - **Apps** (can be hidden from Info): the TV's own apps and Samsung Home - backups, since the SHIELD has the real ones.
@@ -61,7 +83,8 @@ from an older version loads with the defaults for anything new):
 
 | Tile | Default | Does |
 |---|---|---|
-| Apps tab | on | hidden = the tab bar shows Home, Controls, Info and Left/Right skip the Apps spot |
+| Apps tab | on | hidden = the tab bar shows Home, Controls, Info and Left/Right skip the Apps spot; over the picture, the dock's apps row |
+| Home over video | on | Home, Controls and Info open over the playing picture instead of full screen |
 | Live preview | on | video of the current input inside its hero card |
 | Dim when idle | on | OLED care: fade to black with a drifting dim clock after 5 idle minutes |
 | Wallpaper | Auto | Auto (switch at local sunrise/sunset) / Day / Night; only with the photo wallpaper installed |
@@ -69,7 +92,7 @@ from an older version loads with the defaults for anything new):
 | Watch Input / Play Input (Controls) | Automatic | which HDMI input each hero card opens; never both the same |
 
 For development and measurement only: `/tmp/quiet-home-live.conf` (key=value lines, read at start; cleared on
-reboot): `squircle=0|1`, `vsync=N` (render every Nth vsync, 1 = 60 fps), `herofade=1`, `wall=photo|gradient`,
+reboot): `squircle=0|1`, `vsync=N` (render every Nth vsync, 1 = 60 fps), `herofade=1`, `overlay=0` (never over the picture), `wall=photo|gradient`,
 `wallmode=auto|day|night` (only while the Wallpaper tile is Auto), `lat=`/`lon=` (sunset location, default
 New York), `bench=N` (redraw every frame for N s), `enabled=0` (no preview), `scrim=0` (no band behind the words).
 

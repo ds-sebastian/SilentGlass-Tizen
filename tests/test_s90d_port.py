@@ -74,7 +74,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn('Hero("Play","hdmi:"+playPort,InputName(playPort)', launcher())
         # renames fire no source-list event: Home, resume and the 30 s clock tick re-read and compare the card names
         self.assertIn("if(page==0&&(watchName!=InputName(watchPort)||playName!=InputName(playPort))){BuildPage(false);", launcher())
-        self.assertIn("clockTimer?.Start();CloseInputs(false);OnInputsChanged(false);", launcher())
+        self.assertIn("OnInputsChanged(false);ReadSignal();", launcher())
         # no device names baked into the UI: the TV's input names are used as they are
         for name in ("Nintendo Switch", '"SHIELD"', "PlayStation"):
             self.assertNotIn(name, launcher())
@@ -259,7 +259,7 @@ class S90dPortTests(unittest.TestCase):
         # idle check only runs from the clock timer, which is stopped while Quiet Home is in the background
         self.assertIn("IdleTick();if(visible&&page==0&&inputsLayer==null)OnInputsChanged(false);return true;", src)
         on_pause = body(src, "protected override void OnPause()")
-        self.assertIn("CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();", on_pause)
+        self.assertIn("CloseInputs(false);DropVideoBack();ReleaseLiveWindow();clockTimer?.Stop();", on_pause)
         # first key press only wakes, never activates a tile
         on_key = body(src, "void OnKey(")
         self.assertLess(on_key.index("if(dimmed){Wake(true);"), on_key.index("HandleKey(k)"))
@@ -469,7 +469,7 @@ class S90dPortTests(unittest.TestCase):
         toggle = body(src, "void ToggleSetting(")
         for case in ('case "apps":', 'case "live":', 'case "dim":', 'case "wall":', 'case "thread":'):
             self.assertIn(case, toggle)
-        self.assertEqual(toggle.count("SavePrefs();"), 4)  # thread is stored as its marker file instead
+        self.assertEqual(toggle.count("SavePrefs();"), 5)  # thread is stored as its marker file instead
         self.assertIn("prefs.Live&&page==0", (SRC / "Home.Live.cs").read_text())
         self.assertIn("if(prefs.Dim&&editing==", (SRC / "Home.Idle.cs").read_text())
         self.assertIn('string WallMode=>prefs.Wall!="auto"?prefs.Wall:style.WallMode;', (SRC / "Home.Wallpaper.cs").read_text())
@@ -520,7 +520,7 @@ class S90dPortTests(unittest.TestCase):
         self.assertIn("var art=hero.Card.GetChildAt(0);", update)
         # the status dot must not flicker with the signal flag
         self.assertIn("signalTimer=new Tizen.NUI.Timer(800)", src)
-        self.assertIn('page==0&&visible&&!dimmed&&CurrentHasSignal', update)
+        self.assertIn('page==0&&!over&&visible&&!dimmed&&CurrentHasSignal', update)
         self.assertIn('s.Action=="hdmi:"+lastSource', update)
         self.assertIn("catch(Exception ex){liveState=\"failed:\"", update)
         # released whenever Home is left: pause, OLED dim, page rebuild
@@ -544,7 +544,7 @@ class S90dPortTests(unittest.TestCase):
     def test_chrome_is_built_once(self):
         src = launcher()
         self.assertEqual(src.count('"free-background.svg"'), 1)
-        self.assertIn("win.Add(BuildWallpaper());", body(src, "void BuildChrome()"))
+        self.assertIn("wallLayer=BuildWallpaper();win.Add(wallLayer);", body(src, "void BuildChrome()"))
         self.assertIn('"free-background.svg"', body(src, "View BuildWallpaper()"))
         self.assertNotIn("BuildChrome()", body(src, "void BuildPage("))
         # page content is the only thing disposed on a page change
@@ -557,3 +557,54 @@ class S90dPortTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class S90dOverlayTests(unittest.TestCase):
+    """Home over the picture (Home.Overlay.cs): the input keeps playing, SilentGlass draws only over it."""
+
+    def setUp(self):
+        self.src = (SRC / "Home.Overlay.cs").read_text()
+        self.home = (SRC / "Home.cs").read_text()
+
+    def test_picture_stays_full_screen_behind_the_window(self):
+        show = body(self.src, "void ShowVideoBack()")
+        self.assertIn("new Tizen.TV.FLUX.VideoCanvasView{Size2D=new Size2D(1920,1080)", show)
+        self.assertIn("canvas.LowerToBottom();", show)
+        self.assertIn("ForceUpdateVideoGeometry(0,0,1920,1080)", body(self.src, "void PushBack()"))
+        # a failed attach falls back to the full-screen Home instead of a black screen
+        self.assertIn("if(on&&backView==null)on=false;", body(self.src, "bool SetOverlay("))
+
+    def test_only_when_there_is_a_picture_and_it_can_be_switched_off(self):
+        self.assertIn("bool WantOverlay()=>prefs.Overlay&&style.Overlay&&CurrentHasSignal&&page!=1;", self.src)
+        self.assertIn('case "overlay":prefs.Overlay=!prefs.Overlay;SavePrefs();if(!prefs.Overlay)SetOverlay(false);', (SRC / "Home.Prefs.cs").read_text())
+        self.assertIn('Overlay=Flag(c,"overlay",true)', (SRC / "HomeLogic.cs").read_text())
+
+    def test_back_and_home_return_to_the_picture_without_a_resync(self):
+        self.assertIn('void Dismiss(){MarkState("overlay_dismiss");Launch("org.tizen.tv-viewer");}', self.src)
+        self.assertIn("if(over&&page==0&&showing){Dismiss();return;}", body(self.home, "void Home("))
+        self.assertIn("if(over&&src==lastSource){Dismiss();return;}", self.home)  # the input on screen: no connect_source
+        self.assertIn("if(page==0)Dismiss();else{page=0;", self.home)
+
+    def test_pages_over_the_picture(self):
+        self.assertIn("if(over){PresentOverlayPage();if(page==0)BuildDock();else if(page==2)BuildCenter();else BuildInfo();}", self.home)
+        present = body(self.src, "void PresentOverlayPage()")
+        self.assertIn("wallLayer.Opacity=info?.92f:1;", present)  # Info: nearly opaque for reading
+        self.assertIn("SetVeil(page==0?0:page==2?1:-1);", present)
+
+    def test_dock_apps_row_follows_the_apps_setting(self):
+        dock = body(self.src, "void BuildDock()")
+        self.assertIn("var apps=prefs.HideApps?new List<LibraryApp>():library.FindAll(a=>!a.Utility);", dock)
+        self.assertIn('DockInput(watchPort,"feature-watch-wide.svg",x,y);', dock)
+        self.assertIn('DockInput(playPort,"feature-play-wide.svg",x,y);', dock)
+        self.assertIn("InputName(port)", body(self.src, "void DockInput("))
+
+    def test_controls_keep_the_picture_in_view_and_adjust_levels(self):
+        cc = body(self.src, "void BuildCenter()")
+        for tile in ('"Brightness","brightness"', '"Contrast","contrast"', '"Picture Mode","cycle:picturemode"', '"Volume","volume"'):
+            self.assertIn(tile, cc)
+        self.assertIn('else ChangeLevel(editing,d);', self.home)
+        self.assertIn('static readonly string[] SettingIds={"brightness","contrast",', (SRC / "Home.Controls.cs").read_text())
+
+    def test_overlay_never_dims_the_picture(self):
+        idle = (SRC / "Home.Idle.cs").read_text()
+        self.assertIn('if(over){if(visible&&editing==""&&inputsLayer==null&&Environment.TickCount64-lastActivity>=120000)Dismiss();return;}', idle)
