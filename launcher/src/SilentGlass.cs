@@ -15,7 +15,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v40a";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v40h";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -31,17 +31,21 @@ public sealed partial class SilentGlass : NUIApplication
         try { SetRenderRefreshRate(1); } catch { }  // DALi draws every 2nd vsync here by default: 60 fps
         LoadPrefs();
         BuildBackdrop();  // hidden until there is nothing to draw over; never flashes over the picture
+        EnsureOverlay();  // created while the app's main window is still up (as v31 did), so it can take focus later
         WatchTv(); WatchData();
         minuteTimer = new Tizen.NUI.Timer(30000);
         minuteTimer.Tick += (s, e) => { MinuteTick(); return true; };
         minuteTimer.Start();
-        if (NoticePending()) TakeNotice("start");  // started by the bridge only to show a notification
+        // started by the bridge only to show a notification: stay hidden, the picture stays in front
+        if (NoticePending()) { HideBackdrop(); TakeNotice("start"); }
         Note("created");
     }
     // AMD resumes us for every launch request; what to show is decided in OnAppControlReceived
-    protected override void OnResume() { base.OnResume(); Note("resumed"); }
-    // another app is in front: nothing of ours may stay up, or the next Home press would flash it
-    protected override void OnPause() { base.OnPause(); CloseOverlay(null); HideBackdrop(); WriteState("paused"); }
+    protected override void OnResume() { base.OnResume(); Note("resumed fg=" + Foreground()); }
+    // The TV also pauses us whenever our main window is hidden - i.e. whenever only the overlay is up - so a pause
+    // alone must not close it. Another app coming to the front does (OnForegroundChanged); the backdrop never stays
+    // behind anything.
+    protected override void OnPause() { base.OnPause(); if (!overlayShown) HideBackdrop(); Note("paused"); WriteState("paused"); }
 
     protected override void OnAppControlReceived(AppControlReceivedEventArgs e)
     {
@@ -87,6 +91,7 @@ public sealed partial class SilentGlass : NUIApplication
         long t0 = Stopwatch.GetTimestamp();
         try { HandleKey(k, arrow); } catch (Exception ex) { Note("key-error:" + ex.GetType().Name); }
         keyCount++; keyTicksMax = Math.Max(keyTicksMax, Stopwatch.GetTimestamp() - t0);
+        Note("key " + k);  // coalesced: the state file is written later by a timer, never here
     }
     static bool IsBack(string k) => k == "XF86Back" || k == "Back" || k == "Escape" || k == "XF86Exit";
     static bool IsSelect(string k) => k == "Return" || k == "KP_Enter";
@@ -108,9 +113,11 @@ public sealed partial class SilentGlass : NUIApplication
     // (one write per 600 ms at most, never on the key path). ----
     const string StateFile = "/tmp/silentglass-state.txt";
     Tizen.NUI.Timer stateTimer; string activity = "";
+    readonly Queue<string> trail = new();  // the last few events, for diagnosing on the TV
     void Note(string what)
     {
         activity = what;
+        trail.Enqueue(DateTime.Now.ToString("HH:mm:ss.f") + " " + what); while (trail.Count > 16) trail.Dequeue();
         if (stateTimer == null) { stateTimer = new Tizen.NUI.Timer(600); stateTimer.Tick += (s, e) => { WriteState(activity); return false; }; }
         if (!stateTimer.IsRunning()) stateTimer.Start();
     }
@@ -129,6 +136,7 @@ public sealed partial class SilentGlass : NUIApplication
         Put("prefs", Logic.FormatPrefs(prefs).Trim().Replace('\n', ','));
         Put("brightness", Setting("brightness")); Put("contrast", Setting("contrast")); Put("picturemode", Setting("picturemode"));
         Put("game", Setting("game-mode-auto")); Put("volume", volume);
+        Put("trail", string.Join(" | ", trail));
         Put("notice", noticeState); Put("setup", setupState); Put("dimmed", dimmed); Put("library", library.Count);
         b.Append('\n');
         try { File.WriteAllText(StateFile, b.ToString()); } catch { }

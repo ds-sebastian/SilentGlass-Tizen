@@ -95,6 +95,7 @@ public sealed partial class SilentGlass
         if (i == null) return ("Offline", Amber);
         bool wifi = i.StartsWith("wlan");
         string detail = wifi ? (InfoStats.WifiLevel(i) is int dbm ? dbm + " dBm" : null) : InfoStats.LinkSpeed(i);
+        if (detail != null) { int d = detail.IndexOf(" full", StringComparison.Ordinal); if (d < 0) d = detail.IndexOf(" half", StringComparison.Ordinal); if (d > 0) detail = detail.Substring(0, d); }
         return ((wifi ? "Wi-Fi" : "Wired") + (detail != null ? " · " + detail : ""), Live);
     }
     (string, Color) ThreadStatus()

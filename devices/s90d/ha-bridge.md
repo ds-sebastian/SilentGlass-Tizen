@@ -103,6 +103,8 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
 
 ## Set up from a phone
 
+![Setup sheet on the TV](../../docs/screenshots/s90d-setup.jpg)
+
 On the TV: **Home > Info > Home Assistant**. A sheet shows a QR code and a 6-digit code; scan the code with a phone on
 the same network (or open the address shown and type the code). The page, served by the bridge on port 7680, has:
 

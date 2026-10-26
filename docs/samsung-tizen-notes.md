@@ -156,6 +156,15 @@ are ordinary optional features rather than trackers.
   - the TV can leave the main video muted while the viewer is in the background: `IAVControl.MuteVideo(0)` on attach;
   - check placement without screenshots: `enlightenment_info -hwc_wins` (the `VD` plane's `dst_pos`); the video
     plane never appears in a UI capture.
+- **Cold start and focus:** when an app launches, the TV shows a placeholder window (`[WIND]<appid>`) that holds the
+  remote's keys until the app's main window has been shown. Hiding the main window in `OnCreate` leaves the
+  placeholder in charge, so a notification window opened later appears but never receives a key. Let the main
+  window show, then hide it.
+- **Pause:** the TV pauses an app whenever its main window is hidden, even if one of its notification windows is up
+  and focused. Use the foreground app (`memory/appfw/current_fullscreen_appid`), not `OnPause`, to decide that
+  another app has taken over.
+- **Remote keys from Home Assistant** (Samsung TV integration, `remote.send_command`) can arrive seconds late or
+  bunched together. Fine for occasional use; space test sequences out or check the app's own state between keys.
 - **Rendering:** DALi renders every second vsync by default; `SetRenderRefreshRate(1)` gives 60 fps.
   `CornerSquareness` gives continuous corners. The TV's SVG renderer handles `fill-rule="evenodd"` but no masks or
   clip paths.

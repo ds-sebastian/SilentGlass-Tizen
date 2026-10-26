@@ -23,12 +23,14 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## SilentGlass (v40a)
+## SilentGlass (v40h)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
 Version history: [changelog.md](changelog.md). On the TV it keeps its original file names (`quiet-home-*` resources,
 `quiet-otbr-*` units), so earlier installs and restore scripts keep working.
+
+![The bar over the picture](../../docs/screenshots/s90d-overlay-bar.jpg)
 
 ### Overlays only
 
@@ -55,6 +57,8 @@ playing; nothing touches the video plane.
   capsule focus, SF Symbols-style icons (`tools/make_symbols.py`). `tools/overlay_mockup.py OUTDIR` renders the same
   screens 1:1 on the Pi before anything goes to the TV.
 
+![Info](../../docs/screenshots/s90d-info.jpg)
+
 ### Settings
 
 On the TV (Info; saved as `silentglass-prefs.txt` in the app's data directory, so they survive reboots; an older
@@ -80,6 +84,9 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   the soundbar the SHIELD reports Off.
 - **Ambient**: the Art app always hands Home to Samsung Home (hard-coded); SilentGlass watches the foreground app and
   brings itself back on that one hand-off.
+- **Cold start**: the TV's launch placeholder holds the remote's keys until the app's main window has been shown once,
+  so that window starts shown (black, empty) and Home hides it as the bar opens. The TV also pauses the app whenever
+  only the overlay is up; a pause never closes the overlay - another app coming to the front does.
 - **Launch extras** (from the bridge, QuickLaunch or Home Assistant): `sg_open=controls|info|apps|inputs|setup`,
   `sg_source=<type>` (switch input), `sg_notice=1` (start hidden for a notification).
 - **State file** `/tmp/silentglass-state.txt` (coalesced, never on the key path): version, what is showing

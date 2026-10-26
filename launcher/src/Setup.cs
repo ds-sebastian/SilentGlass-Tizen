@@ -74,7 +74,11 @@ public sealed partial class SilentGlass
             case "phone": SetupLine("Your phone is connected - finish there.", Live); break;
             case "saved": SetupLine(c["message"].Length > 0 ? c["message"] : "Saved.", Live); break;
             case "error": SetupLine(c["message"].Length > 0 ? c["message"] : "Something went wrong.", Amber); break;
-            case "closed": SetupLine("Closed. Open it again from Info.", Grey); break;
+            case "closed":  // timed out, or too many wrong codes: back to Info shortly
+                SetupLine("Closed. Open it again from Info.", Grey);
+                var back = new Tizen.NUI.Timer(4000);
+                back.Tick += (s, e) => { if (overlayShown && mode == Mode.Setup) CloseSetup(); return false; };
+                back.Start(); break;
         }
         Note("setup:" + setupState);
     }

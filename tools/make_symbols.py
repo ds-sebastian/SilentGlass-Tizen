@@ -78,8 +78,8 @@ SYMBOLS = {
             + fill("M19 38h10a5 5 0 0 1-10 0z", "nonzero"),
     "homeassistant": '<path d="M5 24L24 6l19 18M10 20v22h28V20"/>' + fill(circle(24, 27, 3.4) + circle(17, 35, 2.6) + circle(31, 35, 2.6), "nonzero")
                      + '<path d="M24 30v3M21.5 33.5l-2.6 1.2M26.5 33.5l2.6 1.2" stroke-width="2.6"/>',
-    "thread": fill(circle(24, 9, 4) + circle(9, 37, 4) + circle(39, 37, 4) + circle(24, 28, 3.4), "nonzero")
-              + '<path d="M24 13v12M12 35l9.5-5.5M36 35l-9.5-5.5M13 37h22M21 11l-10 23M27 11l10 23" stroke-width="2.8"/>',
+    # Thread's mark: a ring with a looped "t" whose stem runs out through the bottom of the ring
+    "thread": '<circle cx="24" cy="24" r="18.5"/><path d="M21.5 45V18.5a5.5 5.5 0 1 1 5.5 5.5H11"/>',
     "check": '<path d="M10 25l9 9 19-20" stroke-width="4.4"/>',
     "chevron": '<path d="M19 12l12 12-12 12" stroke-width="4.4"/>',
 }

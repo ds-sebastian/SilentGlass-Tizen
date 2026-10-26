@@ -6,7 +6,22 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
-- **v40a** (+ HA bridge 2.3; source and offline tests - not yet installed on the TV): **the final shape - overlays only.** No full-screen pages any more: the Home, Apps,
+- **v40h** (+ HA bridge 2.3, installed and checked on the TV): first on-screen run of v40a, and the fixes it needed.
+  - **Keys at cold start**: the TV's launch placeholder (`[WIND]com.samsung.tv.bixby-promotion`) holds the remote's
+    keys until the app's main window has been shown once. v40a hid that window at start, so the bar appeared but
+    never got a key. The main window now starts shown (black, empty) and Home hides it when the bar opens; the bar's
+    window is created at start, as v31 did.
+  - **The bar closed itself**: the TV pauses the app whenever only the overlay is up, and v40a closed the overlay on
+    pause. Now only another app coming to the front closes it.
+  - Info's network line drops "full duplex"; a phone page that times out returns the sheet to Info; a diagnostic
+    event trail (`trail=`) in the state file; the Thread symbol is now Thread's ring-and-loop mark.
+  - Checked on the TV: bar, Inputs (switches; unplugged inputs refused by the TV), Controls (brightness 50 -> 49 ->
+    50, read back), Info (Protected, Wired 100 Mb/s, Thread router with home reachable), the setup sheet end to end
+    from a "phone" (QR decodes; wrong code refused; broker test; Home Assistant's Thread network found; save and
+    reconnect; the password never sent back; Back closes the page and port 7680), a Home Assistant notification
+    over SHIELD, the Ambient -> Home redirect with the wallpaper backdrop, and input switching from Home Assistant.
+  - Deploy pair: `launcher-deploy/update-v40h.sh` (from v32a) / `restore-v32a.sh`.
+- **v40a** (+ HA bridge 2.3): **the final shape - overlays only.** No full-screen pages any more: the Home, Apps,
   Controls and Info pages, the live preview and the glass shader are gone. Over a picture Home toggles the bar;
   Inputs and Apps open above it; Controls and Info are panels on the right that replace the bar (Info near-opaque,
   with all of SilentGlass's settings); with nothing to draw over, the app's window is only a wallpaper backdrop.

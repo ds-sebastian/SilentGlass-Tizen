@@ -166,7 +166,9 @@ public sealed partial class SilentGlass
     void OnForegroundChanged()
     {
         string now = Foreground(); if (now.Length == 0) return;
-        string before = previousForeground; previousForeground = now; NoteForeground(now);
+        string before = previousForeground; previousForeground = now; NoteForeground(now); Note("fg:" + now);
+        // another app came to the front (not us, not the picture): nothing of ours may stay over it
+        if (now != SelfId && now != Viewer && (overlayShown || backdropShown)) { CloseOverlay("foreground:" + now); HideBackdrop(); }
         // Ambient's Home key always opens Samsung Home (hard-coded): come back to SilentGlass instead
         if (now == "com.samsung.tv.csfs" && IsAmbient(before)) { Launch(SelfId); Note("ambient_home_redirect"); }
     }

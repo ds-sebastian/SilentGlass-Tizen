@@ -76,7 +76,12 @@ class LauncherTests(unittest.TestCase):
         # the app's own window only ever holds the backdrop (wallpaper, clock, idle dim)
         backdrop = (SRC / "Backdrop.cs").read_text()
         self.assertEqual(src.count("Window.Default.Add("), 1)  # the dim layer; BuildBackdrop adds via `w`
-        self.assertIn("try { w.Hide(); } catch { }", body(backdrop, "void BuildBackdrop()"))
+        self.assertEqual(body(backdrop, "void BuildBackdrop()").count("w.Add("), 1)  # one root: wallpaper + clock
+        build = body(backdrop, "void BuildBackdrop()")
+        # not hidden at start: the TV's launch placeholder (holding the keys) only goes once this window was shown;
+        # Home hides it when the overlay opens (as v31 did)
+        self.assertNotIn("Hide()", build.replace("backdrop.Hide()", ""))
+        self.assertIn("if (!backdropShown && !mainUp) return;", body(backdrop, "void HideBackdrop()"))
         # shown only when there is nothing to draw over
         home = body(src, "void Home(")
         self.assertIn("bool picture = HasPicture && (lastOther == Viewer || lastOther == \"\");", home)
@@ -96,9 +101,13 @@ class LauncherTests(unittest.TestCase):
         manifest = (ROOT / "launcher/package/tizen-manifest.xml")
         if manifest.exists():
             self.assertIn("http://tizen.org/privilege/window.priority.set", manifest.read_text())
-        # nothing of ours stays up when another app comes to the front
+        # created at start, while the main window is still up, so it can take focus later (v40a's bar got no keys)
+        self.assertIn("EnsureOverlay();  // created while the app's main window is still up", (SRC / "SilentGlass.cs").read_text())
+        # the TV pauses us whenever only the overlay is up: a pause must not close it; another app in front does
         pause = body(launcher(), "protected override void OnPause()")
-        self.assertIn("CloseOverlay(null); HideBackdrop();", pause)
+        self.assertIn("if (!overlayShown) HideBackdrop();", pause)
+        self.assertNotIn("CloseOverlay", pause)
+        self.assertIn('if (now != SelfId && now != Viewer && (overlayShown || backdropShown)) { CloseOverlay("foreground:" + now); HideBackdrop(); }', (SRC / "Tv.cs").read_text())
 
     def test_panels_replace_the_bar_and_menus_sit_above_it(self):
         src = launcher()
@@ -149,7 +158,7 @@ class LauncherTests(unittest.TestCase):
             for slow in ("WriteState(", "File.", "RefreshSettings(", "InfoStats.", "Options("):
                 self.assertNotIn(slow, text, f"{slow} in {member}")
         # the state file is written by a coalescing timer, or at once on pause only
-        self.assertEqual(src.count("WriteState("), 3)
+        self.assertEqual(src.count("WriteState("), 3)  # definition, timer tick, OnPause
         self.assertIn("stateTimer = new Tizen.NUI.Timer(600)", src)
 
     def test_interrupted_animation_lands_on_its_end(self):
@@ -201,6 +210,15 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("if (back) CloseSetup();", (SRC / "Overlay.cs").read_text())
         # closing the overlay any way also closes the phone page
         self.assertIn("CloseSetupServer();", body(launcher(), "void CloseOverlay("))
+
+    def test_deploy_pair_matches_the_version(self):
+        version = re.search(r'ModVersion = "(v\d+\w)"', (SRC / "SilentGlass.cs").read_text()).group(1)
+        deploy = ROOT / "devices/s90d/device/launcher-deploy"
+        update = deploy / f"update-{version}.sh"
+        self.assertTrue(update.exists(), update)
+        prev = re.search(r"Inverse: restore-(v\d+\w)\.sh", update.read_text()).group(1)
+        self.assertTrue((deploy / f"restore-{prev}.sh").exists())
+        self.assertEqual(len(list(deploy.glob("*.sh"))), 2)  # only the current pair
 
     def test_backdrop_art_is_local_svg(self):
         for name in ("tile-samsung-home.svg", "free-background.svg"):

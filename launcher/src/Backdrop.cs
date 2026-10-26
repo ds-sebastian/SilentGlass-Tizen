@@ -10,6 +10,7 @@ using Tizen.NUI.BaseComponents;
 public sealed partial class SilentGlass
 {
     ImageView wallpaper; TextLabel clock; View dimLayer; TextLabel dimClock;
+    View backdrop;  // wallpaper + clock; hidden (with a clear window) except while the backdrop is wanted
     bool backdropShown, wallNight, dimmed;
     long lastActivity = Environment.TickCount64;
     const long IdleMs = 5 * 60 * 1000;
@@ -21,23 +22,32 @@ public sealed partial class SilentGlass
     void BuildBackdrop()
     {
         var w = Window.Default;
-        w.Title = "SilentGlass"; w.BackgroundColor = new Color(0, 0, 0, 1); w.KeyEvent += OnKey;
-        try { w.Hide(); } catch { }
-        if (PhotoWall) { wallNight = WantNight(); wallpaper = new ImageView { ResourceUrl = WallUrl(wallNight), Size2D = new Size2D(1920, 1080) }; w.Add(wallpaper); }
-        else w.Add(new ImageView { ResourceUrl = Res + "free-background.svg", Size2D = new Size2D(1920, 1080), DesiredWidth = 960, DesiredHeight = 540 });
-        clock = Label("", 1420, 40, 420, 64, 40, White, "Display"); clock.HorizontalAlignment = HorizontalAlignment.End; w.Add(clock);
+        w.Title = "SilentGlass"; w.KeyEvent += OnKey;
+        backdrop = new View { Size2D = new Size2D(1920, 1080) };
+        if (PhotoWall) { wallNight = WantNight(); wallpaper = new ImageView { ResourceUrl = WallUrl(wallNight), Size2D = new Size2D(1920, 1080) }; backdrop.Add(wallpaper); }
+        else backdrop.Add(new ImageView { ResourceUrl = Res + "free-background.svg", Size2D = new Size2D(1920, 1080), DesiredWidth = 960, DesiredHeight = 540 });
+        clock = Label("", 1420, 40, 420, 64, 40, White, "Display"); clock.HorizontalAlignment = HorizontalAlignment.End; backdrop.Add(clock);
+        w.Add(backdrop);
+        // The TV shows this window when the app starts, and its launch placeholder (which holds the remote's keys)
+        // only goes away once that has happened. So it is not hidden here: Home hides it when it opens the overlay
+        // (or keeps it as the backdrop). It starts black and empty.
+        w.BackgroundColor = new Color(0, 0, 0, 1); backdrop.Hide();
     }
+    bool mainUp = true;  // the window is on screen (the TV shows it at start)
     void ShowBackdrop()
     {
         if (backdropShown) return;
-        backdropShown = true; UpdateClock(); CheckWallpaper(); lastActivity = Environment.TickCount64;
+        backdropShown = true; mainUp = true; UpdateClock(); CheckWallpaper(); lastActivity = Environment.TickCount64;
+        backdrop.Show();
         try { Window.Default.Show(); Window.Default.Raise(); } catch { }
+        if (overlayShown) { ow.Raise(); try { ow.Activate(); } catch { } }
     }
     void HideBackdrop()
     {
-        if (!backdropShown) return;
-        backdropShown = false; Wake();
+        if (!backdropShown && !mainUp) return;
+        backdropShown = false; mainUp = false; Wake();
         try { Window.Default.Hide(); } catch { }
+        backdrop.Hide();
     }
     void UpdateClock() { clock.Text = DateTime.Now.ToString("h:mm tt"); }
     void CheckWallpaper()

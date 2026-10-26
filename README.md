@@ -37,6 +37,13 @@ No full-screen pages: everything is a bar, a menu or a panel over the picture (t
 
 ![Controls over the picture](docs/screenshots/s90d-overlay-controls.jpg)
 
+![Info](docs/screenshots/s90d-info.jpg)
+
+![With nothing playing: the wallpaper backdrop](docs/screenshots/s90d-backdrop.jpg)
+
+*Overlay windows captured on the TV and composited over the wallpaper (the video plane can't be captured). The last one
+is a full capture of the backdrop with the bar.*
+
 ### Home Assistant
 
 - The TV appears by itself (MQTT discovery): power, the input on screen as a selector (by the TV's input names,
@@ -50,6 +57,10 @@ No full-screen pages: everything is a bar, a menu or a panel over the picture (t
   the remote; the settings stay on the TV.
 
 ![Notification over the picture](docs/screenshots/s90d-notice.jpg)
+
+![Phone setup sheet](docs/screenshots/s90d-setup.jpg)
+
+*The phone setup sheet (address, code and QR code replaced with stand-in values).*
 
 Guide: [devices/s90d/ha-bridge.md](devices/s90d/ha-bridge.md).
 
