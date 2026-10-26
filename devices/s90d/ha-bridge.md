@@ -8,7 +8,7 @@ built-in MQTT 3.1.1 client. It runs as the TV's owner user from a systemd user u
 
 | Entity | What |
 |---|---|
-| `switch.<tv>_power` | on / standby. Turning it on or off needs the small Home Assistant automation below |
+| `switch.<tv>_power` | on / standby, switched on the TV itself (see Power) |
 | `select.<tv>_input` | the input on screen, by the TV's own input names; choosing one switches to it like a card press |
 | `text.<tv>_hdmi_N_name` | the port's name on the TV (attributes: the HDMI-CEC detected name, connected). Editing it renames the input everywhere: TV menu, SilentGlass Home, this selector. Ports only take a name once a device has been seen on them |
 | `button.<tv>_resync_input_names` | re-scans HDMI-CEC and fixes stale detected names (see below) |
@@ -40,10 +40,15 @@ the source library only refreshes its cached list from D-Bus signals, so the bri
 
 ## Power
 
-The bridge runs as an ordinary user: it can read the power state but cannot press Power (key injection is root-only,
-and the TV's remote-control API refuses local clients). Home Assistant's Samsung integration can, so the Power switch
-publishes to `silentglass/s90d/power/set` and a small automation presses KEY_POWER when the TV is not already in the
-requested state: [`device/ha-bridge/ha-power-automation.yaml`](device/ha-bridge/ha-power-automation.yaml).
+The bridge presses Power through its own virtual key: a `/dev/uinput` device ("SilentGlass power key") that can only
+send KEY_POWER. That is how Samsung's own remote server (`msf-server`, via `libautoinput`) sends remote keys, and
+`/dev/uinput` is open to the owner user on this TV, so no root and nothing in Home Assistant is needed. Power is a
+toggle, so the bridge only presses it when the TV is not already in the requested state. It wakes the TV from
+standby and puts it into standby.
+
+Ruled out on the way: deviced's `device_power_set_state(Normal)` and D-Bus `ChangePowerState`/`changestate` return
+-22 even as root (wake is event-driven, not a settable state), `device_power_wakeup` is not supported, `input_keyevent`
+is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
 
 ## How it works
 
@@ -63,9 +68,7 @@ requested state: [`device/ha-bridge/ha-power-automation.yaml`](device/ha-bridge/
 2. Copy `/opt/usr/home/owner/.config/silentglass-ha.conf.example` to `silentglass-ha.conf` (owner, mode 600, same
    SMACK label as the home directory) and fill in the broker. The unit starts once the file exists; input names come
    from the TV.
-3. For the Power switch, add [`ha-power-automation.yaml`](device/ha-bridge/ha-power-automation.yaml) to Home
-   Assistant and reload automations.
-4. The device appears in Home Assistant under Settings > Devices (MQTT).
+3. The device appears in Home Assistant under Settings > Devices (MQTT).
 
 The credentials live only in that file on the TV, never in the repo. A broker user limited to `silentglass/#` and
 `homeassistant/+/silentglass_s90d/#` is the tidy choice; a shared house user works too.

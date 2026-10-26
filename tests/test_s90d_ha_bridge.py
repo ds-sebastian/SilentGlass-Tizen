@@ -14,15 +14,15 @@ class HaBridgeTests(unittest.TestCase):
         handler = SRC.split("static void OnMessage(")[1].split("static void LaunchApp(")[0]
         cases = {c for line in re.findall(r"case ([^:]+?)(?: when |:)", handler) for c in re.findall(r'"([a-z_0-9/]+)"', line)}
         self.assertEqual(cases, {"input/set", "home/press", "ambient/press", "resync/press", "thread_switch/set", "volume/set", "mute/set",
-                                 "brightness/set", "contrast/set", "picture_mode/set", "sound_mode/set", "sleep_timer/set",
+                                 "brightness/set", "contrast/set", "power/set", "picture_mode/set", "sound_mode/set", "sleep_timer/set",
                                  "sound_output/set", "game_mode/set"})
         self.assertIn('Regex.Match(cmd, "^hdmi([1-4])_name/set$")', handler)  # the only other command: renaming a port
         self.assertNotIn("/bin/sh", SRC)  # no shell: launch_app, dbus-send and ot-ctl run directly
         # input requests only for an input the TV lists, by exact name; options only from the TV's own lists
         self.assertIn("Inputs().Where(i => i.Name == payload)", handler)
         self.assertIn("opts.Where(x => x.name == name)", SRC)
-        # power is not handled on the TV (Home Assistant presses it with its trusted token)
-        self.assertNotIn('"power/set"', handler)
+        # power: a virtual Power key, pressed only when the TV is not already in the requested state
+        self.assertIn('if ((payload == "ON") != ScreenOn) { PressPower();', handler)
 
     def test_names_are_written_to_the_default_slot(self):
         # index 0 is a separate, unused name slot: writes there never show up in the source list
@@ -35,8 +35,14 @@ class HaBridgeTests(unittest.TestCase):
         self.assertIn("register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero);", SRC)
         self.assertIn("g_main_loop_run(g_main_loop_new(IntPtr.Zero, false));", SRC)
 
+    def test_power_key_is_a_uinput_device_with_only_the_power_key(self):
+        self.assertIn('open("/dev/uinput", 1 | 2048)', SRC)
+        self.assertEqual(SRC.count("ioctl(fd, UiSetKeyBit,"), 1)  # it can press nothing but Power
+        self.assertIn("const int KeyPower = 116;", SRC)
+        self.assertFalse((DIR / "ha-power-automation.yaml").exists())  # no Home Assistant automation needed
+
     def test_input_names_come_from_the_tv(self):
-        self.assertNotIn("input_", SRC)  # no config labels
+        self.assertNotRegex(SRC, r"\"input_\"|input_\d")  # no config labels
         self.assertIn('i.Name = i.Edit.Length > 0 ? i.Edit : i.Detected.Length > 0 ? i.Detected : i.Port;', SRC)
         # changing a detected name makes the TV reset the port's own name: resync must restore it
         self.assertIn("if (ok && i.Edit.Length > 0) kept = set_edit_name(i.Type, i.Edit, Mbr);", SRC)

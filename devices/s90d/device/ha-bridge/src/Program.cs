@@ -21,7 +21,7 @@ static class Bridge
     const string Launcher = "com.samsung.tv.bixby-promotion", ArtApp = "org.tizen.art-app";
     const string Data = "/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data";
     const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    const string Version = "2.0";
+    const string Version = "2.1";
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf;
     static Mqtt mqtt;
@@ -63,6 +63,47 @@ static class Bridge
             g_main_loop_run(g_main_loop_new(IntPtr.Zero, false));
         } catch (Exception e) { Log("source watch: " + e.GetType().Name); }
     }) { IsBackground = true, Name = "glib" }.Start();
+    // ---- power: a virtual Power key on /dev/uinput (crw-rw-rw- on the TV), the same mechanism Samsung's remote server
+    // (msf-server via libautoinput) uses. One persistent device, so a press needs no hot-plug wait. ----
+    [DllImport("libc.so.6", SetLastError = true)] static extern int open(string path, int flags);
+    [DllImport("libc.so.6", SetLastError = true)] static extern int ioctl(int fd, uint req, int arg);
+    [DllImport("libc.so.6", SetLastError = true)] static extern int ioctl(int fd, uint req);
+    [DllImport("libc.so.6", SetLastError = true)] static extern IntPtr write(int fd, byte[] buf, IntPtr n);
+    [DllImport("libc.so.6")] static extern int close(int fd);
+    const int KeyPower = 116; const uint UiSetEvBit = 0x40045564, UiSetKeyBit = 0x40045565, UiDevCreate = 0x5501;
+    static int keyFd = -1;
+    static bool OpenPowerKey()
+    {
+        if (keyFd >= 0) return true;
+        int fd = open("/dev/uinput", 1 | 2048);  // O_WRONLY | O_NONBLOCK
+        if (fd < 0) { Log("power key: cannot open /dev/uinput (" + Marshal.GetLastWin32Error() + ")"); return false; }
+        var dev = new byte[1116];  // struct uinput_user_dev
+        Encoding.ASCII.GetBytes("SilentGlass power key").CopyTo(dev, 0);
+        BitConverter.GetBytes((ushort)6).CopyTo(dev, 80);       // BUS_VIRTUAL
+        BitConverter.GetBytes((ushort)0x5347).CopyTo(dev, 82);  // vendor "SG"
+        BitConverter.GetBytes((ushort)1).CopyTo(dev, 84);
+        BitConverter.GetBytes((ushort)1).CopyTo(dev, 86);
+        if (ioctl(fd, UiSetEvBit, 1) != 0 || ioctl(fd, UiSetKeyBit, KeyPower) != 0 || (long)write(fd, dev, (IntPtr)dev.Length) != dev.Length || ioctl(fd, UiDevCreate) != 0) {
+            Log("power key: uinput setup failed (" + Marshal.GetLastWin32Error() + ")"); close(fd); return false;
+        }
+        keyFd = fd; return true;
+    }
+    static bool KeyEvent(ushort type, ushort code, int value)
+    {
+        var b = new byte[IntPtr.Size == 8 ? 24 : 16]; int o = IntPtr.Size == 8 ? 16 : 8;  // struct input_event
+        BitConverter.GetBytes(type).CopyTo(b, o); BitConverter.GetBytes(code).CopyTo(b, o + 2); BitConverter.GetBytes(value).CopyTo(b, o + 4);
+        return (long)write(keyFd, b, (IntPtr)b.Length) == b.Length;
+    }
+    static void PressPower()
+    {
+        lock (tv) {
+            if (!OpenPowerKey()) return;
+            bool ok = KeyEvent(1, KeyPower, 1) && KeyEvent(0, 0, 0);
+            Thread.Sleep(80);
+            ok &= KeyEvent(1, KeyPower, 0) && KeyEvent(0, 0, 0);
+            if (!ok) { close(keyFd); keyFd = -1; Log("power key: write failed, device reset"); }
+        }
+    }
     static int VInt(string k) => vconf_get_int(k, out int v) == 0 ? v : -1;
     static string VStr(string k) { var p = vconf_get_str(k); if (p == IntPtr.Zero) return ""; var s = Marshal.PtrToStringUTF8(p); free(p); return s ?? ""; }
 
@@ -251,7 +292,6 @@ static class Bridge
         string st(string obj, bool cmd = true) => ",\"state_topic\":\"" + Base + "/" + obj + "\"" + (cmd ? ",\"command_topic\":\"" + Base + "/" + obj + "/set\"" : "");
         void cfg(string comp, string obj, string body) => mqtt.Publish("homeassistant/" + comp + "/" + Node + "/" + obj + "/config", body == null ? "" : "{" + body + "}", true);
         cfg("binary_sensor", "power", null);  // v1 entity, replaced by the power switch
-        // power: the bridge reports it; the press itself is done by Home Assistant's Samsung integration (see ha-bridge.md)
         cfg("switch", "power_switch", common("power", "Power", "mdi:power") + ",\"state_topic\":\"" + Base + "/power\",\"command_topic\":\"" + Base + "/power/set\"");
         cfg("select", "input", common("input", "Input", "mdi:video-input-hdmi") + st("input") + ",\"options\":" + List(ins.Select(i => i.Name).Append("Other")));
         cfg("sensor", "app", common("app", "App", "mdi:application") + st("app", false));
@@ -287,6 +327,10 @@ static class Bridge
         Log("command " + cmd + " " + (payload.Length > 40 ? payload.Substring(0, 40) : payload));
         bool slow = true;
         switch (cmd) {
+            case "power/set" when payload == "ON" || payload == "OFF":
+                // the key toggles: press only when the TV is not already in the requested state
+                if ((payload == "ON") != ScreenOn) { PressPower(); Log("power key pressed (" + payload + ")"); }
+                Thread.Sleep(3000); slow = false; break;
             case "input/set": {
                 var match = Inputs().Where(i => i.Name == payload).ToList();
                 if (match.Count == 1) LaunchApp(Launcher, "quiet_source", match[0].Type.ToString());
@@ -341,13 +385,13 @@ static class Bridge
             .Where(l => l.Length > 0 && !l.StartsWith("#") && l.Contains('=')).ToDictionary(l => l.Split('=', 2)[0].Trim(), l => l.Split('=', 2)[1].Trim());
         Log("start " + Version);
         StartSourceWatch();
+        OpenPowerKey();
         int backoff = 5;
         while (true) {
             try {
                 mqtt = new Mqtt(conf["host"], int.Parse(conf.GetValueOrDefault("port", "1883")), "silentglass-s90d", conf.GetValueOrDefault("user"), conf.GetValueOrDefault("password"),
                     Base + "/availability", "offline", OnMessage);
                 Log("connected"); backoff = 5;
-                // power/set is handled by Home Assistant (it owns the trusted remote-control token), not subscribed here
                 mqtt.Subscribe(Base + "/+/set", Base + "/+/press", "homeassistant/status");
                 lock (gate) last.Clear();
                 Resync(); mqtt.Publish(Base + "/availability", "online", true);
