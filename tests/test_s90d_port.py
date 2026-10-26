@@ -65,13 +65,19 @@ class S90dPortTests(unittest.TestCase):
 
     def test_primary_shield_uses_observed_source(self):
         src = launcher()
-        self.assertIn('Hero("Watch","hdmi:"+watchPort,HeroSubtitle(watchPort,"shield","SHIELD")', src)
+        self.assertIn('Hero("Watch","hdmi:"+watchPort,InputName(watchPort)', src)
         self.assertIn('lastSource=15', src)
         # heroes follow the TV's own input names, falling back to the observed ports
         self.assertIn('int w=prefs.Watch!=0?prefs.Watch:PortNamed("shield",15),p=prefs.Play!=0?prefs.Play:PortNamed("switch",13);', src)
 
     def test_secondary_keeps_the_tvs_stored_label(self):
-        self.assertIn('Hero("Play","hdmi:"+playPort,HeroSubtitle(playPort,"switch","Nintendo Switch")', launcher())
+        self.assertIn('Hero("Play","hdmi:"+playPort,InputName(playPort)', launcher())
+        # renames fire no source-list event: Home, resume and the 30 s clock tick re-read and compare the card names
+        self.assertIn("if(page==0&&(watchName!=InputName(watchPort)||playName!=InputName(playPort))){BuildPage(false);", launcher())
+        self.assertIn("clockTimer?.Start();CloseInputs(false);OnInputsChanged(false);", launcher())
+        # no device names baked into the UI: the TV's input names are used as they are
+        for name in ("Nintendo Switch", '"SHIELD"', "PlayStation"):
+            self.assertNotIn(name, launcher())
 
     def test_example_console_routes_are_removed(self):
         src = launcher()
@@ -251,7 +257,7 @@ class S90dPortTests(unittest.TestCase):
         src = launcher()
         self.assertIn("const long IdleMs=5*60*1000;", src)
         # idle check only runs from the clock timer, which is stopped while Quiet Home is in the background
-        self.assertIn("IdleTick();return true;", src)
+        self.assertIn("IdleTick();if(visible&&page==0&&inputsLayer==null)OnInputsChanged(false);return true;", src)
         on_pause = body(src, "protected override void OnPause()")
         self.assertIn("CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();", on_pause)
         # first key press only wakes, never activates a tile

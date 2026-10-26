@@ -8,8 +8,15 @@ built-in MQTT 3.1.1 client. It runs as the TV's owner user from a systemd user u
 
 | Entity | What |
 |---|---|
-| `binary_sensor.<tv>_screen` | on / off (standby). The TV stays on the network in standby, so this is not "unavailable" |
-| `select.<tv>_input` | the input on screen; choosing one switches to it through SilentGlass Home, like a card press |
+| `switch.<tv>_power` | on / standby. Turning it on or off needs the small Home Assistant automation below |
+| `select.<tv>_input` | the input on screen, by the TV's own input names; choosing one switches to it like a card press |
+| `text.<tv>_hdmi_N_name` | the port's name on the TV (attributes: the HDMI-CEC detected name, connected). Editing it renames the input everywhere: TV menu, SilentGlass Home, this selector. Ports only take a name once a device has been seen on them |
+| `button.<tv>_resync_input_names` | re-scans HDMI-CEC and fixes stale detected names (see below) |
+| `number.<tv>_volume`, `switch.<tv>_mute` | TV master volume (also drives the soundbar over ARC) |
+| `number.<tv>_brightness`, `number.<tv>_contrast` | picture settings (the TV's own ranges, 0-50) |
+| `select.<tv>_picture_mode`, `select.<tv>_sound_mode` | only the modes the TV offers right now (they change with the input and the soundbar) |
+| `select.<tv>_sound_output` | TV Speaker / Soundbar |
+| `select.<tv>_sleep_timer`, `switch.<tv>_game_mode` | |
 | `sensor.<tv>_app` | foreground app: SilentGlass Home, Ambient, Samsung Home, or the input's name while watching it |
 | `sensor.<tv>_thread_role` | router / child / leader / detached / off (only if the border router is installed) |
 | `switch.<tv>_thread_border_router` | same as the Info switch; survives reboots |
@@ -17,6 +24,26 @@ built-in MQTT 3.1.1 client. It runs as the TV's owner user from a systemd user u
 | `sensor.<tv>_chip_temperature`, `sensor.<tv>_free_memory` | diagnostics |
 
 The device shows as unavailable only when the TV is unplugged or rebooting (retained MQTT last will).
+
+## Input names
+
+Each port has two names on the TV: the one you set (`editName`, TV menu or Home Assistant) and the one the device
+announced over HDMI-CEC (`detectedName`). Everything shows the set name, else the detected one, else "HDMI n";
+nothing is hard-coded. Detected names go stale: the TV keeps the last device it saw on a port (HDMI 1 said
+"PlayStation 5" long after the Switch replaced it), and a device behind a soundbar shows up as the soundbar.
+
+**Resync input names** asks the TV for a fresh HDMI-CEC device search (20 s), then sets each port's detected name to
+what answers on it now. With the TV on, ports where nothing answers are cleared; in standby (devices asleep) names
+are only learned, never cleared. The TV resets a port's own name when its detected name changes, so the bridge puts
+it back. Details: the names live in "activity index" -2 (Samsung's default; index 0 is a separate, unused slot), and
+the source library only refreshes its cached list from D-Bus signals, so the bridge runs a GLib loop for them.
+
+## Power
+
+The bridge runs as an ordinary user: it can read the power state but cannot press Power (key injection is root-only,
+and the TV's remote-control API refuses local clients). Home Assistant's Samsung integration can, so the Power switch
+publishes to `silentglass/s90d/power/set` and a small automation presses KEY_POWER when the TV is not already in the
+requested state: [`device/ha-bridge/ha-power-automation.yaml`](device/ha-bridge/ha-power-automation.yaml).
 
 ## How it works
 

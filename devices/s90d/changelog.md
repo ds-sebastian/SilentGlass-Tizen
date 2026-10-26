@@ -6,6 +6,8 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v29b**: the Watch/Play cards show the TV's own input names (no more built-in "SHIELD" / "Nintendo Switch"), and
+  re-read them on Home, on resume and every 30 s while Home is shown (renames fire no source-list event).
 - **v28a**: accepts `quiet_source=<id>` app-control requests (from the Home Assistant bridge) and switches input exactly
   like a card press; only inputs the TV lists are accepted.
 - **v27a**: chip temperature in This TV (`/sys/devices/platform/soc/thermal/temperature`, Samsung's driver file; these

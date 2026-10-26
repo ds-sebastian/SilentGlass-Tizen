@@ -11,12 +11,7 @@ public sealed partial class QuietHome
  void SavePrefs(){try{File.WriteAllText(PrefsPath(),HomeLogic.FormatPrefs(prefs));}catch(Exception ex){ShowError("Could not save: "+ex.GetType().Name);}}
 
  string InputName(int type){var i=inputs.Find(x=>x.Type==type);return i!=null&&i.Known&&!string.IsNullOrWhiteSpace(i.Name)?i.Name:"HDMI "+(type-12);}
- // the card subtitle: nicely cased brand name when the input is the expected device, else the TV's input name
- string HeroSubtitle(int port,string word,string pretty)
- {
-  string n=InputName(port);
-  return n.IndexOf(word,StringComparison.OrdinalIgnoreCase)>=0?pretty:n;
- }
+ // card subtitles use the TV's own input names (rename from Home Assistant or the TV's input list); nothing hard-coded
  string HeroPortValue(int chosen,int resolved)=>chosen==0?"Auto · "+InputName(resolved):InputName(chosen);
  // Select cycles Automatic -> HDMI 1..4 -> Automatic (never the other card's input); Home rebuilds with the new mapping
  void CycleHeroPort(bool watch)

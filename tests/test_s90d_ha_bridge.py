@@ -12,11 +12,36 @@ SRC = (DIR / "src/Program.cs").read_text()
 class HaBridgeTests(unittest.TestCase):
     def test_commands_are_a_fixed_allowlist(self):
         handler = SRC.split("static void OnMessage(")[1].split("static void LaunchApp(")[0]
-        topics = set(re.findall(r'Base \+ "(/[a-z_/]+)"', handler))
-        self.assertEqual(topics, {"/input/set", "/home/press", "/ambient/press", "/thread_switch/set"})
-        self.assertNotIn("/bin/sh", SRC)  # no shell: launch_app and ot-ctl run directly
-        # input requests only for an input the TV lists, by exact name
-        self.assertIn("Inputs().Where(i => i.name == payload)", handler)
+        cases = {c for line in re.findall(r"case ([^:]+?)(?: when |:)", handler) for c in re.findall(r'"([a-z_0-9/]+)"', line)}
+        self.assertEqual(cases, {"input/set", "home/press", "ambient/press", "resync/press", "thread_switch/set", "volume/set", "mute/set",
+                                 "brightness/set", "contrast/set", "picture_mode/set", "sound_mode/set", "sleep_timer/set",
+                                 "sound_output/set", "game_mode/set"})
+        self.assertIn('Regex.Match(cmd, "^hdmi([1-4])_name/set$")', handler)  # the only other command: renaming a port
+        self.assertNotIn("/bin/sh", SRC)  # no shell: launch_app, dbus-send and ot-ctl run directly
+        # input requests only for an input the TV lists, by exact name; options only from the TV's own lists
+        self.assertIn("Inputs().Where(i => i.Name == payload)", handler)
+        self.assertIn("opts.Where(x => x.name == name)", SRC)
+        # power is not handled on the TV (Home Assistant presses it with its trusted token)
+        self.assertNotIn('"power/set"', handler)
+
+    def test_names_are_written_to_the_default_slot(self):
+        # index 0 is a separate, unused name slot: writes there never show up in the source list
+        self.assertIn("const int Mbr = -2;", SRC)
+        self.assertIn("set_edit_name(12 + int.Parse(m.Groups[1].Value), name, Mbr)", SRC)
+        self.assertNotRegex(SRC, r"set_edit_name\([^)]*, 0\)")
+
+    def test_source_list_cache_is_kept_current(self):
+        # without a GLib loop the library never sees the change signals and renames stay invisible to the bridge
+        self.assertIn("register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero);", SRC)
+        self.assertIn("g_main_loop_run(g_main_loop_new(IntPtr.Zero, false));", SRC)
+
+    def test_input_names_come_from_the_tv(self):
+        self.assertNotIn("input_", SRC)  # no config labels
+        self.assertIn('i.Name = i.Edit.Length > 0 ? i.Edit : i.Detected.Length > 0 ? i.Detected : i.Port;', SRC)
+        # changing a detected name makes the TV reset the port's own name: resync must restore it
+        self.assertIn("if (ok && i.Edit.Length > 0) kept = set_edit_name(i.Type, i.Edit, Mbr);", SRC)
+        # resync never clears a detected name while the TV (and its devices) are in standby
+        self.assertIn('string want = live.TryGetValue(i.Type, out var n) ? n : on ? "" : i.Detected;', SRC)
 
     def test_thread_switch_works_like_the_info_switch(self):
         # the marker gates the units; the trigger file is what quiet-otbr-switch.path watches
@@ -47,6 +72,7 @@ class HaBridgeTests(unittest.TestCase):
         self.assertNotIn("User=", unit)  # owner session, never root
         example = (DIR / "silentglass-ha.conf.example").read_text()
         self.assertIn("password=change-me", example)
+        self.assertNotIn("input_", example)
         self.assertFalse(re.search(r"10\.3\.26\.", inst + example))
 
 

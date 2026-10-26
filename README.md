@@ -49,9 +49,10 @@ what was deliberately left alone.
 
 ### Home Assistant
 
-The TV shows up in Home Assistant by itself (MQTT discovery): screen on/standby, the input on screen as a selector
-that switches inputs, the foreground app, the Thread router's role and on/off switch, Home and Ambient buttons, and
-chip temperature. A small owner service with a fixed set of commands; your broker credentials stay on the TV.
+The TV shows up in Home Assistant by itself (MQTT discovery): power, the input on screen as a selector that switches
+inputs (by the TV's own input names, renamable from Home Assistant, with an HDMI-CEC resync for stale names), volume,
+mute, brightness, contrast, picture and sound mode, sound output, sleep timer, game mode, the foreground app, the
+Thread router's role and switch, Home and Ambient buttons, and chip temperature. A small owner service with a fixed set of commands; your broker credentials stay on the TV.
 Guide: [devices/s90d/ha-bridge.md](devices/s90d/ha-bridge.md).
 
 ### Thread border router

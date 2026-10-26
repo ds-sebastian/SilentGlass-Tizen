@@ -67,7 +67,7 @@ public sealed partial class QuietHome : NUIApplication
   RefreshSource();RefreshInputs();ResolveHeroPorts();WatchInputs();WatchForeground();WatchSignal();
   selected=SourceIndex();BuildPage(false);
   clockTimer=new Tizen.NUI.Timer(30000);
-  clockTimer.Tick+=(s,e)=>{clock.Text=Clock();CheckWallpaper();IdleTick();return true;};clockTimer.Start();
+  clockTimer.Tick+=(s,e)=>{clock.Text=Clock();CheckWallpaper();IdleTick();if(visible&&page==0&&inputsLayer==null)OnInputsChanged(false);return true;};clockTimer.Start();
   visible=true;MarkState("created");
  }
  protected override void OnResume(){base.OnResume();visible=true;styledAll=false;UpdateFocus(false); /* restyle everything after a pause */ BenchRender();CheckWallpaper();Wake(false);clockTimer?.Start();clock.Text=Clock();ReadSignal();OnInputsChanged(false);ScheduleLive();if(page==2){RefreshSettings();RefreshTileValues();}if(page==3)infoTimer?.Start();MarkState("resumed");}
@@ -78,7 +78,7 @@ public sealed partial class QuietHome : NUIApplication
  protected override void OnPause(){base.OnPause();visible=false;editing="";CloseInputs(false);ReleaseLiveWindow();clockTimer?.Stop();infoTimer?.Stop();WriteState("paused");}
  void Home(string activity)
  {
-  clockTimer?.Start();RefreshSource();CloseInputs(false);
+  clockTimer?.Start();CloseInputs(false);OnInputsChanged(false);
   // already on Home: only move focus back. Rebuilding disposed every card and the live preview, so the
   // artwork re-decoded and the video re-attached - that was the flash after Inputs -> Home.
   if(page==0){
@@ -180,8 +180,8 @@ public sealed partial class QuietHome : NUIApplication
   // ports follow the TV's input names (Shield / Switch), so re-cabling needs no code change
   playWide=PlayIsWide();
   int ww=playWide?HeroNarrow:HeroWide,pw=playWide?HeroWide:HeroNarrow;
-  Hero("Watch","hdmi:"+watchPort,HeroSubtitle(watchPort,"shield","SHIELD"),"feature-watch-"+(playWide?"narrow":"wide")+".svg",100,170,ww,560,new Color(.76f,.94f,.56f,1));
-  Hero("Play","hdmi:"+playPort,HeroSubtitle(playPort,"switch","Nintendo Switch"),"feature-play-"+(playWide?"wide":"narrow")+".svg",100+ww+HeroGap,170,pw,560,new Color(1f,.74f,.78f,1));
+  Hero("Watch","hdmi:"+watchPort,InputName(watchPort),"feature-watch-"+(playWide?"narrow":"wide")+".svg",100,170,ww,560,new Color(.76f,.94f,.56f,1));
+  Hero("Play","hdmi:"+playPort,InputName(playPort),"feature-play-"+(playWide?"wide":"narrow")+".svg",100+ww+HeroGap,170,pw,560,new Color(1f,.74f,.78f,1));
   Control("Inputs","inputs","inputs",0);
   Control("Ambient","ambient","ambient",1);
   Control("Sleep Timer","sleeptimer","sleep",2);

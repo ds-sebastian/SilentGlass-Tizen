@@ -52,8 +52,11 @@ public sealed partial class QuietHome
  int PortNamed(string word,int fallback){var m=inputs.Find(i=>i.Known&&i.Type>=13&&i.Type<=16&&i.Name.IndexOf(word,StringComparison.OrdinalIgnoreCase)>=0);return m!=null?m.Type:fallback;}
  void OnInputsChanged(bool announce)
  {
+  string watchName=InputName(watchPort),playName=InputName(playPort);
   var before=inputs;RefreshInputs();RefreshSource();
   if(ResolveHeroPorts()&&page==0){BuildPage(false);MarkState("hero_ports_changed");return;}
+  // a renamed input (TV menu or Home Assistant) fires no source-list event: compare the card names directly
+  if(page==0&&(watchName!=InputName(watchPort)||playName!=InputName(playPort))){BuildPage(false);MarkState("input_names_changed");return;}
   if(RelayoutHeroes())return;
   if(announce&&visible)
    foreach(var now in inputs){
