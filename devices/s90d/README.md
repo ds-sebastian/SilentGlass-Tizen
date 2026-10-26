@@ -89,6 +89,7 @@ verifies every file) and `restore-v(N-1).sh`. Build with `python3 tools/build.py
 | boot-units/quiet-recog-off | owner user-systemd watcher stopping content recognition (later boot targets restart it) | recog-boot-restore.sh |
 | cleanup/batchd | SHIELD does everything: Prime Video, Apple TV, web browser **uninstalled**; TV YouTube and Samsung Home media rows disabled (cast to SHIELD's Chromecast; AirPlay unaffected); janitor unit removed | batchd-restore.sh (store apps: reinstall from Samsung Apps) |
 | boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background | batchd-restore.sh |
+| thread-border-router/ | standalone Thread border router on the home network: owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on eth0, hub stays off; radio on the hub image ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg) |
 
 Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
@@ -96,13 +97,16 @@ Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: 
 
 Not done on purpose: TV YouTube (`cobalt-yt`) is relaunched by litewebappservice within seconds when closed;
 Samsung Home (`csfs`, ~100-120 MB) and its media rows (`home.media`, ~70-150 MB) are relaunched within ~1 min (measured), so closing them only burns CPU;
-SmartThings/OTBR components are kept (custom Thread border router runs on `wpan0`); Art/Ambient services kept.
+SmartThings/OTBR components are kept (the TV is a Thread border router on the home network, see
+[thread-border-router.md](thread-border-router.md)); Art/Ambient services kept.
 
 ## Pi side (pi/)
 
 `s90d_drift_check.py` + `s90d_expected.json` (set `tv`): weekly read-only check of firmware, Home/startup apps,
 vendor markers, disabled apps, Quiet Home DLL hash, boot units and recognition. Prints nothing when all is well
 (cron watchdog pattern); reports only after 3 consecutive unreachable runs.
+
+`probe_forwarding.py`: one-packet proof that LAN -> Thread traffic is routed through the TV (see thread-border-router.md).
 
 ## Findings worth knowing
 

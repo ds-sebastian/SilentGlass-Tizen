@@ -49,8 +49,11 @@ session; allow its cleanup checks to complete first.
 
 ## Implementation constraints
 
-- Do not flash firmware, replace a bootloader, remove partition contents,
-  alter `/etc/passwd` or replace Samsung's SDB verification key.
+- Do not flash TV firmware, replace a bootloader, remove partition contents,
+  alter `/etc/passwd` or replace Samsung's SDB verification key. The one
+  exception is the S90D Thread radio module's application image, switched only
+  between images Samsung ships on the TV, with Samsung's flasher and the owner's
+  approval (devices/s90d/thread-border-router.md).
 - Do not assume UID 0 defeats SMACK, signed-native-executable enforcement or
   secure boot. No custom OS installation path was established for this model.
 - Preserve native advanced/network/Bluetooth settings for functions the new

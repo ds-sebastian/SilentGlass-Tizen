@@ -1,0 +1,15 @@
+[Unit]
+Description=Quiet Home: standalone OpenThread border router on eth0 (home Thread network)
+Wants=quiet-otbr-cpcd.service
+After=quiet-otbr-cpcd.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c 'exec >>/run/user/5001/quiet-otbr.log 2>&1; i=0; until [ -S /dev/shm/cpcd/cpcd_0/ctrl.cpcd.sock ]; do i=$$((i+1)); [ $$i -gt 1200 ] && exit 1; sleep 1; done; sleep 3; echo "$$(date +%%T) agent start"; exec /opt/usr/share/quiet-otbr/otbr-agent -s -B eth0 -d 4 "spinel+cpc://cpcd_0?iid=2"'
+Restart=always
+RestartSec=10
+TimeoutStopSec=5
+
+[Install]
+WantedBy=default.target
