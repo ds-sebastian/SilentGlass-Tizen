@@ -1,4 +1,5 @@
 import base64
+import gzip
 import hashlib
 import re
 import unittest
@@ -66,13 +67,19 @@ class HaBridgeTests(unittest.TestCase):
 
     def test_installer_ships_the_built_bridge_and_no_credentials(self):
         inst = (DIR / "ha-bridge-install.sh").read_text()
-        for dest in ("$Q/silentglass-ha.dll", "$Q/silentglass-ha.runtimeconfig.json", "$UD/$N"):
+        for dest in ("$Q/silentglass-ha.runtimeconfig.json", "$UD/$N"):
             self.assertIn(dest + '.new" <<', inst)
+        # the DLL travels gzipped: the TV runner takes at most 64 KiB per command
+        self.assertIn('base64 -d <<\'B64_EOF\' | gzip -dc > "$Q/silentglass-ha.dll.new"', inst)
+        self.assertLess(len(inst.encode()), 64 * 1024)
         self.assertIn("N=silentglass-ha.service", inst)
-        blocks = re.findall(r"<<'B64_EOF'\n(.*?)\nB64_EOF\n\[ \"\$\(sha256sum [^)]*\)\" = ([0-9a-f]{64}) \]", inst, re.S)
+        blocks = re.findall(r"<<'B64_EOF'[^\n]*\n(.*?)\nB64_EOF\n\[ \"\$\(sha256sum [^)]*\)\" = ([0-9a-f]{64}) \]", inst, re.S)
         self.assertEqual(len(blocks), 4)
         for b64, sha in blocks:
-            self.assertEqual(hashlib.sha256(base64.b64decode(b64)).hexdigest(), sha)
+            data = base64.b64decode(b64)
+            if data[:2] == b"\x1f\x8b":
+                data = gzip.decompress(data)
+            self.assertEqual(hashlib.sha256(data).hexdigest(), sha)
         unit = (DIR / "silentglass-ha.service").read_text()
         self.assertIn("ConditionPathExists=/opt/usr/home/owner/.config/silentglass-ha.conf", unit)
         self.assertNotIn("User=", unit)  # owner session, never root
