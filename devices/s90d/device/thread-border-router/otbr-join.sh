@@ -5,12 +5,12 @@
 #   NEW=1           no Thread network yet: the TV forms one (then add it to Home Assistant's Thread integration)
 #   FORCE=1         also replace a network the TV is already attached to
 # e.g.  cat ~/.config/quiet-tizen/thread.env otbr-join.sh | <your root shell on the TV>
-# The network is saved in /opt/var/lib/thread, so every later start (boot or Info switch) rejoins it.
+# The network is saved in /opt/var/lib/thread, so every later start (boot or the switch) rejoins it.
 set -eu
 C=/opt/usr/apps/com.samsung.tizen.smartthings-hub/bin/ot-ctl
 [ "$(id -u)" = 0 ]
 role(){ "$C" state 2>/dev/null | tr -d "\r" | head -n1; }
-s=$(role); [ -n "$s" ] || { echo "border router not running (Quiet Home Info switch, or otbr-install.sh)"; exit 3; }
+s=$(role); [ -n "$s" ] || { echo "border router not running (switched off on the phone page or in Home Assistant, or otbr-install.sh not run)"; exit 3; }
 case "$s" in child|router|leader) [ "${FORCE:-0}" = 1 ] || { echo "already attached ($s) - FORCE=1 replaces the saved network"; exit 3; };; esac
 if [ "${NEW:-0}" = 1 ]; then
   "$C" dataset init new | grep -q Done; "$C" dataset commit active | grep -q Done

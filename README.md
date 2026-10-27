@@ -26,9 +26,9 @@ No full-screen pages: everything is a bar, a menu or a panel over the picture (t
 - **Controls** is a panel on the right, so the picture stays in view while you change brightness, contrast, volume,
   picture and sound mode, sound output, Game Mode (Automatic / Always / Never), sleep timer and Pixel Shift; plus
   Ambient, Bluetooth, Network and the TV's own settings.
-- **Info** is a near-opaque panel: privacy, network, Thread and TV status, then SilentGlass's settings - which input
-  Watch and Play open, apps in the bar, dim when idle, wallpaper, the Thread border router, notifications, and
-  Home Assistant setup.
+- **Info** is a near-opaque panel: privacy, network, Thread, Home Assistant and TV status, then SilentGlass's
+  settings - which input Watch and Play open, apps in the bar, dim when idle, wallpaper, notifications - and
+  **Advanced settings**, which opens the phone page.
 - **With nothing to draw over** (no signal, or Home from Ambient or an app), a day/night wallpaper and the time sit
   behind the bar; after 5 idle minutes it fades to a dim drifting clock (OLED care).
 - Built for anyone in the house: visual, few words, no "On/Off" jargon, 60 fps, nothing truncated.
@@ -70,7 +70,7 @@ Guide: [devices/s90d/ha-bridge.md](devices/s90d/ha-bridge.md).
 The S90D has a Thread radio for Samsung's SmartThings hub, which can only create its *own* network. SilentGlass runs
 the radio with OpenThread as a standalone **border router that joins your existing network** - Home Assistant,
 Apple Home, Google Home or any OTBR - with the SmartThings hub left off. Join from the phone setup page (it can read
-Home Assistant's preferred network for you); it keeps running in standby and has a switch in Info.
+Home Assistant's preferred network for you); it keeps running in standby, with an on/off switch on the phone page and in Home Assistant.
 Guide: [devices/s90d/thread-border-router.md](devices/s90d/thread-border-router.md).
 
 ### Privacy

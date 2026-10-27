@@ -169,12 +169,13 @@ def controls(focus=0):
 def info(focus=0):
     green, grey = "#30d158", "#8e8e93"
     rows = [("d", "", "Privacy", "Protected", green), ("d", "", "Network", "Wired · 1 Gb/s", green),
-            ("d", "", "Thread", "Router · home reachable", green), ("d", "", "This TV", "Up 3 h · 41 °C", green), "hr",
+            ("d", "", "Thread", "Router · home reachable", green), ("d", "", "Home Assistant", "Connected", green),
+            ("d", "", "This TV", "Up 3 h · 41 °C", green), "hr",
             ("v", "tv", "Watch", "Auto · SHIELD"), ("v", "gamecontroller", "Play", "Auto · Nintendo Switch"),
             ("t", "apps", "Apps in the bar", False), ("t", "moon", "Dim when idle", True), ("v", "picture", "Wallpaper", "Follows sunset"),
-            ("t", "thread", "Thread border router", True), ("t", "bell", "Notifications", True), "hr",
-            ("a", "homeassistant", "Home Assistant", "Connected")]
-    return panel(rows, focus, title=("SilentGlass", "v40a · nothing sent anywhere"), opaque=True)
+            ("t", "bell", "Notifications", True), "hr",
+            ("a", "gear", "Advanced settings", "")]
+    return panel(rows, focus, title=("SilentGlass", "v42e · nothing sent anywhere"), opaque=True)
 
 
 def setup_sheet(qr):
@@ -185,11 +186,11 @@ def setup_sheet(qr):
             f'<div class="glass" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;border-radius:44px;background:rgba(22,22,26,.96)">'
             f'<div style="position:absolute;left:48px;top:48px;width:340px;height:340px;border-radius:28px;background:#fff;display:flex;align-items:center;justify-content:center">{qr_img}</div>'
             f'<div style="position:absolute;left:430px;top:52px;right:48px">'
-            f'<div style="font-family:QID;font-size:44px;line-height:1.1">Set up Home Assistant</div>'
+            f'<div style="font-family:QID;font-size:44px;line-height:1.1">Advanced settings</div>'
             f'<div style="font-size:27px;opacity:.7;margin-top:18px;line-height:1.35">Scan with your phone, or open<br><b style="opacity:1;font-weight:600">192.168.1.50:7680</b> and enter</div>'
             f'<div style="font-family:QID;font-size:72px;letter-spacing:10px;margin-top:22px">482 913</div></div>'
             f'<div style="position:absolute;left:48px;right:48px;bottom:40px;display:flex;align-items:center;gap:14px;font-size:26px;opacity:.85">'
-            f'<span style="width:14px;height:14px;border-radius:7px;background:#ff9f0a"></span>Waiting for your phone…'
+            f'<span style="width:14px;height:14px;border-radius:7px;background:#30d158"></span>Saved. Connected to your broker.'
             f'<span style="margin-left:auto;opacity:.6">Back to close</span></div></div>')
 
 
@@ -237,7 +238,7 @@ def main():
              "bar": bar(0),
              "info": bar(6) + info(5),
              "backdrop": backdrop() + bar(0),
-             "setup": bar(6) + setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
+             "setup": setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
     for name, body in pages.items():
         (out / f"{name}.html").write_text(page(name, body, bg))
         subprocess.run(["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",

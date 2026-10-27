@@ -46,9 +46,9 @@ playing; nothing touches the video plane.
 - **Controls** (panel on the right, replacing the bar; translucent so the picture shows the change): Brightness,
   Contrast, Volume (Select mutes); Picture Mode, Sound Mode, Sound Output, Game Mode (Automatic / Always / Never -
   the TV's single three-way `game-mode-auto`), Sleep Timer, Pixel Shift; Ambient, Bluetooth, Network, TV Settings.
-- **Info** (panel on the right, near-opaque): Privacy, Network, Thread and This TV status (refreshed every 3 s), then
-  the settings below, then **Home Assistant** (phone setup sheet: QR code + 6-digit code; see
-  [ha-bridge.md](ha-bridge.md)).
+- **Info** (panel on the right, near-opaque): Privacy, Network, Thread, Home Assistant and This TV status (refreshed
+  every 3 s), then the settings below, then **Advanced settings** (phone sheet: QR code + 6-digit code; the phone
+  page also has these settings, notifications, the Thread border router and MQTT - see [ha-bridge.md](ha-bridge.md)).
 - **Backdrop**: with nothing to draw over (no signal, or Home from Ambient or an app) the app's own window shows the
   wallpaper and time behind the bar; Back there goes to the last input. After 5 idle minutes it fades to a dim
   drifting clock (OLED care). It is hidden whenever anything else is in front, so it never flashes over the picture.
@@ -61,7 +61,8 @@ playing; nothing touches the video plane.
 
 ### Settings
 
-On the TV (Info; saved as `silentglass-prefs.txt` in the app's data directory, so they survive reboots; an older
+On the TV (Info) or the phone (Advanced settings; SilentGlass reloads the file when the phone saves it). Saved as
+`silentglass-prefs.txt` in the app's data directory, so they survive reboots; an older
 `quiet-home-prefs.txt` is read once and replaced):
 
 | Setting | Default | Does |

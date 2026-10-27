@@ -14,8 +14,8 @@ Status on the tested TV (firmware in [README.md](README.md)): router in the home
 upstream OTBR, LAN -> Thread forwarding proven with a real packet, survives reboots (verified across
 several owner reboots) and **through standby** since the standby fix in section 6 (before it, the radio lost power
 whenever the TV was switched off, so the TV only routed while it was on). Thread status
-is on SilentGlass Home's **Info** tab ("Home network: Connected / Forwarding off"), with a switch to stop and start it
-(section 5).
+is on SilentGlass's **Info** panel ("Router · home reachable"); the switch to stop and start it is on the phone's
+Advanced settings page and in Home Assistant (section 5).
 
 ## 1. Radio firmware (once, owner approval)
 
@@ -68,7 +68,7 @@ iptables) and then:
 | `quiet-otbr-cpcd` | waits until Samsung's boot-time `iot-hub-control-setup.service` has run and finished, recreates `/tmp/iot_factory_data`, runs the hub `cpcd` (921600, socket `/dev/shm/cpcd/cpcd_0`) |
 | `quiet-otbr-agent` | waits for the cpcd socket, runs the private agent `-s -B <backbone> -d 4 "spinel+cpc://cpcd_0?iid=2"` (auto-attaches to the saved network); the backbone is the default-route interface (`eth0` wired, `wlan0` Wi-Fi), waited for up to 2 min |
 | `quiet-otbr-forward` | waits for `wpan0` and Samsung's `matter-setup.path`, then touches `/tmp/matter_setup` every 10 s until IPv6 forwarding is on |
-| `quiet-otbr-switch.path` / `.service` | SilentGlass Home's Info switch (section 5): applies a flip at once |
+| `quiet-otbr-switch.path` / `.service` | the border router switch (section 5): applies a flip at once |
 
 Why each wait exists:
 
@@ -102,7 +102,7 @@ cat ~/.config/quiet-tizen/thread.env device/thread-border-router/otbr-join.sh | 
 
 It refuses to replace an attached network without `FORCE=1` and never echoes the dataset. Do not add a prefix:
 the TV favors the existing OMR prefix. It attaches as a child and becomes a router within ~2 minutes. The network
-is saved in `/opt/var/lib/thread`, so every later start (boot or the Info switch) rejoins by itself.
+is saved in `/opt/var/lib/thread`, so every later start (boot or the switch) rejoins by itself.
 
 ## 4. Verify (mesh membership is not border routing)
 
@@ -113,15 +113,17 @@ is saved in `/opt/var/lib/thread`, so every later start (boot or the Info switch
   `ip6tables -nvx -L OTBR_FORWARD_CHAIN` eth0 -> wpan0 counter rise. `ot-ctl ping` from the TV only proves
   mesh reachability.
 
-## 5. Info page switch (SilentGlass Home)
+## 5. The on/off switch
 
-SilentGlass Home's Info page shows **Thread border router** with a switch, only on TVs where these units are installed.
+On TVs where these units are installed, the phone's **Advanced settings** page (Info > Advanced settings) shows a
+**Border router** switch, and Home Assistant gets `switch.<tv>_thread_border_router`. Both go through the
+SilentGlass bridge (unit comments still call it the Info switch, where it used to be):
 
-- Off: SilentGlass Home creates `thread-off` in its own data directory
+- Off: the bridge creates `thread-off` in SilentGlass's data directory
   (`/opt/usr/home/owner/apps_rw/com.samsung.tv.bixby-promotion/data`, persistent; the owner's systemd may read it)
   and rewrites `thread-switch`. `quiet-otbr-switch.path` sees the rewrite and stops forward, agent, then cpcd
   (under 2 s). The TV leaves the mesh as a router; other border routers carry it.
-- On: SilentGlass Home deletes the marker and rewrites `thread-switch`; the units start and rejoin the saved network
+- On: the bridge deletes the marker and rewrites `thread-switch`; the units start and rejoin the saved network
   (router again in ~10 s when the mesh still remembers it, up to ~2 min otherwise).
 - Reboots: every daemon has `ConditionPathExists=!.../thread-off`, so the choice holds at boot and a manual
   start while off is skipped (a skipped condition never triggers `Restart=`).
@@ -145,7 +147,7 @@ until the TV is switched on again. Two separate things do it, both found on the 
   (`org.tizen.system.storage.BlockManager.UsbDeviceChangePortPower`, int32 1; it records the caller's pid and drops
   the request when that process exits - kernel log: `[STORAGED] usb port power on:(1) by /usr/bin/dotnet(<pid>)`).
   `quiet-otbr-usbpower` is a 7 KB .NET program (`usb-power-keeper/`, run by the TV's own `dotnet`, ~16 MB RSS) that
-  makes the request, stays alive and repeats it every 5 minutes. It is part of the Info switch like the other units.
+  makes the request, stays alive and repeats it every 5 minutes. It is part of the switch like the other units.
 
 Install on an existing border router: `otbr-standby-update.sh`; inverse `otbr-standby-restore.sh`. New installs
 (`otbr-install.sh`) include both; `otbr-restore.sh` undoes both.

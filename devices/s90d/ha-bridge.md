@@ -21,7 +21,7 @@ built-in MQTT 3.1.1 client. It runs as the TV's owner user from a systemd user u
 | `switch.<tv>_notifications` | banners on the TV (see Notifications); off drops them |
 | `sensor.<tv>_app` | foreground app: SilentGlass Home, Ambient, Samsung Home, or the input's name while watching it (also while SilentGlass only shows a banner over it) |
 | `sensor.<tv>_thread_role` | router / child / leader / detached / off (only if the border router is installed) |
-| `switch.<tv>_thread_border_router` | same as the Info switch; survives reboots |
+| `switch.<tv>_thread_border_router` | same as the phone page's switch; survives reboots |
 | `button.<tv>_home`, `button.<tv>_ambient` | open SilentGlass Home / Ambient |
 | `sensor.<tv>_chip_temperature`, `sensor.<tv>_free_memory` | diagnostics |
 
@@ -98,7 +98,7 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
   restarts (`homeassistant/status`).
 - Commands are a fixed list; there is no shell. Input: `launch_app com.samsung.tv.bixby-promotion quiet_source <id>`
   (the launcher only accepts an input it lists). Home / Ambient: `launch_app`. Thread: writes or removes the
-  `thread-off` marker and touches `thread-switch`, exactly like the Info switch.
+  `thread-off` marker and touches `thread-switch`, exactly like the phone page's switch.
 - Topics: `silentglass/s90d/...`; discovery under `homeassistant/<component>/silentglass_s90d/...`.
 
 ## Set up from a phone
