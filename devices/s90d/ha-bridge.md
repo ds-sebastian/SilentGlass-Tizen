@@ -105,8 +105,8 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
 
 ![Setup sheet on the TV](../../docs/screenshots/s90d-setup.jpg)
 
-On the TV: **Home > Info > Home Assistant**. A sheet shows a QR code and a 6-digit code; scan the code with a phone on
-the same network (or open the address shown and type the code). The page, served by the bridge on port 7680, has:
+On the TV: **Home > Info > Home Assistant**. A sheet shows a QR code of the address and a 6-digit code; scan it with a phone
+on the same network (or open the address shown), then type the code - the QR never carries it. The page, served by the bridge on port 7680, has:
 
 - **Home Assistant**: MQTT server, port, username, password, with a **Test connection** button. The password is never
   sent back to the phone; leave it empty to keep the current one.

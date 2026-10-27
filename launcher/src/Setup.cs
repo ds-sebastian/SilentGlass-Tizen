@@ -5,7 +5,7 @@ using Tizen.NUI.BaseComponents;
 
 // Setting up Home Assistant from a phone (Info > Home Assistant): SilentGlass asks the bridge to open its setup page
 // (data/setup-request); the bridge answers in data/setup.json with the address and a one-time code, and keeps it
-// current (phone connected, saved, error). The sheet shows a QR code of the address + code, the code itself, and the
+// current (phone connected, saved, error). The sheet shows a QR code of the address, the code to type on the phone, and the
 // state. Back closes it, and the bridge closes the page (data/setup-close). The page only works while this is open.
 public sealed partial class SilentGlass
 {
@@ -63,10 +63,11 @@ public sealed partial class SilentGlass
                 // a new file name each time: DALi caches images by URL
                 foreach (var old in Directory.GetFiles(System.IO.Path.GetDirectoryName(DataFile("x")), "setup-qr-*.svg")) File.Delete(old);
                 string file = DataFile("setup-qr-" + (++qrN) + ".svg");
-                File.WriteAllText(file, Qr.Svg(Qr.Encode(url + "?code=" + code)));
+                // the address only: the phone always asks for the code, which is only on this screen
+                File.WriteAllText(file, Qr.Svg(Qr.Encode(url)));
                 setupQr.ResourceUrl = file;
             } catch (Exception e) { Note("qr-failed:" + e.GetType().Name); }
-            setupAddress.Text = "Scan with your phone, or open\n" + url.Replace("http://", "").TrimEnd('/') + " and enter";
+            setupAddress.Text = "Scan with your phone, or open\n" + url.Replace("http://", "").TrimEnd('/') + ", then enter";
             setupCode.Text = code.Substring(0, 3) + " " + code.Substring(3);
         }
         switch (setupState) {

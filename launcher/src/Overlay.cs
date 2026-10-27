@@ -139,7 +139,9 @@ public sealed partial class SilentGlass
         string a = bar[barSel].Action;
         if (a.StartsWith("hdmi:")) {
             int t = int.Parse(a.Substring(5));
-            if (screen.BarWatching(t)) CloseOverlay("bar:watching"); else SelectSource(t);
+            // always a real input selection, like Inputs > SHIELD: after SHIELD wakes through the soundbar the TV can
+            // report its picture while showing black, and only selecting the input again brings it up
+            SelectSource(t);
         }
         else if (a == "inputs") OpenInputs();
         else if (a == "apps") OpenApps();

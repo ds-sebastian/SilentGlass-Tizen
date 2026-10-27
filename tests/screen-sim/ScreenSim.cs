@@ -130,7 +130,7 @@ sealed class FakeTv : IScreen
         if (!Overlay) return;
         // seen on the TV (event log, v41e): after the bar closes on a remote key, the Home app gets one or two stray
         // launch requests 0.7-2.2 s later
-        if (why == "back" || why == "bar:watching" || why == "launch:close")
+        if (why == "back" || why == null || why == "launch:close")  // null: SelectSource
             foreach (var at in new[] { 700 + Rnd.Next(300), 1400 + Rnd.Next(800) })
                 Later(at, () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
         CloseOverlayNow(why);
@@ -243,7 +243,7 @@ sealed class FakeTv : IScreen
         }
         Advance(1500);  // people take a moment between presses
     }
-    void Activate(int t) { if (Mode != "bar") return; if (App.BarWatching(t)) CloseOverlay("bar:watching"); else App.SelectSource(t); }
+    void Activate(int t) { if (Mode != "bar") return; App.SelectSource(t); }
     // a key on the remote: to the overlay if it has focus, to our main window if that is in front, else to the TV
     void Key(Action onBar)
     {

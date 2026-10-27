@@ -163,8 +163,6 @@ public sealed class Screen
         Source = type; pictureLostOn = -1; ui.Note("source:" + type + ":" + ok);
         ui.CloseOverlay(null); ui.HideBackdrop(); ui.Launch(Viewer);
     }
-    // Watch / Play on the bar: already showing that picture - just step aside; else switch to it
-    public bool BarWatching(int type) => type == Source && HasPicture && !ui.BackdropShown;
     // Back on the bar: over the wallpaper it goes to the picture (the last input); over the picture it closes the bar
     public void BarBack() { if (ui.BackdropShown) SelectSource(Source); else ui.CloseOverlay("back"); }
     // the TV also pauses us whenever only the overlay is up, so a pause alone must not close it

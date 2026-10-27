@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v41g**: after the TV woke with SHIELD coming on through the soundbar, the screen stayed black while the TV
+  reported SHIELD selected with a picture. Watch only closed the bar ("already watching"); Inputs > SHIELD - a real
+  input selection - brought the picture up. Watch and Play now always select their input, exactly like Inputs. The
+  setup QR code is now the address only, so the phone always asks for the 6-digit code shown on the TV (it used to
+  carry the code). All launch requests, real presses and the TV's strays, come from `tvctx-manager`, so the caller
+  cannot tell them apart; the 2.6 s window stays. Deploy pair `update-v41g.sh` / `restore-v32a.sh`.
 - **v41f**: the bounce, again; clearer current input.
   - v41e's event log showed the rest of the bounce: after the bar closes on a remote key (Back, Watch, Home), the TV
     sends the Home app one or two more launch requests 0.7-2.2 s later, with no key, and the second reopened the bar.
@@ -16,7 +22,7 @@ records. Conf keys mentioned in older entries may since have been removed - the 
     Inputs menu. Unchanged values are now dropped, and Inputs redraws only when its contents change (no fade).
   - Things appear by fading in place (180 ms), with the dimming behind the bar fading too; the 16-24 px rise is gone.
   - The input on screen keeps a soft pill, on the bar (Watch/Play) and in Inputs (with its checkmark); the focus is
-    the white pill; the green dot means that input has a picture. Deploy pair `update-v41f.sh` / `restore-v32a.sh`.
+    the white pill; the green dot means that input has a picture.
 - **v41e**: the bounce. The event log showed that the remote's Home reaches the app twice: a second launch request
   0.4-1 s after the first undid it, so the bar closed and reopened on every press (and reopened about 1 s after
   Watch). A plain Home within 1.2 s of the last one, or of the bar closing, is now ignored (`launch:echo` in the log).

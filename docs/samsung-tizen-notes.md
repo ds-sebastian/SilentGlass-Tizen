@@ -178,6 +178,10 @@ are ordinary optional features rather than trackers.
   0.4-1 s later. Treat a Home launch within ~1.2 s of the last one as the same press, or the second undoes the first.
   After the Home app hides its windows on a physical-remote key (Back, Enter, Home), it gets one or two more launch
   requests 0.7-2.2 s later; Home Assistant's keys did not cause them.
+- **Soundbar passthrough:** after a device behind the soundbar wakes the TV (CEC), the viewer can show black while
+  the signal flag says picture; selecting the same input again (`connect_source` + launching the viewer) brings it
+  up. Never treat "already on that input" as nothing to do. All Home launch requests, real and stray, come from
+  `tvctx-manager`.
 - **The signal flag is re-sent unchanged** whenever another app comes in front of the viewer; compare before acting.
 - **Remote keys from Home Assistant** (Samsung TV integration, `remote.send_command`) can arrive seconds late or
   bunched together. Fine for occasional use; space test sequences out or check the app's own state between keys.
