@@ -96,6 +96,8 @@ Each phase has its inverse; run them in reverse order (newest change first), and
 - `devices/s90d/device/ha-bridge/ha-bridge-restore.sh`
 - back to Samsung Home: `recipes/restore-launcher.sh home-01 ORIGINAL_MAIN_OPERATION_ID ORIGINAL_HOME_ID
   ORIGINAL_STARTUP_ID` - the three values you saved (all `com.samsung.tv.csfs` on the TVs seen so far; use yours).
+  It only replaces the version `install-launcher.sh` put there (it checks that DLL's hash); after an update, run
+  that update's inverse first.
   The tested TV was installed by an earlier trial script; its undo is
   `devices/s90d/device/launcher-deploy/restore-stock-home.sh`, which works from any SilentGlass version.
 

@@ -19,5 +19,5 @@ printf '\nPreload preference\n'
 vconftool get db/was/preload_by_country
 sqlite3 -readonly /opt/dbspace/.webappservice.db \
     "SELECT json_extract(value,'$.rsp.preloadByCountry') FROM WASConfigTable WHERE name='RESERVED_18' AND json_valid(value);"
-printf '\nLauncher diagnostic state (local, overwritten)\n'
-if [ -f /tmp/quiet-home-state.txt ]; then cat /tmp/quiet-home-state.txt; fi
+printf '\nSilentGlass state (local, overwritten)\n'
+if [ -f /tmp/silentglass-state.txt ]; then cat /tmp/silentglass-state.txt; fi

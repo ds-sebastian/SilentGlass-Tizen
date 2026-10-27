@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Build the photo wallpaper assets (not in git): python -I tools/make_wallpapers.py DAY.jpg NIGHT.jpg
-Writes launcher/assets/wallpapers/wall-{day,night}.jpg (1920x1080, darker top for the clock, dimmed for OLED) and
-wall-{day,night}-frost.png (480x270 heavily blurred backdrop the glass shader samples). Needs pillow + numpy."""
+Writes launcher/assets/wallpapers/wall-{day,night}.jpg (1920x1080, darker top for the clock, dimmed for OLED).
+Needs pillow + numpy."""
 import sys
 from pathlib import Path
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 OUT = Path(__file__).resolve().parents[1] / "launcher/assets/wallpapers"
@@ -19,5 +19,4 @@ for name, path, dim in (("day", sys.argv[1], .86), ("night", sys.argv[2], 1.0)):
     v = 1 - .62 * np.clip(1 - y / .24, 0, 1) ** 1.4 - .18 * np.clip((y - .62) / .38, 0, 1)
     disp = Image.fromarray((np.clip(a * v * dim, 0, 1) * 255 + .5).astype(np.uint8))
     disp.save(OUT / f"wall-{name}.jpg", quality=90, optimize=True, subsampling="4:2:0")
-    disp.resize((480, 270), Image.BILINEAR).filter(ImageFilter.GaussianBlur(7)).save(OUT / f"wall-{name}-frost.png", optimize=True)
     print("wrote", name)
