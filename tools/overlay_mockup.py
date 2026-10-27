@@ -227,7 +227,7 @@ def main():
     bg = Path(sys.argv[2]) if len(sys.argv) > 2 else A / "wallpapers" / "wall-day.jpg"
     cat = ROOT / "launcher/assets/apps.local.json"
     apps = json.loads((cat if cat.exists() else A / "apps.json").read_text())
-    apps = [a for a in (apps if isinstance(apps, list) else apps.get("apps", [])) if not a.get("Utility")]
+    apps = apps if isinstance(apps, list) else apps.get("apps", [])
     apps.append({"Name": "Samsung Home", "Asset": "tile-samsung-home.svg", "Background": "#1C2638"})
     global INPUTS_X
     INPUTS_X = 960 - 150  # approximate centre of "Inputs" in the mock bar

@@ -10,7 +10,7 @@ SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soun
   not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
   because it exists.
 
-## SilentGlass (v42l)
+## SilentGlass (v43a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -79,6 +79,8 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
 - **Cold start**: the TV's launch placeholder holds the remote's keys until the app's main window has been shown once,
   so that window starts shown (black, empty) and Home hides it as the bar opens. The TV also pauses the app whenever
   only the overlay is up; a pause never closes the overlay - another app coming to the front does.
+- **Shared with the bridge**: app ids, launch extras and the files in the data directory are all in
+  [`Shared.cs`](../../launcher/src/Shared.cs), compiled into both.
 - **Launch extras**: `sg_source=<type>` (switch input) and `sg_notice=1` (start hidden for a notification) from the
   bridge; `sg_open=controls|info|apps|inputs|setup` opens one part directly (for `app_launcher`).
 - **State file** `/tmp/silentglass-state.txt` (coalesced, never on the key path): version, what is showing
@@ -88,7 +90,8 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   path, native callbacks posted to the UI thread, interrupted animations land on their end state.
 
 Deploy: `launcher-deploy/update-vN.sh` (refuses unless the installed DLL is the previous version; keeps SMACK labels;
-verifies every file) and its inverse. The published pair upgrades from v32a (`update-v42l.sh` / `restore-v32a.sh`).
+verifies every file) and its inverse. The published pair upgrades from v42l (`update-v43a.sh` / `restore-v42l.sh`);
+it pins both DLL hashes, and builds are reproducible (`python3 tools/build.py launcher`).
 Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
 then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).
 A first install: [docs/install.md](../../docs/install.md).
@@ -110,10 +113,10 @@ A first install: [docs/install.md](../../docs/install.md).
 | cleanup/multiview | Multi View no longer preloads at boot (marker that Samsung's own unit checks: `ConditionPathExists=!.../disable_preloading`); opens on demand, cold | multiview-restore.sh |
 | boot-units/quiet-csfs-off | owner watcher: while SilentGlass is the Home app, closes Samsung Home (`csfs`, ~100 MB) after it has sat in the background for two one-minute checks; never while it is on screen. Identity by SMACK label | csfs-off-restore.sh |
 | ha-bridge | Home Assistant bridge over MQTT discovery: power, input (selectable, TV-named), per-port rename + CEC name resync, volume/mute, brightness/contrast, picture/sound mode, sound output, sleep timer, game mode, app, Thread role and switch, Home/Ambient buttons, temperature, memory. Owner service, fixed command list. See [ha-bridge.md](ha-bridge.md) | ha-bridge-restore.sh |
-| boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background | batchd-restore.sh |
+| boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background (its scripts are in git history before v43a) | batchd-restore.sh |
 | thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; on/off switch on the phone page and in Home Assistant ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
 
-Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
+Install the units with `*-install.sh`, then the latest `*-update*.sh` (recognition watcher: `recog-boot-update5.sh`). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
 `DBUS_SESSION_BUS_ADDRESS=kernel:path=/sys/fs/kdbus/5001-user/bus XDG_RUNTIME_DIR=/run/user/5001 systemctl --user`.
 

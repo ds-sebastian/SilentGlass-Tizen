@@ -1,73 +1,42 @@
-# App library and crisp artwork
+# App library and artwork
 
-The launcher opens existing installed apps. A catalog entry does not download
-an app, create a subscription or install an Android APK.
+The Apps menu (above the bar) opens apps that are already installed on the TV. A catalog entry does not download an
+app or create a subscription. It shows up to 11 apps from the catalog plus Samsung Home, four to a row.
 
-The example catalog includes Netflix, YouTube, Prime Video, HBO Max, Disney+,
-Hulu, Spotify, Apple TV, Tubi, Amazon Luna and Xbox. App IDs vary across regions,
-releases and packages. Match IDs against the current TV's metadata, then
-test each shortcut.
+The public catalog `launcher/assets/apps.json` is an example (Netflix, YouTube, Prime Video, HBO Max, Disney+, Hulu,
+Spotify, Apple TV, Tubi, Amazon Luna, Xbox) with text-only placeholder cards. App IDs vary by region, release and
+package: match them against your TV's own app list, and test each one.
 
-Copy `launcher/assets/apps.json` to the ignored
-`launcher/assets/apps.local.json` to customize it. Entries contain a name,
-native app ID, local asset path, fit mode, background and source dimensions.
-Optional normalized `Crop` values are `[x,y,width,height]`. Paths must stay
-within the resource directory. The “Get more apps” utility tile draws a
-centered plus symbol; its regular caption remains below the card.
+Copy it to the ignored `launcher/assets/apps.local.json` to customize it; `tools/build.py launcher` packages the
+local file as `apps.json`. Each entry has `Name`, `Id` (the native app ID), `Asset` (a path inside the resource
+directory), `Fit` (`cover`, `contain` or `contain-full`), `Background` (behind a contained image), and the asset's
+`Width` and `Height`. An optional `Crop` is a normalized `[x, y, width, height]` of the asset. SilentGlass refuses
+the whole catalog if an entry is incomplete, an ID repeats, a path leaves the resource directory or a crop leaves
+the image.
 
-## Optional publisher artwork
+## Publisher artwork (optional, local only)
 
-The public repository ships text-only placeholders. Official/publisher
-artwork is fetched locally rather than redistributed under our code license:
+Official artwork is fetched locally rather than redistributed under this project's license:
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install Pillow
 .venv/bin/python tools/fetch_artwork.py --all
-# Or select individual apps:
+# or only some:
 .venv/bin/python tools/fetch_artwork.py --app 'Prime Video' --app Xbox
 python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
-Review the source manifest before downloading. Downloads are written to
-ignored `launcher/assets/app-icons/`, the updated catalog goes to
-`apps.local.json`, and source/output hashes go to `.local/artwork-receipts.json`.
-The downloader preserves locally edited app IDs. It validates raster
-dimensions, reads only the chosen ZIP member, and rejects active/external
-SVG content. If a publisher URL expires or changes shape, the affected
-entry keeps its previous artwork and the command reports a failure.
+Downloads go to the ignored `launcher/assets/app-icons/`, the updated catalog to `apps.local.json` (app IDs you
+edited there are kept), and source and output hashes to `.local/artwork-receipts.json`. The downloader checks
+raster sizes, reads only the chosen member of a ZIP and rejects SVG with scripts or external references. If a
+publisher URL changes, that entry keeps its previous artwork and the command reports the failure.
 
-Sources are documented per asset in
-[artwork-sources.json](../launcher/artwork-sources.json):
+Sources, per asset: [artwork-sources.json](../launcher/artwork-sources.json). Netflix, Hulu and Spotify are
+publisher vector artwork; Prime Video is Amazon's 2024 wordmark (via Wikimedia Commons, with a white fill); YouTube
+and Disney+ large brand artwork; HBO Max, Apple TV and Tubi 1024-pixel App Store artwork; Luna Amazon artwork; Xbox
+the logo from Microsoft's 2560×1440 wallpaper (raster, not a vector), framed with a `Crop` whose decode size accounts
+for the crop, so the card stays sharp.
 
-- Netflix, Hulu and Spotify: publisher vector artwork.
-- Prime Video: Amazon's 2024 vector wordmark, mirrored by Wikimedia Commons.
-  The path geometry is retained, with explicit dimensions and a white fill.
-- YouTube and Disney+: large publisher/brand artwork.
-- HBO Max, Apple TV and Tubi: publisher-provided 1024-pixel App Store artwork.
-- Luna: Amazon artwork.
-- Xbox: Microsoft's exact green translucent logo from its 2560×1440 wallpaper.
-  This is high-resolution raster artwork, **not a claimed public vector**.
-
-The Xbox card uses a normalized viewport to frame the logo. Its decode
-dimensions account for that crop, so the renderer does not first shrink the
-whole wallpaper to a tiny card and then enlarge the crop. Similar care was
-needed to fix the earlier pixelated Prime Video and Xbox cards.
-
-## Avoid the “snap in” effect
-
-Keep app images on the TV, not behind live remote URLs. Quiet Home preloads
-and retains the actual grid/dock `ImageView` instances, then reparents them
-when changing pages. Preloading bytes alone is insufficient if a new image
-view later discards/redecodes the texture.
-
-The cache lasts for the launcher process lifetime. A restart still reloads
-resources; this is not a permanent GPU cache. Large catalogs increase
-retained memory, so keep only useful entries and use suitable source sizes.
-The current-state file reports pending/ready counts to help diagnose missing
-or unsupported resources.
-
-After adding artwork, rebuild and redeploy the resources using the same
-backup-first approach. Source changes need an assembly rebuild; catalog and
-asset changes alone do not. Stop the launcher before replacing resources,
-preserve ownership/SMACK labels, and restart it to reload the catalog.
+Catalog and artwork changes need no rebuild of the DLL, only a redeploy of the resources (backup first, keep the
+ownership and SMACK labels, then restart SilentGlass so it reads the catalog again).

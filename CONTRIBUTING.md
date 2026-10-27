@@ -26,9 +26,11 @@ maintenance language without concealing required privileges or security limits.
 For local checks:
 
 ```sh
-python3 -m unittest discover -s tests -v
-dotnet run --project tests/CatalogTests.csproj -- launcher/assets/apps.json
+uv run --with notifications-android-tv==0.1.5 --with qrcode python -m unittest discover -s tests -v
 ```
+
+With the .NET 6 SDK on the path this also builds and runs the C# checks (`tests/CatalogTests.cs`), the screen
+simulation and the notification harness; without the two Python packages those parts skip.
 
 The S90D inventory comparison and optional local-catalog test skip when ignored
 private inputs are absent. Do not upload device inventories or synthesize observations

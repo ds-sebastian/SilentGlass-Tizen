@@ -138,10 +138,11 @@ class LauncherSource(unittest.TestCase):
 
     def test_key_path_has_no_io_or_ipc(self):
         src = launcher()
-        for member in ("void OnKey(", "void HandleKey(", "void OverlayKey(", "void FocusBar(", "void FocusMenu()", "void FocusApps(", "void InputsKey("):
+        for member in ("void OnKey(", "void HandleKey(", "void OverlayKey(", "void FocusBar(", "void FocusMenu()", "void FocusApps(", "void InputsKey(", "void PanelKey("):
             text = body(src, member)
             for slow in ("WriteState(", "File.", "RefreshSettings(", "InfoStats.", "Options(", "Cec."):
                 self.assertNotIn(slow, text, f"{slow} in {member}")
+        self.assertNotIn("UpdatePanel(true)", body(src, "void PanelKey("))  # a focus move re-reads nothing from the TV
         # the state file is written by a coalescing timer, or at once on pause
         self.assertEqual(len(re.findall(r"\bWriteState\(", src)), 3)  # definition, the timer, OnPause
 

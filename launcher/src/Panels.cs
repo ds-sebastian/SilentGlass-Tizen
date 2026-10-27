@@ -13,7 +13,7 @@ public sealed partial class SilentGlass
     sealed class Row
     {
         public RowKind Kind; public string Name, Glyph;
-        public Func<string> Value; public Func<float> Amount; public Func<bool> On; public Func<Color> Tone;
+        public Func<string> Value; public Func<float> Amount; public Func<bool> On; public Func<(string text, Color tone)> Read;
         public Action<int> Adjust; public Action Select;
         public View Box, Track, Fill, Light; public ImageView Icon; public TextLabel Label, Val; public Switch Sw;
     }
@@ -30,11 +30,7 @@ public sealed partial class SilentGlass
         new() { Kind = RowKind.Switch, Glyph = glyph, Name = name, On = on, Adjust = d => set(d > 0), Select = () => set(!on()) };
     static Row Open(string glyph, string name, Action select, Func<string> value = null) =>
         new() { Kind = RowKind.Action, Glyph = glyph, Name = name, Select = select, Value = value };
-    static Row Status(string name, Func<(string text, Color tone)> read)
-    {
-        (string text, Color tone) last = ("", Grey);
-        return new Row { Kind = RowKind.Status, Name = name, Value = () => (last = read()).text, Tone = () => last.tone };
-    }
+    static Row Status(string name, Func<(string text, Color tone)> read) => new() { Kind = RowKind.Status, Name = name, Read = read };
 
     // ---- Controls ----
     void OpenControls()
@@ -82,18 +78,21 @@ public sealed partial class SilentGlass
         infoTimer ??= new Tizen.NUI.Timer(3000);
         infoTimer.Tick -= InfoTick; infoTimer.Tick += InfoTick; infoTimer.Start();
     }
-    bool InfoTick(object s, Tizen.NUI.Timer.TickEventArgs e) { if (!overlayShown || mode != Mode.Info) return false; UpdatePanel(); return true; }
+    bool InfoTick(object s, Tizen.NUI.Timer.TickEventArgs e) { if (!overlayShown || mode != Mode.Info) return false; UpdatePanel(true); return true; }
 
+    // ~45 app-framework calls: read at most every 30 s
+    (string, Color) privacy; long privacyAt = long.MinValue / 2; string privacyGaps = "";
     (string, Color) PrivacyStatus()
     {
+        if (Environment.TickCount64 - privacyAt < 30000) return privacy;
+        privacyAt = Environment.TickCount64;
         var gaps = InfoStats.PrivacyGaps(SelfId); privacyGaps = gaps == null ? "unknown" : string.Join(",", gaps);
-        if (gaps == null) return ("Unknown", Grey);
-        if (gaps.Count == 0) return ("Protected", Live);
+        if (gaps == null) return privacy = ("Unknown", Grey);
+        if (gaps.Count == 0) return privacy = ("Protected", Live);
         // name what is on (the app id's last part) so it can be found; several: how many
         string What(string g) { var n = g.StartsWith("marker:") ? g.Substring(7) : g; int d = n.LastIndexOf('.'); return d >= 0 ? n.Substring(d + 1) : n; }
-        return (gaps.Count == 1 ? "Check · " + What(gaps[0]) + " is on" : "Check · " + gaps.Count + " not blocked", Amber);
+        return privacy = (gaps.Count == 1 ? "Check · " + What(gaps[0]) + " is on" : "Check · " + gaps.Count + " not blocked", Amber);
     }
-    string privacyGaps = "";
     (string, Color) NetworkStatus()
     {
         string i = InfoStats.DefaultInterface();
@@ -167,15 +166,20 @@ public sealed partial class SilentGlass
             panel.Add(r.Box); rows.Add(r); y += rh;
         }
         rowSel = rows.FindIndex(r => r.Kind != RowKind.Status);
-        UpdatePanel(); FadeIn(panel); Note(m.ToString().ToLowerInvariant());
+        UpdatePanel(true); FadeIn(panel); Note(m.ToString().ToLowerInvariant());
     }
-    void UpdatePanel()
+    // refresh: read the TV again (settings for Controls, the status rows for Info) - on open, every 3 s in Info and when
+    // the TV changes, never for a focus move (each read is IPC or file I/O); a changed setting reads itself back
+    void UpdatePanel(bool refresh = false)
     {
-        if (mode == Mode.Controls) RefreshSettings();
+        if (refresh && mode == Mode.Controls) RefreshSettings();
         for (int i = 0; i < rows.Count; i++) {
             var r = rows[i]; bool f = i == rowSel; var ink = f ? Ink : White;
+            if (r.Kind == RowKind.Status) {
+                if (refresh) { var (text, tone) = r.Read(); if (r.Val.Text != text) r.Val.Text = text; r.Light.BackgroundColor = tone; }
+                continue;
+            }
             if (r.Value != null) { var v = r.Value(); if (r.Val.Text != v) r.Val.Text = v; }
-            if (r.Kind == RowKind.Status) { r.Light.BackgroundColor = r.Tone(); continue; }
             r.Box.BackgroundColor = f ? FocusFill : Clear; r.Label.TextColor = ink; r.Icon.Color = ink;
             if (r.Val != null) r.Val.TextColor = r.Kind == RowKind.Level ? ink : f ? FaintInk : Faint;
             if (r.Track != null) {

@@ -21,7 +21,7 @@ public sealed partial class SilentGlass : NUIApplication
     public const string SelfId = Shared.Self, Viewer = Shared.Viewer, ModVersion = "v43a";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
-    Tizen.NUI.Timer tickTimer, privacyTimer;
+    Tizen.NUI.Timer tickTimer;
 
     protected override void OnCreate()
     {
@@ -29,6 +29,9 @@ public sealed partial class SilentGlass : NUIApplication
         ui = System.Threading.SynchronizationContext.Current;
         try { FontClient.Instance.AddCustomFontDirectory(Res + "fonts"); } catch { }
         try { library = AppLibrary.Load(Res + "apps.json"); } catch { }
+        // the Apps menu shows MaxApps tiles; Samsung Home is always one of them
+        if (library.Count > MaxApps) library = library.GetRange(0, MaxApps);
+        if (!library.Exists(a => a.Id == Shared.SamsungHome) && library.Count == MaxApps) library.RemoveAt(MaxApps - 1);
         if (!library.Exists(a => a.Id == Shared.SamsungHome))
             library.Add(new LibraryApp { Name = "Samsung Home", Id = Shared.SamsungHome, Asset = "tile-samsung-home.svg", Background = "#1C2638", Width = 640, Height = 360 });
         try { SetRenderRefreshRate(1); } catch { }  // DALi draws every 2nd vsync here by default: 60 fps
@@ -42,9 +45,7 @@ public sealed partial class SilentGlass : NUIApplication
         // started by the bridge only to show a notification: stay hidden, the picture stays in front
         if (NoticePending()) { HideBackdrop(); TakeNotice("start"); }
         Note("created");
-        privacyTimer = new Tizen.NUI.Timer(8000);
-        privacyTimer.Tick += (s, e) => { PrivacyStatus(); Note("privacy:" + privacyGaps); return false; };
-        privacyTimer.Start();
+        After(8000, () => { PrivacyStatus(); Note("privacy:" + privacyGaps); });
     }
     // AMD resumes us for every launch request; what to show is decided in OnAppControlReceived
     protected override void OnResume() { base.OnResume(); Note("resumed fg=" + Foreground()); }

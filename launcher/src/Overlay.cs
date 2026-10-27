@@ -209,7 +209,7 @@ public sealed partial class SilentGlass
         if (!overlayShown) return;
         if (mode == Mode.Bar && BarSignature() != barSig) OpenBar(true);
         else if (mode == Mode.Inputs && InputsSignature() != inputsSig) OpenInputs();
-        else if (mode == Mode.Controls || mode == Mode.Info) UpdatePanel();
+        else if (mode == Mode.Controls || mode == Mode.Info) UpdatePanel(true);
     }
     string FocusName() => !overlayShown ? "" : mode == Mode.Bar && barSel >= 0 && barSel < bar.Count ? bar[barSel].Action :
         (mode == Mode.Controls || mode == Mode.Info) && rowSel >= 0 && rowSel < rows.Count ? rows[rowSel].Name : mode.ToString();

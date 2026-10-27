@@ -4,8 +4,16 @@ The launcher was called Quiet Home (the name inherited from Quiet Tizen) until t
 entries keep that name.
 
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
-records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
+records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v43a** + **bridge 2.8.0** (built and tested off the TV; not yet on it): one contract file
+  (`launcher/src/Shared.cs`) compiled into both, for app ids, launch extras, the data-directory files and the input
+  list; dead code removed. Fixes: the phone page could report "Connected" after saving settings that then failed (it
+  read the old connection's state); a broker gone without a reset (network loss) was never noticed (now 90 s without
+  a packet ends the connection); the setup sheet's auto-close timer could be collected before it fired; a setting
+  changed on the TV made SilentGlass reload and rebuild the bar. Info shows "Connecting…" while the bridge tries new
+  settings. Deploy pair: a staged file that failed its checksum no longer passes under `set -e`. Phone page: a wrong
+  code clears the field, network failures are reported, accessible buttons and switches.
 - **v42l**: a green dot on every input whose device is on, not just the one on screen. HDMI-CEC lists the devices
   that are awake (a sleeping one drops out); read in-process over GDBus (`Cec.cs`, ~50 ms) when the bar or Inputs
   opens, cleared on standby. A device plugged straight into the TV must also not report standby; behind a soundbar

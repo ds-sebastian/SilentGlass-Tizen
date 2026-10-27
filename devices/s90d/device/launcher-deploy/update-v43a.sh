@@ -7,7 +7,7 @@ BK=/opt/usr/share/quiet-tizen-backups/s90d-home-v43a-20261027
 ST=/home/owner/share/tmp/sdk_tools/s90d-home-v43a
 LBL=User::Pkg::com.samsung.tv.bixby-promotion::RO
 PREV=c208d23dcf858593900678316e9987f17d971e7afa2f9cf44f17e375d6d7d6a9  # v42l
-DLL=6a1de909a08decd317688ad7e9ea48beac39bec88f75951e859008acaf289025  # v43a: python3 tools/build.py launcher (reproducible)
+DLL=6589763b58fead61807aac72c718ef8bd88a41e55d83a662bc787a1b95d17a1a  # v43a: python3 tools/build.py launcher (reproducible)
 [ "$(id -u)" = 0 ]
 [ ! -e "$BK" ] || { echo 'v43a backup dir exists - refusing'; exit 3; }
 [ "$(sha256sum $A/bin/BixbyPromotion.dll | cut -d' ' -f1)" = "$PREV" ] || { echo 'installed DLL is not v42l - refusing'; exit 4; }

@@ -10,8 +10,7 @@ using System.Text.RegularExpressions;
 sealed class HttpRequest
 {
     public string Method = "", Path = "/", Boundary = ""; public byte[] Body = Array.Empty<byte>();
-    public readonly Dictionary<string, string> Headers = new(), Query = new();
-    public string Text => Encoding.UTF8.GetString(Body);
+    public readonly Dictionary<string, string> Headers = new();
     public static HttpRequest Read(Stream s, int maxBody)
     {
         var buf = new byte[65536]; int got = 0, end = -1;
@@ -24,8 +23,7 @@ sealed class HttpRequest
         var first = lines[0].Split(' ');
         var r = new HttpRequest { Method = first[0] };
         string target = first.Length > 1 ? first[1] : "/"; int q = target.IndexOf('?');
-        r.Path = q < 0 ? target : target.Substring(0, q);
-        if (q >= 0) foreach (var kv in target.Substring(q + 1).Split('&')) { var p = kv.Split('=', 2); if (p[0].Length > 0) r.Query[Uri.UnescapeDataString(p[0])] = p.Length > 1 ? Uri.UnescapeDataString(p[1].Replace('+', ' ')) : ""; }
+        r.Path = q < 0 ? target : target.Substring(0, q);  // the query (the QR code's ?s=) only makes the address unique
         int length = 0;
         foreach (var l in lines.Skip(1)) {
             int c = l.IndexOf(':'); if (c < 0) continue;

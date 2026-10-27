@@ -63,7 +63,7 @@ public sealed partial class SilentGlass
     void OpenApps()
     {
         mode = Mode.Apps; FocusBar(false); CloseMenu();
-        var apps = library.Count > MaxApps ? library.GetRange(0, MaxApps) : library;
+        var apps = library;  // at most MaxApps (OnCreate)
         int n = apps.Count, lines = (n + AppCols - 1) / AppCols, cols = Math.Min(AppCols, n);
         int w = cols * AppW + (cols - 1) * AppGap, h = lines * (AppH + 50) + (lines - 1) * 18, x0 = 960 - w / 2, y0 = BarTop - PopGap - 20 - h;
         if (oDim != null) { oDim.Position2D = new Position2D(0, BandTop); oDim.Size2D = new Size2D(1920, 1080 - BandTop); }  // dim further up for the names
