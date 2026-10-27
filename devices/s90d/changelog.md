@@ -6,6 +6,17 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42e**: no wait before reopening the bar. The 2.6 s after-close window swallowed real presses: in one test
+  session 6 Home presses in a row (0.3 s apart) were dropped after a close. Now closing starts no window. Only a
+  launch request with no Home key, within 1.2 s of the press that opened the bar, is dropped (the TV's duplicate);
+  a real press while the bar is up always reaches it as a key first, so it always counts. Opening, closing and
+  reopening all within 1.2 s is the one case where a press can still be dropped. Stray requests after a close
+  aren't filtered any more (the bar hides on the key's release since v42b, and the log showed none after a remote
+  Home close); if they come back, the cost is a bounce, not a delay - the owner's preference. Also: Home pressed
+  just after the picture dropped (counted as over it) now brings the wallpaper up behind the bar if the picture is
+  still gone when the 4 s grace ends. Screen sim: "<step> quickly" steps, a 0.5 s "Home over the picture opens at
+  once" rule (proven to fail on v42d), `SG_SIM_TRACE=<scenario>` prints one scenario's log. Deploy pair
+  `update-v42e.sh` / `restore-v32a.sh`.
 - **Release tooling**: `tools/build.py bridge` builds the bridge reproducibly (same flags as the launcher; the
   installer embeds that build), the SDK is pinned (`global.json`), `tools/release.py` builds the release files from
   a clean checkout and checks for local-only assets, and CI checks that the committed installer is its source. Lab
@@ -20,7 +31,7 @@ records. Conf keys mentioned in older entries may since have been removed - the 
     `db/built-in-app-upgrader/server_upgrade` (was on). `cleanup/batchg-apply.sh` turns it off, and the OMA-DM
     firmware auto-update (`db/SyncML/ivi-oma-dm-service/software-update/autoupdate/setting`, separate from the
     menu's), with the old values saved; `batchg-restore.sh` puts them back (round trip tested). The drift check
-    now verifies all four update keys. Deploy pair `update-v42d.sh` / `restore-v32a.sh`.
+    now verifies all four update keys.
 - **v42c**: a double/triple flash when the bar appears. A window trace (`enlightenment_info -topvwins` every ~40 ms)
   shows a warm open is one clean step - overlay hidden -> shown, nothing else moves - so the flash is the overlay's
   own content. Likely cause: the window was hidden before it was cleared, so it kept the old bar as its last frame,

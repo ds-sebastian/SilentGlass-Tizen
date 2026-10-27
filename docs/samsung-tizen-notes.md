@@ -176,10 +176,11 @@ are ordinary optional features rather than trackers.
 - **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off. A device waking with One
   Touch Play switches the TV's input underneath any open app window; a notification window that had the keys loses
   them.
-- **The Home key reaches the Home app twice:** a key event plus a launch request, then a second launch request
-  0.4-1 s later. Treat a Home launch within ~1.2 s of the last one as the same press, or the second undoes the first.
-  After the Home app hides its windows on a physical-remote key (Back, Enter, Home), it gets one or two more launch
-  requests 0.7-2.2 s later; Home Assistant's keys did not cause them.
+- **The Home key can reach the Home app twice:** a launch request, then a second one 0.4-1 s later with no key
+  event. While the app's focused window is up, a real Home press arrives as a key event just before its launch
+  request, so drop only key-less requests within ~1.2 s of the press that opened the app's UI. Don't drop requests
+  for a time after closing: those were mostly the user's own presses. Requests seen 0.7-2.2 s after a close (when
+  the windows hid on a key's press) are best avoided by hiding on the key's release instead.
 - **Four automatic-update switches, two of them hidden** (vconf, S90D 2026 firmware): `db/apps/auto_update` (menu
   "Auto update apps", read by `org.tizen.was-appupdate`), `db/built-in-app-upgrader/server_upgrade` (no menu; read by
   `org.tizen.was-builtinupgrade`, which updates Samsung's built-in apps even with the menu setting off; `was-reset`

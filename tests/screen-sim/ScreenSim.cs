@@ -44,13 +44,16 @@ static class ScreenSim
     }
 
     static readonly string[] Pool = {
-        "Home", "Home", "Home", "Select Watch", "Select Play", "Back", "Open Info", "Arrow", "Wait 2s", "Wait 10s", "Wait 50s", "Wait 6min",
+        "Home", "Home", "Home", "Home quickly", "Back quickly", "Select Watch", "Select Play", "Back", "Open Info", "Arrow", "Wait 2s", "Wait 10s", "Wait 50s", "Wait 6min",
         "SHIELD sleeps", "SHIELD wakes (its remote)", "SHIELD resyncs", "Switch sleeps", "Switch wakes (docked)", "Ambient",
         "Power off", "Power on", "HA input SHIELD", "HA input Switch", "HA Home" };
 
     static IEnumerable<(string, string[])> Scenarios() => new[] {
         ("Home over SHIELD, Home again", new[] { "Home", "Wait 2s", "Home", "Wait 2s" }),
         ("Home, Home, Home quickly (the bounce)", new[] { "Home", "Home", "Home", "Wait 3s" }),
+        ("Close with Home, reopen at once", new[] { "Home", "Wait 2s", "Home quickly", "Home", "Wait 2s" }),
+        ("Close with Back, reopen at once", new[] { "Home", "Wait 2s", "Back quickly", "Home", "Wait 2s" }),
+        ("Watch, then Home at once", new[] { "Home", "Wait 2s", "Select Watch quickly", "Home", "Wait 2s" }),
         ("SHIELD asleep: Home, then SHIELD's remote", new[] { "SHIELD sleeps", "Wait 2s", "Home", "Wait 2s", "SHIELD wakes (its remote)", "Wait 10s" }),
         ("SHIELD asleep: Home, wallpaper dims, then SHIELD's remote", new[] { "SHIELD sleeps", "Wait 2s", "Home", "Wait 6min", "SHIELD wakes (its remote)", "Wait 10s" }),
         ("Home during a frame-rate switch", new[] { "SHIELD resyncs", "Wait 1s", "Home", "Wait 10s" }),
@@ -81,7 +84,10 @@ static class ScreenSim
                 else found[v] = (1, example);
             }
         }
+        // SG_SIM_TRACE=<scenario name>: print that scenario's whole log (first variant), to debug the model
+        if (Environment.GetEnvironmentVariable("SG_SIM_TRACE") == name && traced.Add(name)) foreach (var l in tv.Log) Console.WriteLine("  " + l);
     }
+    static readonly HashSet<string> traced = new();
     static int StepCount(List<string> ex) => ex.First(l => l.StartsWith("steps: ")).Split(" > ").Length;
 }
 
@@ -108,7 +114,7 @@ sealed class FakeTv : IScreen
     public bool BackdropShown => Bd;
     public bool SetupOpen => Overlay && Mode == "setup";
     public bool HomeKeyJustPressed => T - homeKeyAt < 300; long homeKeyAt = long.MinValue / 2;
-    public long OverlayClosedAt => closedAt; long closedAt = long.MinValue / 2, openedAt = long.MinValue / 2;
+    long closedAt = long.MinValue / 2, openedAt = long.MinValue / 2;
     public readonly Random Rnd = new(7);
     public int ReadSignal() => SignalVconf;
     public int ReadSource() => Src;
@@ -129,11 +135,9 @@ sealed class FakeTv : IScreen
     public void CloseOverlay(string why)
     {
         if (!Overlay) return;
-        // seen on the TV (event log, v41e): after the bar closes on a remote key, the Home app gets one or two stray
-        // launch requests 0.7-2.2 s later
-        if (why == "back" || why == null || why == "launch:close")  // null: SelectSource
-            foreach (var at in new[] { 700 + Rnd.Next(300), 1400 + Rnd.Next(800) })
-                Later(at, () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
+        // Stray requests after a close (seen before v42b) are not modelled: the bar now hides on the key's release,
+        // and the v42b log shows none after a remote Home close; the requests that followed the others were the
+        // owner's own repeated presses, which the old after-close window swallowed.
         CloseOverlayNow(why);
     }
     void CloseOverlayNow(string why) { if (!Overlay) return; Overlay = false; closedAt = T; Focused = false; Mode = ""; if (why != null) Note(why); }
@@ -206,22 +210,28 @@ sealed class FakeTv : IScreen
     public void Do(string step)
     {
         Tv("> " + step);
-        if (!step.StartsWith("Wait ")) homeCheck = false;  // a later press decides instead
+        // "<step> quickly": the next step follows 0.3 s later instead of the usual 1.5 s
+        bool quick = step.EndsWith(" quickly"); if (quick) step = step[..^8];
+        if (!step.StartsWith("Wait ")) homeCheck = homeQuick = false;  // a later press decides instead
         switch (step) {
             case "Home":
                 if (!Power) break;
                 // a Home press closes a working bar over the picture; otherwise it must leave a working bar
                 homeCheck = true; homeAt = T; homeExpectClose = Overlay && Focused && !Bd && Front != Art && Front != Csfs;
+                // over a live picture with the bar closed, this press itself must open it (no waiting, no rescue by a
+                // later duplicate request)
+                homeQuick = Power && !Overlay && !Bd && InputHasPicture && Front != Art && Front != Csfs && T - openedAt >= Screen.EchoMs;
                 homeNoPicture = !homeExpectClose && !InputHasPicture && T - pictureSeenAt > 6000;
-                // within 1.2 s of the bar opening, or 2.6 s of it closing, a press is taken for one of the TV's stray
-                // launch requests (Screen.EchoMs / AfterCloseMs): either outcome is fine
-                if (T - openedAt < Screen.EchoMs || T - closedAt < Screen.AfterCloseMs) homeCheck = false;
+                // a press that doesn't reach the bar (not focused) within 1.2 s of it opening may be taken for the TV's
+                // duplicate request (Screen.EchoMs): either outcome is fine. Every other press must count.
+                if (T - openedAt < Screen.EchoMs && !(Overlay && Focused)) homeCheck = false;
                 if (Front == Art) { SetFront(Csfs); break; }  // Ambient's Home key opens Samsung Home
                 if (Overlay && Focused) homeKeyAt = T + 140;  // the key reaches the focused bar just before its launch request
                 Later(150, () => Amd(Self, null));
-                // seen on the TV (event log, v41b): the remote's Home reaches the app twice, the second launch request
-                // 0.4-1 s after the first
-                Later(150 + 400 + Rnd.Next(600), () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
+                // seen on the TV (event log, v41b): a Home that opens the bar can reach the app twice, the second launch
+                // request 0.4-1 s later and with no key event
+                if (!(Overlay && Focused))
+                    Later(150 + 400 + Rnd.Next(600), () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
                 break;
             case "HA Home": Later(150, () => Amd(Self, null)); break;
             case "HA input SHIELD": Later(150, () => Amd(Self, "src:15")); break;
@@ -240,10 +250,10 @@ sealed class FakeTv : IScreen
             case "Power off": if (!Power) break; Power = false; Focused = false; Front = Self; Fg(); Later(100, () => App.Standby()); break;  // memory/pm/state
             case "Power on": PowerOn(Src); break;
             default:
-                if (step.StartsWith("Wait ")) { Advance(step.EndsWith("min") ? int.Parse(step[5..^3]) * 60000 : int.Parse(step[5..^1]) * 1000); return; }
+                if (step.StartsWith("Wait ")) { Advance(step.EndsWith("min") ? int.Parse(step[5..^3]) * 60000 : step.EndsWith("ms") ? int.Parse(step[5..^2]) : int.Parse(step[5..^1]) * 1000); return; }
                 throw new ArgumentException(step);
         }
-        Advance(1500);  // people take a moment between presses
+        Advance(quick ? 300 : 1500);  // people take a moment between presses
     }
     void Activate(int t) { if (Mode != "bar") return; App.SelectSource(t); }
     // a key on the remote: to the overlay if it has focus, to our main window if that is in front, else to the TV
@@ -275,7 +285,7 @@ sealed class FakeTv : IScreen
     }
 
     // ---- time, SilentGlass' own timers, and the rules ----
-    readonly Dictionary<string, long> since = new(); readonly List<string> violations = new(); bool homeCheck, homeExpectClose, homeNoPicture; long homeAt, pictureSeenAt;
+    readonly Dictionary<string, long> since = new(); readonly List<string> violations = new(); bool homeCheck, homeExpectClose, homeNoPicture, homeQuick; long homeAt, pictureSeenAt;
     void Advance(long ms)
     {
         long end = T + ms;
@@ -302,6 +312,10 @@ sealed class FakeTv : IScreen
         Rule("the wallpaper (or its dimmed black) covers a live picture on the current input", Power && Front == Self && MainUp && InputHasPicture && !SetupOpen);
         Rule("the bar is on screen but the remote's keys go elsewhere", Power && Overlay && !Focused);
         Rule("SilentGlass stays over another app (Ambient / Samsung Home)", Power && (Front == Art || Front == Csfs) && (Overlay || MainUp));
+        if (homeQuick && T - homeAt == 500) {
+            homeQuick = false;
+            if (Power && !(Overlay && Focused)) violations.Add("Home over the picture: no bar 0.5 s later (the press was dropped)");
+        }
         if (homeCheck && T - homeAt == 3000) {
             homeCheck = false;
             if (Power && (homeExpectClose ? Overlay : !(Overlay && Focused))) violations.Add(homeExpectClose ? "Home over the bar did not close it" : "Home press: no working bar 3 s later");

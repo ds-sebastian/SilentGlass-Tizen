@@ -18,7 +18,6 @@ public interface IScreen
     bool OverlayShown { get; }
     bool BackdropShown { get; }
     bool SetupOpen { get; }
-    long OverlayClosedAt { get; }   // clock ms when the overlay last closed
     bool HomeKeyJustPressed { get; } // the Home key itself reached our window (the bar was up): a real press
     int ReadSignal();
     int ReadSource();
@@ -47,8 +46,8 @@ public sealed class Screen
     public string LastOther = "";         // the last app in front other than us
     string previous = "";
     int settleGen, homeGen, pollGen; bool homeAfterViewer, directHome; string pendingOpen;
-    public const int BackdropPollMs = 1000, EchoMs = 1200, AfterCloseMs = 2600;
-    bool selfLaunch; long lastHome = long.MinValue / 2;  // the next launch request is our own relaunch, not a Home press
+    public const int BackdropPollMs = 1000, EchoMs = 1200;
+    bool selfLaunch; long lastOpenHome = long.MinValue / 2;  // the next launch request is our own relaunch, not a Home press
     void LaunchSelf() { selfLaunch = true; ui.Launch(Self); }
     long pictureLostAt = long.MinValue / 2; int pictureLostOn = -1;
     public bool HasPicture => Signal == 1;
@@ -65,13 +64,13 @@ public sealed class Screen
     public void Home(string open, string why)
     {
         bool own = selfLaunch; selfLaunch = false;
-        // The TV sends the Home app stray launch requests: a second one 0.4-1 s after a Home press, and one or two
-        // 0.7-2.2 s after the bar closes on a remote key (Back, Watch, Home) - each reopened the bar (the "bounce",
-        // seen in the event log). A plain Home within 1.2 s of the last one, or 2.6 s of the bar closing, is ignored.
+        // The TV can send the Home app a second launch request 0.4-1 s after a press that opened the bar; taken as a
+        // press, it toggled the bar again (the "bounce"). A real press while the bar is up reaches it as a Home key
+        // just before its request, so only a request with no key within 1.2 s of an opening press is dropped. Closing
+        // starts no window: Home right after a close reopens at once (an after-close window swallowed real presses).
         long now = clock();
-        // A request right after the Home key itself reached us is a real press, whatever the timing.
-        if (!own && open == "" && !ui.HomeKeyJustPressed && (now - lastHome < EchoMs || !ui.OverlayShown && now - ui.OverlayClosedAt < AfterCloseMs)) { ui.Note(why + ":echo"); return; }
-        if (open == "") lastHome = now;
+        if (!own && open == "" && !ui.HomeKeyJustPressed && now - lastOpenHome < EchoMs) { ui.Note(why + ":echo"); return; }
+        if (open == "" && !ui.OverlayShown) lastOpenHome = now;  // our own relaunch opens the bar too
         // a press while going to the picture first: this press decides, the pending relaunch is dropped
         if (!own && homeAfterViewer) { homeAfterViewer = false; ++homeGen; }
         ui.Wake();
@@ -82,10 +81,23 @@ public sealed class Screen
         if (!direct && IsAmbient(LastOther)) { PictureFirst(open, why); return; }
         if (open == "" && ui.OverlayShown && !ui.BackdropShown) { ui.CloseOverlay(why + ":close"); return; }
         bool keep = open == "" && ui.OverlayShown;
-        if (OverPicture()) ui.HideBackdrop(); else { ui.ShowBackdrop(); PollUnderBackdrop(); }
+        if (OverPicture()) { ui.HideBackdrop(); if (!HasPicture) WallpaperIfNoPictureReturns(); }
+        else { ui.ShowBackdrop(); PollUnderBackdrop(); }
         ui.OpenBar(keep);
         if (open != "") ui.OpenPart(open);
         ui.Note(why + (open == "" ? "" : ":" + open) + (ui.BackdropShown ? ":backdrop" : ":picture"));
+    }
+
+    // Home just after the picture dropped counts as over it (a flicker or a frame-rate switch); if the picture is still
+    // gone when that grace ends, the wallpaper comes up behind the open bar
+    void WallpaperIfNoPictureReturns()
+    {
+        int g = homeGen;
+        long wait = Math.Max(0, DropoutGraceMs - (clock() - pictureLostAt)) + 50;
+        ui.After((int)wait, () => {
+            if (g != homeGen || !ui.OverlayShown || ui.BackdropShown || ui.SetupOpen || OverPicture()) return;
+            ui.ShowBackdrop(); PollUnderBackdrop(); ui.OpenBar(true); ui.Note("picture_gone:backdrop");
+        });
     }
 
     public void Foreground(string now)

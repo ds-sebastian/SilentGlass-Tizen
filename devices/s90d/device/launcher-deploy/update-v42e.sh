@@ -1,26 +1,26 @@
 #!/bin/sh
-# SilentGlass v32a -> v42d (overlays only, phone setup for Home Assistant). Inverse: restore-v32a.sh.
+# SilentGlass v32a -> v42e (overlays only, phone setup for Home Assistant). Inverse: restore-v32a.sh.
 set -eu
 A=/opt/usr/apps/com.samsung.tv.bixby-promotion
-BK=/opt/usr/share/quiet-tizen-backups/s90d-home-v42d-20261025
-ST=/home/owner/share/tmp/sdk_tools/s90d-home-v42d
+BK=/opt/usr/share/quiet-tizen-backups/s90d-home-v42e-20261025
+ST=/home/owner/share/tmp/sdk_tools/s90d-home-v42e
 LBL=User::Pkg::com.samsung.tv.bixby-promotion::RO
 PREV=4edf70c0a22d3ccf08b1adc1302a14a9779f1484053d455939a3ca7a11710529
-TARSHA=9c2492d3c62b30e5c6dc846a2cd335405f70a6600d740c5d099ab35daf6a0f8a
+TARSHA=c745a0e8738c38039c13024533f94ecb7ef47a953863ca634227b1cffd71e0e7
 [ "$(id -u)" = 0 ]
-[ ! -e "$BK" ] || { echo 'v42d backup dir exists - refusing'; exit 3; }
+[ ! -e "$BK" ] || { echo 'v42e backup dir exists - refusing'; exit 3; }
 [ "$(sha256sum $A/bin/BixbyPromotion.dll | cut -d' ' -f1)" = "$PREV" ] || { echo 'installed DLL is not v32a - refusing'; exit 4; }
 [ ! -e "$A/bin/.native_image" ] || { echo 'unexpected native image cache - refusing'; exit 5; }
 [ -d "$A/res/quiet-home" ]
 [ "$(stat -c %d $A/res)" = "$(stat -c %d /opt/usr/share/quiet-tizen-backups)" ] || { echo 'backup is on another filesystem; mv would not preserve labels - refusing'; exit 7; }
-[ "$(sha256sum $ST/v42d.tar.gz | cut -d' ' -f1)" = "$TARSHA" ] || { echo 'staged archive hash mismatch'; exit 6; }
+[ "$(sha256sum $ST/v42e.tar.gz | cut -d' ' -f1)" = "$TARSHA" ] || { echo 'staged archive hash mismatch'; exit 6; }
 dll_mode=$(stat -c %a $A/bin/BixbyPromotion.dll); dll_owner=$(stat -c %u:%g $A/bin/BixbyPromotion.dll)
 echo "v32a DLL mode=$dll_mode owner=$dll_owner label=$(chsmack $A/bin/BixbyPromotion.dll | sed 's/.*access=//')"
 
 mkdir -m 700 "$BK"; mkdir "$BK/stage"
-cp "$ST/v42d.tar.gz" "$ST/v42d-files.sha256" "$BK/"
-tar -xzf "$BK/v42d.tar.gz" -C "$BK/stage"
-(cd "$BK/stage" && sha256sum -c ../v42d-files.sha256 >/dev/null) && echo 'staged files verified'
+cp "$ST/v42e.tar.gz" "$ST/v42e-files.sha256" "$BK/"
+tar -xzf "$BK/v42e.tar.gz" -C "$BK/stage"
+(cd "$BK/stage" && sha256sum -c ../v42e-files.sha256 >/dev/null) && echo 'staged files verified'
 app_launcher -u 5001 -k com.samsung.tv.bixby-promotion >/dev/null 2>&1 || true
 
 echo '=== backup v32a'
@@ -28,7 +28,7 @@ cp -a "$A/bin/BixbyPromotion.dll" "$BK/v32a-BixbyPromotion.dll"
 mv "$A/res/quiet-home" "$BK/v32a-quiet-home"
 [ "$(sha256sum $BK/v32a-BixbyPromotion.dll | cut -d' ' -f1)" = "$PREV" ]
 
-echo '=== install v42d'
+echo '=== install v42e'
 cp "$BK/stage/BixbyPromotion.dll" "$A/bin/BixbyPromotion.dll"
 chown "$dll_owner" "$A/bin/BixbyPromotion.dll"; chmod "$dll_mode" "$A/bin/BixbyPromotion.dll"; chsmack -a "$LBL" "$A/bin/BixbyPromotion.dll"
 cp -R "$BK/stage/quiet-home" "$A/res/quiet-home"
@@ -38,9 +38,9 @@ find "$A/res/quiet-home" -exec chown 201:0 {} \;
 find "$A/res/quiet-home" -exec chsmack -a "$LBL" {} \;
 
 echo '=== verify'
-(cd "$A/res" && sed -n 's#  quiet-home/#  quiet-home/#p' "$BK/v42d-files.sha256" | sha256sum -c - >/dev/null) && echo 'resources verified'
-[ "$(sha256sum $A/bin/BixbyPromotion.dll | cut -d' ' -f1)" = "$(grep '  BixbyPromotion.dll$' $BK/v42d-files.sha256 | cut -d' ' -f1)" ] && echo 'DLL verified'
+(cd "$A/res" && sed -n 's#  quiet-home/#  quiet-home/#p' "$BK/v42e-files.sha256" | sha256sum -c - >/dev/null) && echo 'resources verified'
+[ "$(sha256sum $A/bin/BixbyPromotion.dll | cut -d' ' -f1)" = "$(grep '  BixbyPromotion.dll$' $BK/v42e-files.sha256 | cut -d' ' -f1)" ] && echo 'DLL verified'
 echo "DLL mode=$(stat -c %a $A/bin/BixbyPromotion.dll) owner=$(stat -c %u:%g $A/bin/BixbyPromotion.dll) label=$(chsmack $A/bin/BixbyPromotion.dll | sed 's/.*access=//')"
 bad=$(find "$A/res/quiet-home" -exec chsmack {} \; | grep -vc "access=\"$LBL\"" || true); echo "resource label mismatches: $bad"
 rm -rf "$BK/stage" "$ST"
-echo 'V42D INSTALLED. Press Home to open the new Quiet Home.'
+echo 'V42E INSTALLED. Press Home to open the new Quiet Home.'
