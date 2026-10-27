@@ -91,12 +91,15 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
 
 ## How it works
 
-- State is read every 2 s from cheap local sources: `memory/pm/state` (4 = standby),
-  `memory/eden/source/current_source` (`SOURCE_TYPE_HDMIn`), `memory/appfw/current_fullscreen_appid`, SilentGlass
-  Home's input list in `/tmp/quiet-home-state.txt`; temperature, memory and the Thread role (`ot-ctl state`) every
-  30 s. Only changes are published (retained), plus a full refresh every 5 minutes and whenever Home Assistant
-  restarts (`homeassistant/status`).
-- Commands are a fixed list; there is no shell. Input: `launch_app com.samsung.tv.bixby-promotion quiet_source <id>`
+- Power, input and the app in front are sent when they change: vconf change notifications on `memory/pm/state`
+  (4 = standby), `memory/eden/source/current_source` (`SOURCE_TYPE_HDMIn`) and
+  `memory/appfw/current_fullscreen_appid`, plus the source library's list-changed callback. Volume, mute, input
+  names (`get_source_list`) and SilentGlass's own state (`/tmp/silentglass-state.txt`) are checked every 10 s
+  (`update=` 2, 5, 10, 30 or 60; Advanced settings › Home Assistant). Temperature, memory, the Thread role
+  (`ot-ctl state`) and the picture settings every minute; the picture/sound mode lists take dozens of settings calls,
+  so they are never part of the frequent check. Only changes are published (retained), plus a full refresh every
+  5 minutes and whenever Home Assistant restarts (`homeassistant/status`).
+- Commands are a fixed list; there is no shell. Input: `launch_app com.samsung.tv.bixby-promotion sg_source <id>`
   (the launcher only accepts an input it lists). Home / Ambient: `launch_app`. Thread: writes or removes the
   `thread-off` marker and touches `thread-switch`, exactly like the phone page's switch.
 - Topics: `silentglass/s90d/...`; discovery under `homeassistant/<component>/silentglass_s90d/...`.

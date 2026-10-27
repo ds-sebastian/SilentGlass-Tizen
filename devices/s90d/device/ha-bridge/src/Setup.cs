@@ -31,15 +31,26 @@ static partial class Bridge
     static int setupFailures;
     static bool setupPhone;
 
+    // SilentGlass's requests arrive as files in its data folder: watched with inotify, so the bridge sleeps until one
+    // comes (a 30 s check covers a missed event; 1 s if the watch could not start). While the page is open its
+    // time limit is checked every 5 s.
+    static FileSystemWatcher setupFiles;
+    static readonly AutoResetEvent setupKick = new(false);
     static void StartSetupWatch() => new Thread(() => {
+        bool watching = false;
+        try {
+            setupFiles = new FileSystemWatcher(Data) { NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite };
+            setupFiles.Created += (s, e) => setupKick.Set(); setupFiles.Changed += (s, e) => setupKick.Set(); setupFiles.Renamed += (s, e) => setupKick.Set();
+            setupFiles.EnableRaisingEvents = watching = true;
+        } catch (Exception e) { Log("setup watch: " + e.Message + " (checking every second)"); }
         while (true) {
             try {
                 if (File.Exists(Data + "/setup-close")) { File.Delete(Data + "/setup-close"); CloseSetup("closed on the TV"); }
                 if (File.Exists(Data + "/setup-request")) { File.Delete(Data + "/setup-request"); OpenSetup(); }
-                bool expired; lock (setupGate) expired = setupListener != null && DateTime.UtcNow > setupUntil;
-                if (expired) CloseSetup("timed out");
-            } catch (Exception e) { Log("setup watch: " + e.Message); }
-            Thread.Sleep(400);
+                bool open, expired; lock (setupGate) { open = setupListener != null; expired = open && DateTime.UtcNow > setupUntil; }
+                if (expired) { CloseSetup("timed out"); open = false; }
+                setupKick.WaitOne(!watching ? 1000 : open ? 5000 : 30000);
+            } catch (Exception e) { Log("setup watch: " + e.Message); Thread.Sleep(1000); }
         }
     }) { IsBackground = true, Name = "setup-watch" }.Start();
 
@@ -146,7 +157,7 @@ static partial class Bridge
         var c = LoadConf(); var loc = LoadLocation(); var p = LoadPrefs();
         return new {
             name = c.GetValueOrDefault("name", TvName), host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
-            has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""),
+            has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""), update = UpdateSeconds(c),
             notifications = !File.Exists(Data + "/notify-off"), lat = loc.lat, lon = loc.lon,
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
             thread_on = ThreadWanted,
@@ -219,13 +230,14 @@ static partial class Bridge
     static (bool, string) SaveSetup(Func<string, string> S)
     {
         string host = S("host").Trim(), portText = S("port").Trim(), user = S("user").Trim(), password = S("password"), name = S("name").Trim(),
-            from = S("notify_from").Trim(), lat = S("lat").Trim(), lon = S("lon").Trim(), threadMode = S("thread"), tlv = S("tlv").Trim();
+            from = S("notify_from").Trim(), update = S("update").Trim(), lat = S("lat").Trim(), lon = S("lon").Trim(), threadMode = S("thread"), tlv = S("tlv").Trim();
         if (host.Length > 0 && !ValidHost(host)) return (false, "The server name is not valid.");
         if (portText.Length > 0 && (!int.TryParse(portText, out int port) || port is < 1 or > 65535)) return (false, "The port is a number up to 65535.");
         if (!ValidText(user, 128) || !ValidText(password, 256) || !ValidText(name, 40)) return (false, "Names and passwords can't contain line breaks.");
         var senders = from.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
         if (senders.Length > 8 || senders.Any(h => !ValidHost(h))) return (false, "\"Also from\" takes up to 8 addresses, separated by commas.");
         if (!ValidCoordinate(lat, 90) || !ValidCoordinate(lon, 180)) return (false, "Latitude and longitude are numbers, like 40.7 and -74.0.");
+        if (update.Length > 0 && !(int.TryParse(update, out int every) && UpdateChoices.Contains(every))) return (false, "Pick how often to update Home Assistant.");
         string dataset = threadMode == "ha" ? haTlv : threadMode == "tlv" ? tlv : "";
         if (threadMode == "ha" && dataset.Length == 0) return (false, "Get Home Assistant's network first.");
         if (threadMode == "tlv" && !ValidDataset(dataset)) return (false, "That doesn't look like a Thread dataset (hex).");
@@ -238,6 +250,7 @@ static partial class Bridge
         var c = LoadConf(); bool hostChanged = c.GetValueOrDefault("host", "") != host;
         void Put(string k, string v) { if (v.Length > 0) c[k] = v; else c.Remove(k); }
         Put("host", host); Put("port", portText == "1883" ? "" : portText); Put("user", user); Put("name", name); Put("notify_from", string.Join(",", senders));
+        Put("update", update == DefaultUpdate.ToString() ? "" : update);
         if (password.Length > 0) c["password"] = password; else if (hostChanged || user.Length == 0) c.Remove("password");
         try { SaveConf(c); } catch (Exception e) { return (false, "Could not save (" + e.Message + ")."); }
         try {
@@ -259,7 +272,7 @@ static partial class Bridge
         string threadResult = dataset.Length > 0 ? ApplyThread(dataset) : "";
         lock (setupGate) haTlv = "";
         // reconnect with the new settings and report how that went
-        string before = mqttState; reload = true;
+        string before = mqttState; reload = true; changed.Set();
         string result = "Saved.";
         if (host.Length > 0) {
             for (int i = 0; i < 40 && (reload || mqttState == before && before != "connected"); i++) Thread.Sleep(250);

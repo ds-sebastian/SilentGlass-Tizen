@@ -9,3 +9,6 @@ name=Living Room TV
 # Notifications (Home Assistant "Notifications for Android TV" integration, port 7676) are accepted only from the
 # broker host above and from notify_from= (comma-separated addresses or names), if Home Assistant runs elsewhere.
 #notify_from=192.168.1.20
+# How often volume, mute and input names are checked, in seconds: 2, 5, 10 (default), 30 or 60. Power, input and the
+# app on screen are sent when they change.
+#update=10

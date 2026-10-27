@@ -104,6 +104,11 @@ body.locked main,body.locked #save{display:none}
   <div class="row btnrow" id="test" onclick="testMqtt()">Test connection</div>
 </div>
 <p class="foot">Your MQTT broker (Home Assistant's Mosquitto add-on, or your own). The TV appears in Home Assistant by itself. The password stays on the TV; leave it empty to keep the current one.</p>
+<div class="group" style="margin-top:14px">
+  <div class="row"><span>Check volume and names every</span></div>
+  <div class="seg" id="updseg"><button data-u="2">2 s</button><button data-u="5">5 s</button><button data-u="10" class="on">10 s</button><button data-u="30">30 s</button><button data-u="60">1 min</button></div>
+</div>
+<p class="foot">Power, input and the app on screen are sent the moment they change. Volume, mute and input names are checked this often; longer saves the TV a little work. Temperature and picture settings: every minute.</p>
 
 <h2>This TV</h2>
 <div class="group">
@@ -117,7 +122,7 @@ body.locked main,body.locked #save{display:none}
 <script>
 const $ = id => document.getElementById(id);
 let code = '';  // typed on the code screen; never part of the address
-let threadMode = 'keep', haReady = false, wall = 'auto';
+let threadMode = 'keep', haReady = false, wall = 'auto', update = 10;
 
 async function api(path, body) {
   const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-Code': code, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -138,7 +143,7 @@ function show(s) {
   $('notify').checked = s.notifications; $('from').value = s.notify_from || '';
   $('lat').value = s.lat ?? ''; $('lon').value = s.lon ?? '';
   fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
-  $('apps').checked = !s.hideapps; $('dim').checked = s.dim; setWall(s.wall || 'auto');
+  $('apps').checked = !s.hideapps; $('dim').checked = s.dim; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
   $('thon').checked = s.thread_on;
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
   dot($('mqttdot'), m[0]); $('mqttstate').textContent = m[1];
@@ -150,6 +155,8 @@ function show(s) {
 async function load() {
   try { const s = await api('/api/state'); $('gate').classList.add('hidden'); document.body.classList.remove('locked'); show(s); } catch (e) {}
 }
+function setUpdate(u) { update = u; document.querySelectorAll('#updseg button').forEach(x => x.classList.toggle('on', +x.dataset.u === u)); }
+document.querySelectorAll('#updseg button').forEach(b => b.onclick = () => setUpdate(+b.dataset.u));
 function setWall(w) { wall = w; document.querySelectorAll('#wallseg button').forEach(x => x.classList.toggle('on', x.dataset.w === w)); }
 document.querySelectorAll('#wallseg button').forEach(b => b.onclick = () => setWall(b.dataset.w));
 function fillInputs(sel, list, value) {
@@ -182,7 +189,7 @@ async function fetchHa() {
 async function save() {
   if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep network.'); return; }
   if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
-  const body = Object.assign(mqttBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(),
+  const body = Object.assign(mqttBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
     lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
     watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').checked ? '1' : '0', wall,
     thread_on: $('thon').checked ? 'on' : 'off' });

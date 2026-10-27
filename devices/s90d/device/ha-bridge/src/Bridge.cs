@@ -26,13 +26,13 @@ static partial class Bridge
     static readonly string ConfPath = Environment.GetEnvironmentVariable("SG_CONF") ?? "/opt/usr/home/owner/.config/silentglass-ha.conf";
     static bool noTv;
     const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    const string Version = "2.4.1";
+    const string Version = "2.5.0";
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf = new();
     static Mqtt mqtt;
     static readonly Dictionary<string, string> last = new();
     static readonly object gate = new(), tv = new();
-    static string discoverySig = "";
+    static string inputSig = "", optionsSig = "";
     static volatile bool reload;
     static volatile string mqttState = "unconfigured", mqttError = "";
 
@@ -46,6 +46,11 @@ static partial class Bridge
     static void Log(string s) { if (noTv) Console.WriteLine(s); try { File.AppendAllText("/run/user/5001/silentglass-ha.log", DateTime.Now.ToString("MM-dd HH:mm:ss ") + s + "\n"); } catch { } }
     static string TvName => conf.GetValueOrDefault("name", "").Length > 0 ? conf["name"] : "Living Room TV";
     static bool Configured => conf.GetValueOrDefault("host", "").Length > 0;
+    // how often volume, mute, input names and the rest are checked (power, input and app are sent when they change);
+    // temperature, memory, Thread and picture settings every minute
+    public static readonly int[] UpdateChoices = { 2, 5, 10, 30, 60 };
+    public const int DefaultUpdate = 10, SlowSeconds = 60;
+    public static int UpdateSeconds(Dictionary<string, string> c) => int.TryParse(c.GetValueOrDefault("update", ""), out int s) && UpdateChoices.Contains(s) ? s : DefaultUpdate;
 
     // ---- config: key=value lines; the file is the owner's alone (it holds the broker password) ----
     public static Dictionary<string, string> ParseConf(IEnumerable<string> lines) => lines.Select(l => l.Trim())
@@ -56,7 +61,7 @@ static partial class Bridge
         string tmp = ConfPath + ".new";
         File.WriteAllText(tmp, ""); Run("/bin/chmod", "600 " + tmp, 3000);  // private before anything is written
         File.AppendAllText(tmp, "# SilentGlass bridge - written by the setup page (Info > Advanced settings on the TV)\n" +
-            string.Join("", new[] { "host", "port", "user", "password", "name", "notify_from" }.Where(c.ContainsKey).Select(k => k + "=" + c[k] + "\n")));
+            string.Join("", new[] { "host", "port", "user", "password", "name", "notify_from", "update" }.Where(c.ContainsKey).Select(k => k + "=" + c[k] + "\n")));
         File.Move(tmp, ConfPath, true);
     }
     // what the Info panel shows (rewritten on every change and once a minute, so a stale file means "not running")
@@ -78,7 +83,7 @@ static partial class Bridge
     {
         var ins = Inputs();
         // new names change the selector's options: announce them first, or Home Assistant rejects the new state
-        if (Signature(ins) != discoverySig) { Discovery(); force = true; }
+        if (InputSig(ins) != inputSig) { Discovery(); force = true; }
         Pub("power", ScreenOn ? "ON" : "OFF", force);
         int src = SourceId(VStr("memory/eden/source/current_source"));
         string input = ins.Where(i => i.Type == src).Select(i => i.Name).FirstOrDefault() ?? "Other";
@@ -97,6 +102,8 @@ static partial class Bridge
     }
     static void PublishSlow(bool force)
     {
+        // the picture/sound mode lists take dozens of settings calls: checked here, not with every state check
+        if (OptionsSig() != optionsSig) { Discovery(); PublishFast(true); force = true; }
         if (int.TryParse(Read("/sys/devices/platform/soc/thermal/temperature").Trim(), out int t)) Pub("temperature", t.ToString(), force);
         var mem = Regex.Match(Read("/proc/meminfo"), @"MemAvailable:\s+(\d+)");
         if (mem.Success) Pub("memory", (long.Parse(mem.Groups[1].Value) / 1024).ToString(), force);
@@ -109,8 +116,8 @@ static partial class Bridge
         Pub("game_mode", OptionName(GameOptions(), Setting("game-mode-auto")), force);
     }
     // discovery depends on what the TV currently offers (input names, picture/sound modes)
-    static string Signature(List<Input> ins) => string.Join("|", ins.Select(i => i.Name)) + "#" + string.Join("|", Options("picturemode").Select(o => o.name)) +
-        "#" + string.Join("|", Options("external-sound-mode").Select(o => o.name));
+    static string InputSig(List<Input> ins) => string.Join("|", ins.Select(i => i.Name));
+    static string OptionsSig() => string.Join("|", Options("picturemode").Select(o => o.name)) + "#" + string.Join("|", Options("external-sound-mode").Select(o => o.name));
 
     static string Device() => "{\"identifiers\":[\"" + Node + "\"],\"name\":\"" + J(TvName) +
         "\",\"manufacturer\":\"Samsung\",\"model\":\"QN65S90D (SilentGlass-Tizen)\",\"sw_version\":\"silentglass-ha " + Version + "\"}";
@@ -118,7 +125,7 @@ static partial class Bridge
     static string List(IEnumerable<string> xs) => "[" + string.Join(",", xs.Select(x => "\"" + J(x) + "\"")) + "]";
     static void Discovery()
     {
-        var ins = Inputs(); discoverySig = Signature(ins);
+        var ins = Inputs(); inputSig = InputSig(ins); optionsSig = OptionsSig();
         string common(string obj, string name, string icon, bool diag = false, bool config = false) => "\"unique_id\":\"" + Node + "_" + obj + "\",\"object_id\":\"living_room_tv_" + obj +
             "\",\"name\":\"" + name + "\",\"icon\":\"" + icon + "\",\"availability_topic\":\"" + Base + "/availability\",\"device\":" + Device() +
             (diag ? ",\"entity_category\":\"diagnostic\"" : config ? ",\"entity_category\":\"config\"" : "");
@@ -231,18 +238,30 @@ static partial class Bridge
             try {
                 mqtt = new Mqtt(conf["host"], int.Parse(conf.GetValueOrDefault("port", "1883")), "silentglass-s90d", conf.GetValueOrDefault("user"), conf.GetValueOrDefault("password"),
                     Base + "/availability", "offline", OnMessage);
+                mqtt.Closed = () => changed.Set();
                 Log("connected"); backoff = 5; SetState("connected", "");
                 if (noTv) { while (mqtt.Alive && !reload) Thread.Sleep(200); throw new Exception(reload ? "reload" : "connection lost"); }
                 mqtt.Subscribe(Base + "/+/set", Base + "/+/press", "homeassistant/status");
                 lock (gate) last.Clear();
                 Resync(); mqtt.Publish(Base + "/availability", "online", true);
-                for (long n = 1; mqtt.Alive && !reload; n++) {
-                    Thread.Sleep(2000);
-                    PublishFast(false);
-                    if (inputsChanged) { inputsChanged = false; Log("source list changed"); }
-                    if (n % 15 == 0) PublishSlow(false);
-                    if (n % 30 == 0) SetState("connected", "");
-                    if (n % 150 == 0) { PublishFast(true); PublishSlow(true); }
+                int every = UpdateSeconds(conf); Log("updates every " + every + " s, and on changes");
+                var clock = Stopwatch.StartNew(); long nextFast = every * 1000L, nextSlow = SlowSeconds * 1000L, nextFull = 300_000;
+                while (mqtt.Alive && !reload) {
+                    // sleeps until the next check, a change notification (published 0.3 s later: they come in bursts),
+                    // a lost connection or new settings
+                    long wait = Math.Min(nextFast, Math.Min(nextSlow, nextFull)) - clock.ElapsedMilliseconds;
+                    bool ev = changed.WaitOne((int)Math.Clamp(wait, 1, 300_000));
+                    if (!mqtt.Alive || reload) break;
+                    if (ev) { Thread.Sleep(300); changed.Reset(); }
+                    long now = clock.ElapsedMilliseconds;
+                    bool full = now >= nextFull, slow = full || now >= nextSlow;
+                    if (ev || full || now >= nextFast) { PublishFast(full); nextFast = now + every * 1000L; }
+                    if (slow) {
+                        PublishSlow(full); SetState("connected", ""); nextSlow = now + SlowSeconds * 1000L;
+                        var counts = keyEvents.Select((_, i) => Interlocked.Exchange(ref keyEvents[i], 0)).ToArray();
+                        if (counts.Any(c => c > 0)) Log("changes in the last minute: power " + counts[0] + ", input " + counts[1] + ", app " + counts[2] + ", input list " + counts[3]);
+                    }
+                    if (full) nextFull = now + 300_000;
                 }
                 Log(reload ? "reconnecting with the new settings" : "disconnected");
                 if (!reload) SetState("error", "connection lost");

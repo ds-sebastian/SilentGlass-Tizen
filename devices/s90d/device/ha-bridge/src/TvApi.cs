@@ -39,12 +39,24 @@ static partial class Bridge
     [DllImport("/usr/lib/libsource-api.so")] static extern void register_sourcelist_changed_callback(SourceListChangedCallback cb, IntPtr userData);
     [DllImport("libglib-2.0.so.0")] static extern IntPtr g_main_loop_new(IntPtr context, bool isRunning);
     [DllImport("libglib-2.0.so.0")] static extern void g_main_loop_run(IntPtr loop);
-    static SourceListChangedCallback sourceListCallback;  // kept alive: native code holds the pointer
-    static volatile bool inputsChanged;
+    // power, input and the app in front are vconf keys: their change notifications (on the same GLib loop) publish
+    // at once, so the timed check only has to catch the rest (volume, names)
+    delegate void VconfChangedCallback(IntPtr node, IntPtr userData);
+    [DllImport("libvconf.so.0")] static extern int vconf_notify_key_changed(string key, VconfChangedCallback cb, IntPtr userData);
+    static readonly string[] WatchedKeys = { "memory/pm/state", "memory/eden/source/current_source", "memory/appfw/current_fullscreen_appid" };
+    static SourceListChangedCallback sourceListCallback;  // kept alive: native code holds the pointers
+    static readonly List<VconfChangedCallback> keyCallbacks = new();
+    static readonly int[] keyEvents = new int[4];  // per watched key + source list, logged once a minute when nonzero
+    static readonly AutoResetEvent changed = new(false);
     static void StartSourceWatch() => new Thread(() => {
         try {
-            sourceListCallback = (t, d) => inputsChanged = true;
+            sourceListCallback = (t, d) => { Interlocked.Increment(ref keyEvents[3]); changed.Set(); };
             register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero);
+            for (int i = 0; i < WatchedKeys.Length; i++) {
+                int k = i; VconfChangedCallback cb = (n, d) => { Interlocked.Increment(ref keyEvents[k]); changed.Set(); };
+                keyCallbacks.Add(cb);
+                if (vconf_notify_key_changed(WatchedKeys[k], cb, IntPtr.Zero) != 0) Log("watch " + WatchedKeys[k] + ": failed");
+            }
             g_main_loop_run(g_main_loop_new(IntPtr.Zero, false));
         } catch (Exception e) { Log("source watch: " + e.GetType().Name); }
     }) { IsBackground = true, Name = "glib" }.Start();

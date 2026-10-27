@@ -11,6 +11,8 @@ sealed class Mqtt
     readonly TcpClient tcp; readonly NetworkStream s; readonly object w = new(); readonly Action<string, string> onMessage;
     volatile bool alive = true; ushort pid = 1;
     public bool Alive => alive;
+    public Action Closed;  // called once when the connection is lost or closed
+    void Die() { if (!alive) return; alive = false; try { Closed?.Invoke(); } catch { } }
     public Mqtt(string host, int port, string clientId, string user, string pass, string willTopic, string willMsg, Action<string, string> onMsg)
     {
         onMessage = onMsg;
@@ -31,7 +33,7 @@ sealed class Mqtt
         }
         s.ReadTimeout = Timeout.Infinite;
         new Thread(Reader) { IsBackground = true }.Start();
-        new Thread(() => { while (alive) { Thread.Sleep(30000); try { Send(0xC0, new List<byte>()); } catch { alive = false; } } }) { IsBackground = true }.Start();
+        new Thread(() => { while (alive) { Thread.Sleep(30000); try { Send(0xC0, new List<byte>()); } catch { Die(); } } }) { IsBackground = true }.Start();
     }
     static void Str(List<byte> p, string v) { var b = Encoding.UTF8.GetBytes(v); p.Add((byte)(b.Length >> 8)); p.Add((byte)b.Length); p.AddRange(b); }
     void Send(byte header, List<byte> payload)
@@ -44,7 +46,7 @@ sealed class Mqtt
     public bool Publish(string topic, string msg, bool retain)
     {
         try { var p = new List<byte>(); Str(p, topic); p.AddRange(Encoding.UTF8.GetBytes(msg)); Send((byte)(0x30 | (retain ? 1 : 0)), p); return true; }
-        catch { alive = false; return false; }
+        catch { Die(); return false; }
     }
     public void Subscribe(params string[] topics)
     {
@@ -73,9 +75,9 @@ sealed class Mqtt
                 ThreadPool.QueueUserWorkItem(_ => { try { onMessage(topic, msg); } catch { } });
             }
         } catch { }
-        alive = false;
+        Die();
     }
-    public void Close() { alive = false; try { tcp.Close(); } catch { } }
+    public void Close() { Die(); try { tcp.Close(); } catch { } }
     // a clean DISCONNECT: the broker drops the last will instead of publishing it
     public void Disconnect() { try { Send(0xE0, new List<byte>()); } catch { } Close(); }
 }

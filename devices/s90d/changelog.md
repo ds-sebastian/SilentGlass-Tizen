@@ -6,6 +6,19 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **bridge 2.5.0**: about a seventh of the CPU (per-thread `/proc/<pid>/task/*/stat` over 2 min with the picture on:
+  ~0.4% of one core, was ~2.4-3%).
+  - Power, input and the app in front are published when they change (vconf change notifications on the bridge's
+    GLib loop, plus the source list callback); measured: power on reached Home Assistant in 1.5 s.
+  - Volume, mute and input names are checked every 10 s instead of 2 s, settable on the phone page (Advanced
+    settings › Home Assistant: 2 s / 5 s / 10 s / 30 s / 1 min; `update=` in the config). Temperature, memory, Thread
+    role and picture settings every minute (was 30 s).
+  - The picture/sound mode lists (dozens of settings-service calls) are no longer read on every state check, only
+    with the once-a-minute check.
+  - The two idle wake-ups that cost more than the work: the setup-page watch polled for its request file every
+    0.4 s (now inotify; the page also opens faster, 0.16 s), and the main loop sleeps until the next check, a change,
+    a lost connection or new settings.
+  - Log: per-minute counts of change notifications, when there were any.
 - **v42g-v42j**: the bar no longer flashes over a picture, and every Home press counts.
   - Window traces (`enlightenment_info -topvwins` every ~29 ms) showed what Controls (never flashing) didn't do:
     each open *showed* the bar's window, and the compositor drew a newly shown window in software for ~70 ms before

@@ -96,11 +96,11 @@ class SetupPageTests(unittest.TestCase):
         self.assertEqual(st, 200); self.assertIn(b"Enter the code shown on the TV", page)
         self.assertEqual(self.api("/api/state", code="000000" if code != "000000" else "111111")[0], 403)
         st, body = self.api("/api/state", code=code); state = json.loads(body)
-        self.assertEqual((st, state["mqtt"], state["has_password"]), (200, "unconfigured", False))
+        self.assertEqual((st, state["mqtt"], state["has_password"], state["update"]), (200, "unconfigured", False, 10))
         self.assertEqual(self.status()["state"], "phone")
         # validation
         for bad in ({"host": "bad host!"}, {"host": "h", "port": "70000"}, {"host": "h", "name": "a\nb"}, {"host": "h", "thread": "tlv", "tlv": "zz"},
-                    {"host": "h", "lat": "100"}, {"host": "h", "notify_from": "x;rm"}):
+                    {"host": "h", "lat": "100"}, {"host": "h", "notify_from": "x;rm"}, {"host": "h", "update": "1"}, {"host": "h", "update": "3;x"}):
             ok = json.loads(self.api("/api/save", bad, code)[1])["ok"]
             self.assertFalse(ok, bad)
         self.assertFalse(self.conf.exists())
@@ -111,17 +111,17 @@ class SetupPageTests(unittest.TestCase):
         self.assertTrue(r["ok"], r)
         # save: conf written owner-only, bridge connects with it
         r = json.loads(self.api("/api/save", {"host": "127.0.0.1", "port": str(self.broker.port), "user": "tv", "password": "secret", "name": "Den TV",
-                                              "notifications": False, "notify_from": "192.0.2.5", "lat": "40.7", "lon": "-74.0", "thread": "keep"}, code)[1])
+                                              "notifications": False, "notify_from": "192.0.2.5", "lat": "40.7", "lon": "-74.0", "thread": "keep", "update": "30"}, code)[1])
         self.assertTrue(r["ok"], r); self.assertIn("Connected", r["message"])
         self.assertEqual(oct(self.conf.stat().st_mode & 0o777), "0o600")
         conf = self.conf.read_text()
-        for line in ("host=127.0.0.1", "user=tv", "password=secret", "name=Den TV", "notify_from=192.0.2.5"): self.assertIn(line, conf)
+        for line in ("host=127.0.0.1", "user=tv", "password=secret", "name=Den TV", "notify_from=192.0.2.5", "update=30"): self.assertIn(line, conf)
         self.assertTrue((self.data / "notify-off").exists()); self.assertIn("lat=40.7", (self.data / "location.txt").read_text())
         self.assertIn(("silentglass-s90d", "tv", "secret"), self.broker.connects)
         self.assertEqual(self.status()["state"], "saved")
         # the password is never sent back; blank keeps it
         state = json.loads(self.api("/api/state", code=code)[1])
-        self.assertNotIn("secret", json.dumps(state)); self.assertTrue(state["has_password"]); self.assertEqual(state["mqtt"], "connected")
+        self.assertNotIn("secret", json.dumps(state)); self.assertTrue(state["has_password"]); self.assertEqual((state["mqtt"], state["update"]), ("connected", 30))
         r = json.loads(self.api("/api/save", {"host": "127.0.0.1", "port": str(self.broker.port), "user": "tv", "password": "", "name": "Den TV", "notifications": True, "thread": "keep"}, code)[1])
         self.assertTrue(r["ok"], r); self.assertIn("password=secret", self.conf.read_text()); self.assertFalse((self.data / "notify-off").exists())
         # closing on the TV ends the page
