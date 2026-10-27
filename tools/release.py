@@ -49,8 +49,9 @@ def deterministic_tar(src: Path, dest: Path):
                     tar.addfile(info, f)
             else:
                 tar.addfile(info)
-    with dest.open("wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as gz:
-        gz.write(buf.getvalue())
+    z = bytearray(gzip.compress(buf.getvalue(), 9, mtime=0))
+    z[9] = 255  # the OS byte differs between Python versions; pin it
+    dest.write_bytes(bytes(z))
 
 
 def main():
