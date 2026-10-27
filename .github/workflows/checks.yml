@@ -2,6 +2,7 @@ name: Offline checks
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -14,9 +15,13 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "6.0.x"
+          global-json-file: global.json
       - name: Build the Home Assistant bridge (setup-page test uses it)
-        run: dotnet build devices/s90d/device/ha-bridge/src/HaBridge.csproj -c Release -o .local/ha-bridge-test
+        run: python3 tools/build.py bridge
+      - name: The committed bridge installer is this source, byte for byte
+        run: |
+          python3 tools/bridge_installer.py .local/build/ha-bridge
+          git diff --exit-code devices/s90d/device/ha-bridge/ha-bridge-install.sh
       - name: Python tests and recipe syntax
         run: python3 -m unittest discover -s tests -v
       - name: Test native catalog logic without Samsung references

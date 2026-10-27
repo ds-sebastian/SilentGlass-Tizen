@@ -139,7 +139,9 @@ dotnet run --project tests/CatalogTests.csproj -c Release -- launcher/assets/app
 python3 tools/overlay_mockup.py .local/mock      # render the UI on a desktop before touching the TV
 ```
 
-Deploys go through versioned `update-vN.sh` / `restore-v(N-1).sh` pairs that verify every file.
+Deploys go through versioned `update-vN.sh` / `restore-v(N-1).sh` pairs that verify every file. Builds are
+reproducible (SDK pinned in `global.json`); `python3 tools/release.py VERSION` builds the release files from a clean
+checkout and refuses if the committed bridge installer doesn't match its source.
 
 ## Lineage and credits
 

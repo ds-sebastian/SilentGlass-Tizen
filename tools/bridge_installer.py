@@ -2,8 +2,8 @@
 """Refresh the embedded files of devices/s90d/device/ha-bridge/ha-bridge-install.sh (base64 blocks + sha256 guards)
 from a bridge build and the unit/example next to the installer.
 
-    dotnet build devices/s90d/device/ha-bridge/src/HaBridge.csproj -c Release -o .local/ha-bridge-X
-    python3 tools/bridge_installer.py .local/ha-bridge-X
+    python3 tools/build.py bridge          (reproducible: the same source gives the same bytes anywhere)
+    python3 tools/bridge_installer.py .local/build/ha-bridge
 """
 import base64
 import gzip

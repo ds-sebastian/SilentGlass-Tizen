@@ -3,11 +3,12 @@
   qhbench.py set  NAME glass shadow squircle   -> write /tmp/quiet-home-live.conf on the TV, kill Quiet Home
   qhbench.py read NAME                          -> collect state + memory, append to bench-results.json
 """
+import os
 import json, re, subprocess, sys, time
 from pathlib import Path
 
-SC = Path("/home/dietpi/.hermes/cache/scratch")
-OBS = Path("/home/dietpi/opt/samsung-tv-lab/observations/tv-cleanup-20261024")
+SC = Path(os.environ.get("SG_BENCH_TMP", "/tmp/sg-bench"))  # where the runner scripts are written
+OBS = Path(os.environ.get("SG_BENCH_OUT", ".local/bench"))  # the runner's output directory (S90D_OUT)
 OUT = SC / "bench-results.json"
 
 

@@ -4,13 +4,13 @@ prints a short report when something drifted (e.g. after a Samsung firmware upda
 could not run. Expected values: s90d_expected.json next to this script.
 Inspired by cleanyourtv's tools/check.py; changes nothing on the TV.
 """
-import json, subprocess, sys, time
+import json, os, subprocess, sys, time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 EXP = json.loads((HERE / "s90d_expected.json").read_text())
 MISS = Path.home() / ".cache" / "s90d-drift-misses"
-TV_ACCESS = "/home/dietpi/opt/samsung-tv-lab/src/s90c-tools/tools/tv_access/tv-access"
+TV_ACCESS = os.environ.get("TV_ACCESS") or EXP.get("tv_access") or "tv-access"  # s90c-tools' helper
 
 ids = " ".join(EXP["disabled_apps"])
 keys = " ".join(EXP.get("settings", {}))

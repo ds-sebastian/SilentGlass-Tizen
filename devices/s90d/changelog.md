@@ -6,6 +6,11 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **Release tooling**: `tools/build.py bridge` builds the bridge reproducibly (same flags as the launcher; the
+  installer embeds that build), the SDK is pinned (`global.json`), `tools/release.py` builds the release files from
+  a clean checkout and checks for local-only assets, and CI checks that the committed installer is its source. Lab
+  paths removed from tests, bench helpers and the drift check (`TV_ACCESS` / `tv_access`). Bridge reinstalled
+  from the reproducible build (same source as 2.4.1).
 - **v42d** + **bridge 2.4.1** + **batch G**:
   - The phone's code screen still looked see-through: the phone had switched to its old tab (same address) instead
     of loading the new page. The QR now carries a fresh `?s=` per sheet (not the code), so phones load it anew. The

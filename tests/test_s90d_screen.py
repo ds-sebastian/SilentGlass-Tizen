@@ -4,12 +4,12 @@ Home Assistant launches, the bar's idle close and the OLED dim. Scripted scenari
 combination of the TV behaviours not yet measured. Fails on any broken rule: the wallpaper over a live picture, a bar
 the remote cannot reach, SilentGlass over another app, Home leaving no working bar, Home with no picture and no
 wallpaper."""
-import os, shutil, subprocess, unittest
+import os
+import shutil, subprocess, unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LAB_DOTNET = "/home/dietpi/opt/samsung-tv-lab/dotnet6/dotnet"
-DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet") or (LAB_DOTNET if os.path.exists(LAB_DOTNET) else None)
+DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet")
 
 
 @unittest.skipUnless(DOTNET, "needs the .NET 6 SDK")

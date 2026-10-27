@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """qhmeasure.py NAME [windows] - during Quiet Home's bench redraw: per 8 s window, compositor fps of the Quiet Home
 window and GPU busy % (Mali DVFS counters, whole GPU). Appends raw text to bench-results.json."""
+import os
 import json, re, subprocess, sys, time
 from pathlib import Path
 
-SC = Path("/home/dietpi/.hermes/cache/scratch"); OBS = Path("/home/dietpi/opt/samsung-tv-lab/observations/tv-cleanup-20261024")
+SC = Path(os.environ.get("SG_BENCH_TMP", "/tmp/sg-bench"))  # where the runner scripts are written; OBS = Path(os.environ.get("SG_BENCH_OUT", ".local/bench"))  # the runner's output directory (S90D_OUT)
 name = sys.argv[1]; n = int(sys.argv[2]) if len(sys.argv) > 2 else 3
 body = r"""W=$(enlightenment_info -topvwins 2>&1 | awk '/SilentGlass Home|Quiet Home/{print $2; exit}')
 echo "win=$W fg=$(buxton2ctl get memory memory/appfw/current_fullscreen_appid | sed 's/.*= String: //')"

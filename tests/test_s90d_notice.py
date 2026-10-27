@@ -7,6 +7,7 @@ tests/notice-harness. Skipped unless the harness is built (.local/notice-harness
 """
 import json
 import os
+import shutil
 import subprocess
 import time
 import unittest
@@ -14,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = ROOT / ".local/notice-harness/NoticeHarness.dll"
-DOTNET = os.environ.get("DOTNET", "/home/dietpi/opt/samsung-tv-lab/dotnet6/dotnet")
+DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet") or "dotnet"
 SAMPLE = ROOT / ".local/notice-mock/sample.jpg"
 SRC = ROOT / "launcher/src"
 BRIDGE_DIR = ROOT / "devices/s90d/device/ha-bridge/src"
@@ -34,7 +35,7 @@ except ImportError:  # pragma: no cover - optional
     Notifications = None
 
 
-@unittest.skipUnless(Notifications and HARNESS.exists() and Path(DOTNET).exists(), "harness or client library missing")
+@unittest.skipUnless(Notifications and HARNESS.exists() and shutil.which(DOTNET), "harness or client library missing")
 class NoticeProtocolTests(unittest.TestCase):
     def test_home_assistant_client_round_trip(self):
         p = subprocess.Popen([DOTNET, str(HARNESS), "3"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

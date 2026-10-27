@@ -5,8 +5,8 @@ import json, os, shutil, socket, subprocess, tempfile, threading, time, unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DLL = Path(os.environ.get("SG_BRIDGE_DLL", ROOT / ".local/ha-bridge-test/silentglass-ha.dll"))
-DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet") or str(Path.home() / "opt/samsung-tv-lab/dotnet6/dotnet")
+DLL = Path(os.environ.get("SG_BRIDGE_DLL", ROOT / ".local/build/ha-bridge/silentglass-ha.dll"))  # tools/build.py bridge
+DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet") or "dotnet"
 
 
 class FakeBroker:
@@ -50,7 +50,7 @@ def free_port():
     s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
 
 
-@unittest.skipUnless(DLL.exists() and Path(DOTNET).exists(), "build the bridge into .local/ha-bridge-test first")
+@unittest.skipUnless(DLL.exists() and shutil.which(DOTNET), "build the bridge first: python3 tools/build.py bridge")
 class SetupPageTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); t = Path(self.tmp.name)
