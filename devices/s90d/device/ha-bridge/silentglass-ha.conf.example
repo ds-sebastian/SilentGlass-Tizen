@@ -4,7 +4,8 @@ host=192.168.1.10
 port=1883
 user=mqtt-user
 password=change-me
-name=Living Room TV
+# The TV's own name (Settings › Device Name) is used; set one here only to override it in Home Assistant.
+#name=Living Room TV
 # Input names come from the TV (set on the TV or from HDMI-CEC); rename them from Home Assistant ("HDMI n name").
 # Notifications (Home Assistant "Notifications for Android TV" integration, port 7676) are accepted only from the
 # broker host above and from notify_from= (comma-separated addresses or names), if Home Assistant runs elsewhere.

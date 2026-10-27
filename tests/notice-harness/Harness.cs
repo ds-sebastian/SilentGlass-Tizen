@@ -24,6 +24,7 @@ static class NoticeHarness
             app_bar = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=bar\nbackdrop=hidden\nfg=org.tizen.tv-viewer\n"),
             game = new[] { "Auto", "On", "Off" }.Select(Bridge.GameName).ToArray(),
             prefs = Prefs(),
+            slugs = new[] { "Living Room TV", "  Den / TV #2 ", "Téléviseur", "" }.Select(Bridge.Slug).ToArray(),
             picture_only_dropped = Bridge.ApplyPrefs(new Bridge.NoticeData { Image = new byte[600], Ext = "jpg" }, new() { ["notify_images"] = "0" }) == null,
             quiet = new[] { ("22:00-07:00", 23), ("22:00-07:00", 12), ("22:00-07:00", 6), ("09:00-17:00", 18), ("", 3) }
                 .Select(q => Bridge.InQuietHours(q.Item1, TimeSpan.FromHours(q.Item2))).ToArray() }));

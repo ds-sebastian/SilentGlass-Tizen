@@ -133,7 +133,19 @@ are ordinary optional features rather than trackers.
   - `connect_source(type)` switches input. `register_sourcelist_changed_callback` pushes plug and rename events
     (renames fire nothing: re-read).
   - Names come from `editName`, then `detectedName` (HDMI-CEC).
-  - `powerState` is unreliable behind a soundbar: devices report Off. Trust the signal key instead.
+  - `powerState` is unreliable behind a soundbar: devices report Off. Trust the signal key (current input) and the
+    HDMI-CEC device list (the others) instead.
+- **HDMI-CEC devices:** the system-bus service `org.tizen.tv.hdmicec` (`/org/tizen/tv/hdmicec`, interface
+  `org.tizen.tv.HdmiCec`) answers an app and the owner user; GDBus from C# takes about 50 ms for the whole list.
+  - `GetDeviceCount(b with_receiver) -> (i result, i count)`, then per index `GetDevicePortNum`, `GetDeviceType`
+    (`PLAYBACK_DEVICE1`, `AUDIO_SYSTEM`, ...), `GetDeviceName`; each returns `(i result, value)`.
+  - A device that sleeps drops out of the list. `GetDevicePowerStatusByHdmiPort(i port) -> (i power)` gives 0 on,
+    1 standby, -1 nothing there; behind a soundbar it answers for the soundbar.
+  - There is no per-device power call.
+- **The TV's name:** `db/menu/network/devicename/tv_name` (vconf, writable by the owner; `default_tv_name` holds
+  the factory one). Samsung's Device Name screen saves it with this single write, and the screen-mirroring server
+  (port 8001), Bluetooth and SmartThings read it. The hostname (`Samsung`) is a separate, firmware-fixed value.
+  The model is `system_info_get_platform_string("http://tizen.org/system/model_name")`.
 - **Volume:** `libcapi-media-sound-manager-tv.so` (`sound_manager_get/set_master_volume`, `..._mute`).
 - **Launching:** `app_control` with extras.
   - `org.tizen.menu` opens a specific settings page with `menuitem=<id>`, `launchoption=pressed`,
@@ -186,7 +198,8 @@ are ordinary optional features rather than trackers.
   first new frame. Clear (or reset) a window's content and let a few frames render before hiding it.
 - **Window effects:** the compositor animates app windows in and out unless the window sets the aux hint
   `wm.comp.win.effect.enable=0`; set it on every window you show and hide yourself, the main window included.
-- **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off. A device waking with One
+- **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off, on any input, and the TV
+  turning on wakes the SHIELD. A device waking with One
   Touch Play switches the TV's input underneath any open app window; a notification window that had the keys loses
   them.
 - **The Home key could reach the Home app twice** (a second request 0.4-1 s later, with no key event) while the app

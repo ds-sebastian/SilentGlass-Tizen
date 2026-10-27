@@ -165,7 +165,7 @@ static partial class Bridge
     {
         var c = LoadConf(); var loc = LoadLocation(); var p = LoadPrefs();
         return new {
-            name = c.GetValueOrDefault("name", TvName), host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
+            name = TvName, host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
             has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""), update = UpdateSeconds(c),
             notify_position = c.GetValueOrDefault("notify_position", ""), notify_size = c.GetValueOrDefault("notify_size", ""),
             notify_duration = c.GetValueOrDefault("notify_duration", ""), notify_images = c.GetValueOrDefault("notify_images", "1") != "0",
@@ -257,7 +257,7 @@ static partial class Bridge
             from = S("notify_from").Trim(), update = S("update").Trim(), lat = S("lat").Trim(), lon = S("lon").Trim(), threadMode = S("thread"), tlv = S("tlv").Trim();
         if (host.Length > 0 && !ValidHost(host)) return (false, "The server name is not valid.");
         if (portText.Length > 0 && (!int.TryParse(portText, out int port) || port is < 1 or > 65535)) return (false, "The port is a number up to 65535.");
-        if (!ValidText(user, 128) || !ValidText(password, 256) || !ValidText(name, 40)) return (false, "Names and passwords can't contain line breaks.");
+        if (!ValidText(user, 128) || !ValidText(password, 256) || !ValidText(name, 32)) return (false, "Names and passwords can't contain line breaks.");
         var senders = from.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
         if (senders.Length > 8 || senders.Any(h => !ValidHost(h))) return (false, "\"Also from\" takes up to 8 addresses, separated by commas.");
         if (!ValidCoordinate(lat, 90) || !ValidCoordinate(lon, 180)) return (false, "Latitude and longitude are numbers, like 40.7 and -74.0.");
@@ -275,7 +275,12 @@ static partial class Bridge
 
         var c = LoadConf(); bool hostChanged = c.GetValueOrDefault("host", "") != host;
         void Put(string k, string v) { if (v.Length > 0) c[k] = v; else c.Remove(k); }
-        Put("host", host); Put("port", portText == "1883" ? "" : portText); Put("user", user); Put("name", name); Put("notify_from", string.Join(",", senders));
+        Put("host", host); Put("port", portText == "1883" ? "" : portText); Put("user", user); Put("notify_from", string.Join(",", senders));
+        // the name is the TV's own (TvApi TvNameKey); the config keeps one only if the TV refused it
+        string own = noTv ? "" : VStr(TvNameKey), nameNote = "";
+        if (name.Length == 0 || name == own) Put("name", "");
+        else if (!noTv && SetTvName(name)) { Put("name", ""); Log("TV name: '" + own + "' -> '" + name + "'"); }
+        else { Put("name", name); if (!noTv) nameNote = " The TV's own name could not be changed."; }
         Put("update", update == DefaultUpdate.ToString() ? "" : update);
         foreach (var kv in noticePrefs) Put(kv.Key, kv.Value);
         if (password.Length > 0) c["password"] = password; else if (hostChanged || user.Length == 0) c.Remove("password");
@@ -307,6 +312,7 @@ static partial class Bridge
             result = mqttState == "connected" ? "Saved. Connected to " + host + "." : "Saved, but can't connect yet: " + (mqttError.Length > 0 ? mqttError : "no answer") + ".";
         }
         if (threadResult.Length > 0) result += " " + threadResult;
+        result += nameNote;
         bool ok = !result.Contains("can't") && !threadResult.StartsWith("Thread:");
         SetupStatus(ok ? "saved" : "error", result);
         return (ok, result);

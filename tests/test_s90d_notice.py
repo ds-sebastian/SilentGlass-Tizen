@@ -67,6 +67,7 @@ class NoticeProtocolTests(unittest.TestCase):
         # owner settings override what was sent; pictures off drops a picture-only notice
         self.assertEqual(misc["prefs"], ["top-left", "small", 30, 0])
         self.assertEqual(misc["picture_only_dropped"], True)
+        self.assertEqual(misc["slugs"], ["living_room_tv", "den_tv_2", "t_l_viseur", "samsung_tv"])
         self.assertEqual(misc["quiet"], [True, False, True, False, False])
 
 

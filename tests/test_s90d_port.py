@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "launcher/src"
 BRIDGE = ROOT / "devices/s90d/device/ha-bridge/src"
 PARTS = ("SilentGlass.cs", "Ui.cs", "Backdrop.cs", "Overlay.cs", "Menus.cs", "Panels.cs", "Setup.cs", "Notice.cs", "Tv.cs",
-         "Screen.cs", "Logic.cs", "Qr.cs", "AppLibrary.cs", "InfoStats.cs")
+         "Cec.cs", "Screen.cs", "Logic.cs", "Qr.cs", "AppLibrary.cs", "InfoStats.cs")
 
 
 def launcher():

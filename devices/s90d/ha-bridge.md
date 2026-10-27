@@ -124,7 +124,11 @@ on the same network (or open the address shown), then type the code - the QR nev
   stopped first so nothing is pushed to the rest of the mesh.
 - **Home Assistant**: MQTT server, port, username, password, with a **Test connection** button. The password is never
   sent back to the phone; leave it empty to keep the current one. Info on the TV shows its status.
-- **This TV**: the name it has in Home Assistant.
+- **This TV**: the TV's own name (Settings › General › System Manager › Device Name), which Home Assistant, phones,
+  SmartThings and Bluetooth show. Saving a new one renames the TV the way Samsung's Device Name screen does (one
+  write of `db/menu/network/devicename/tv_name`); Home Assistant's device follows a rename made either way. New
+  installs get entity ids from it (`living_room_tv_power`); existing entities keep theirs. The model comes from the
+  TV. The network hostname ("Samsung") is fixed in the firmware and not changed.
 
 Save writes the owner-only config, reconnects, and the sheet on the TV shows the result. The page only works while
 the sheet is open: Back on the TV, 10 minutes, or 8 wrong codes close it. It is plain HTTP on your LAN, like the TV's

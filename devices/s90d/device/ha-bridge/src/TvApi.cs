@@ -43,14 +43,26 @@ static partial class Bridge
     // at once, so the timed check only has to catch the rest (volume, names)
     delegate void VconfChangedCallback(IntPtr node, IntPtr userData);
     [DllImport("libvconf.so.0")] static extern int vconf_notify_key_changed(string key, VconfChangedCallback cb, IntPtr userData);
-    static readonly string[] WatchedKeys = { "memory/pm/state", "memory/eden/source/current_source", "memory/appfw/current_fullscreen_appid" };
+    // the TV's own name: Settings › General › System Manager › Device Name, also what phones, SmartThings, Bluetooth and
+    // screen mirroring show. Samsung's Device Name screen saves it with exactly this one write (DeviceName.dll).
+    const string TvNameKey = "db/menu/network/devicename/tv_name";
+    [DllImport("libvconf.so.0")] static extern int vconf_set_str(string key, string value);
+    static bool SetTvName(string name) { try { return vconf_set_str(TvNameKey, name) == 0; } catch { return false; } }
+    [DllImport("libcapi-system-info.so.0")] static extern int system_info_get_platform_string(string key, out IntPtr value);
+    static string model;
+    static string Model() {
+        if (model != null) return model;
+        try { if (system_info_get_platform_string("http://tizen.org/system/model_name", out var p) == 0 && p != IntPtr.Zero) { model = Marshal.PtrToStringUTF8(p) ?? ""; free(p); } } catch { }
+        return model ??= "";
+    }
+    static readonly string[] WatchedKeys = { "memory/pm/state", "memory/eden/source/current_source", "memory/appfw/current_fullscreen_appid", TvNameKey };
     static SourceListChangedCallback sourceListCallback;  // kept alive: native code holds the pointers
     static readonly List<VconfChangedCallback> keyCallbacks = new();
-    static readonly int[] keyEvents = new int[4];  // per watched key + source list, logged once a minute when nonzero
+    static readonly int[] keyEvents = new int[5];  // per watched key + source list, logged once a minute when nonzero
     static readonly AutoResetEvent changed = new(false);
     static void StartSourceWatch() => new Thread(() => {
         try {
-            sourceListCallback = (t, d) => { Interlocked.Increment(ref keyEvents[3]); changed.Set(); };
+            sourceListCallback = (t, d) => { Interlocked.Increment(ref keyEvents[WatchedKeys.Length]); changed.Set(); };
             register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero);
             for (int i = 0; i < WatchedKeys.Length; i++) {
                 int k = i; VconfChangedCallback cb = (n, d) => { Interlocked.Increment(ref keyEvents[k]); changed.Set(); };

@@ -6,6 +6,15 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42l**: a green dot on every input whose device is on, not just the one on screen. HDMI-CEC lists the devices
+  that are awake (a sleeping one drops out); read in-process over GDBus (`Cec.cs`, ~50 ms) when the bar or Inputs
+  opens, cleared on standby. A device plugged straight into the TV must also not report standby; behind a soundbar
+  the port's answer is the soundbar's, so being listed counts. Measured: SHIELD on HDMI 3 behind the Q990D listed and
+  dotted; the sleeping Switch not listed, no dot.
+- **bridge 2.7.0**: "This TV" › Name is the TV's own name (Settings › Device Name; also phones, SmartThings,
+  Bluetooth). Saving renames the TV with Samsung's own single write; Home Assistant's device follows renames made
+  on the TV too (watched key). Entity ids for new installs come from the name, the model from the TV. Measured: a
+  rename showed at once on the TV's port-8001 API and in Home Assistant.
 - **bridge 2.6.0**: notification settings on the phone page (Advanced settings › Notifications), applied by the
   bridge to every notification: position, size and time on screen (each "As sent" by default), pictures on/off,
   quiet hours (dropped, not queued; TV time), and "Send a test notification" with the page's unsaved values (ignores

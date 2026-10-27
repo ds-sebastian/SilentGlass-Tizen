@@ -99,9 +99,10 @@ public sealed partial class SilentGlass
     }
 
     // ---- the bar ----
-    string BarSignature() => InputName(watchPort) + "|" + InputName(playPort) + "|" + lastSource + "|" + screen.Signal + "|" + prefs.HideApps;
+    string BarSignature() => InputName(watchPort) + "|" + InputName(playPort) + "|" + lastSource + "|" + screen.Signal + "|" + prefs.HideApps + "|" + cecSig;
     bool PortsChanged() { RefreshInputs(); ResolvePorts(); return BarSignature() != barSig; }
-    bool LiveDot(string action) => action == "hdmi:" + lastSource && HasPicture;
+    // the green dot: the device on that input is on (Tv.cs DeviceOn)
+    bool LiveDot(string action) => action.StartsWith("hdmi:") && int.TryParse(action.AsSpan(5), out int t) && DeviceOn(t);
     void OpenBar(bool keepFocus)
     {
         EnsureOverlay();
@@ -125,7 +126,7 @@ public sealed partial class SilentGlass
             labels.Add((t, s, w)); total += 2 * ItemPad + GlyphS + GlyphGap + w;
         }
         capsule = Glass(960 - total / 2, BarTop, total, BarH, BarH / 2); oLayer.Add(capsule);
-        // the input on screen keeps a soft pill (where the focus goes is the white one; the green dot = it has a picture)
+        // the input on screen keeps a soft pill (where the focus goes is the white one; the green dot = its device is on)
         currentMark = new View { Size2D = new Size2D(10, ItemH), BackgroundColor = CurrentFill, CornerRadius = Round(ItemH / 2f), Opacity = 0 }; capsule.Add(currentMark);
         highlight = new View { Size2D = new Size2D(10, ItemH), BackgroundColor = FocusFill, CornerRadius = Round(ItemH / 2f) }; capsule.Add(highlight);
         int ix = 12;
@@ -151,6 +152,7 @@ public sealed partial class SilentGlass
         bool fresh = !overlayShown; Note(fresh ? "bar:open" : "bar:rebuild");
         ShowOverlay(); OverlayActivity();
         if (fresh) { FadeIn(capsule); FadeIn(oDim); }
+        RefreshDevices();
     }
     // the focused item is a white capsule; while one of its menus is open it stays marked in faint white
     void FocusBar(bool animate)

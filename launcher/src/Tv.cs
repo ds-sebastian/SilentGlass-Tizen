@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -98,8 +99,9 @@ public sealed partial class SilentGlass
     void ToggleMute() { if (sound_manager_get_master_mute(out int n) == 0) sound_manager_set_master_mute(n == 1 ? 0 : 1); RefreshSettings(); }
 
     // ---- inputs: Samsung's source list (names, connected) and the current source, pushed by the TV.
-    // powerState is never used: devices behind the soundbar report Off. The only trusted power signal is the picture
-    // on the current input (memory/tv-viewer/mainscreen_signal_state). ----
+    // The source list's powerState is never used: devices behind the soundbar report Off. A device is on when the
+    // input on screen has a picture (memory/tv-viewer/mainscreen_signal_state) or HDMI-CEC lists it (Logic.DevicesOn),
+    // read in the background when the bar or Inputs opens. ----
     const string SignalKey = "memory/tv-viewer/mainscreen_signal_state", SourceKey = "memory/system/source_type", ForegroundKey = "memory/appfw/current_fullscreen_appid";
     const string PmKey = "memory/pm/state";  // 1 on, 2 dim, 3 screen off, 4 standby
     List<InfoStats.InputSource> inputs = new();
@@ -118,12 +120,33 @@ public sealed partial class SilentGlass
         try { signalCallback = (n, d) => OnUi(screen.SignalFlapped); vconf_notify_key_changed(SignalKey, signalCallback, IntPtr.Zero); } catch { }
         try { foregroundCallback = (n, d) => OnUi(() => { HideParkedUnderApp(); PlaceholderGuard(); screen.Foreground(Foreground()); }); vconf_notify_key_changed(ForegroundKey, foregroundCallback, IntPtr.Zero); } catch { }
         try {
-            pmCallback = (n, d) => OnUi(() => { if (vconf_get_int(PmKey, out int v) == 0 && v >= 3) { screen.Standby(); HideParked("standby"); } });
+            pmCallback = (n, d) => OnUi(() => { if (vconf_get_int(PmKey, out int v) == 0 && v >= 3) { screen.Standby(); HideParked("standby"); devicesOn = new(); cecSig = ""; } });
             vconf_notify_key_changed(PmKey, pmCallback, IntPtr.Zero);
         } catch { }
         RefreshInputs(); screen.Start(); ResolvePorts();
     }
     void RefreshInputs() => inputs = InfoStats.Sources();
+    // devices that are on (input types), from CEC; refreshed off the UI thread, at most every 1.5 s
+    HashSet<int> devicesOn = new(); string cecSig = ""; bool cecBusy; long cecAt = -10000;
+    bool DeviceOn(int type) => type == lastSource && HasPicture || devicesOn.Contains(type);
+    void RefreshDevices()
+    {
+        long now = Environment.TickCount64;
+        if (cecBusy || now - cecAt < 1500) return;
+        cecBusy = true; cecAt = now;
+        new Thread(() => {
+            HashSet<int> on = null;
+            try { var list = Cec.Devices(); if (list != null) on = Logic.DevicesOn(list, Cec.Power); } catch (Exception e) { Cec.Error = e.GetType().Name; }
+            long ms = Environment.TickCount64 - now;
+            OnUi(() => {
+                cecBusy = false;
+                if (on == null) { Note("cec:error:" + Cec.Error); return; }
+                string sig = string.Join(",", on.OrderBy(t => t));
+                if (sig == cecSig) return;
+                devicesOn = on; cecSig = sig; Note("cec:on=" + sig + ":" + ms + "ms"); OnTvChanged();
+            });
+        }) { IsBackground = true, Name = "cec" }.Start();
+    }
     void OnInputsChanged(bool announce)
     {
         var before = inputs; RefreshInputs(); ResolvePorts();

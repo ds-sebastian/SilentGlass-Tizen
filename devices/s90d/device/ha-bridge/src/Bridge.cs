@@ -26,7 +26,7 @@ static partial class Bridge
     static readonly string ConfPath = Environment.GetEnvironmentVariable("SG_CONF") ?? "/opt/usr/home/owner/.config/silentglass-ha.conf";
     static bool noTv;
     const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    const string Version = "2.6.0";
+    const string Version = "2.7.0";
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf = new();
     static Mqtt mqtt;
@@ -44,7 +44,11 @@ static partial class Bridge
         File.WriteAllText(Data + "/thread-switch", DateTime.UtcNow.ToString("o") + (on ? " on\n" : " off\n"));
     }
     static void Log(string s) { if (noTv) Console.WriteLine(s); try { File.AppendAllText("/run/user/5001/silentglass-ha.log", DateTime.Now.ToString("MM-dd HH:mm:ss ") + s + "\n"); } catch { } }
-    static string TvName => conf.GetValueOrDefault("name", "").Length > 0 ? conf["name"] : "Living Room TV";
+    // the TV's own name (TvApi TvNameKey), unless the config sets one: older installs, or the TV refused the change
+    static string TvName { get { string n = conf.GetValueOrDefault("name", ""); if (n.Length == 0 && !noTv) n = VStr(TvNameKey); return n.Length > 0 ? n : "Samsung TV"; } }
+    // "Living Room TV" -> "living_room_tv": the entity ids Home Assistant picks when it first sees the TV
+    public static string Slug(string s) { var t = Regex.Replace((s ?? "").ToLowerInvariant(), "[^a-z0-9]+", "_").Trim('_'); return t.Length > 0 ? t : "samsung_tv"; }
+    static string discoveredName = "";
     static bool Configured => conf.GetValueOrDefault("host", "").Length > 0;
     // how often volume, mute, input names and the rest are checked (power, input and app are sent when they change);
     // temperature, memory, Thread and picture settings every minute
@@ -83,7 +87,8 @@ static partial class Bridge
     {
         var ins = Inputs();
         // new names change the selector's options: announce them first, or Home Assistant rejects the new state
-        if (InputSig(ins) != inputSig) { Discovery(); force = true; }
+        // the same for a new TV name (the device's name in Home Assistant follows it)
+        if (InputSig(ins) != inputSig || TvName != discoveredName) { Discovery(); force = true; }
         Pub("power", ScreenOn ? "ON" : "OFF", force);
         int src = SourceId(VStr("memory/eden/source/current_source"));
         string input = ins.Where(i => i.Type == src).Select(i => i.Name).FirstOrDefault() ?? "Other";
@@ -120,13 +125,13 @@ static partial class Bridge
     static string OptionsSig() => string.Join("|", Options("picturemode").Select(o => o.name)) + "#" + string.Join("|", Options("external-sound-mode").Select(o => o.name));
 
     static string Device() => "{\"identifiers\":[\"" + Node + "\"],\"name\":\"" + J(TvName) +
-        "\",\"manufacturer\":\"Samsung\",\"model\":\"QN65S90D (SilentGlass-Tizen)\",\"sw_version\":\"silentglass-ha " + Version + "\"}";
+        "\",\"manufacturer\":\"Samsung\",\"model\":\"" + J((noTv ? "" : Model()) is { Length: > 0 } m ? m : "Samsung TV") + " (SilentGlass-Tizen)\",\"sw_version\":\"silentglass-ha " + Version + "\"}";
     static string J(string s) => (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
     static string List(IEnumerable<string> xs) => "[" + string.Join(",", xs.Select(x => "\"" + J(x) + "\"")) + "]";
     static void Discovery()
     {
-        var ins = Inputs(); inputSig = InputSig(ins); optionsSig = OptionsSig();
-        string common(string obj, string name, string icon, bool diag = false, bool config = false) => "\"unique_id\":\"" + Node + "_" + obj + "\",\"object_id\":\"living_room_tv_" + obj +
+        var ins = Inputs(); inputSig = InputSig(ins); optionsSig = OptionsSig(); discoveredName = TvName; string slug = Slug(discoveredName);
+        string common(string obj, string name, string icon, bool diag = false, bool config = false) => "\"unique_id\":\"" + Node + "_" + obj + "\",\"object_id\":\"" + slug + "_" + obj +
             "\",\"name\":\"" + name + "\",\"icon\":\"" + icon + "\",\"availability_topic\":\"" + Base + "/availability\",\"device\":" + Device() +
             (diag ? ",\"entity_category\":\"diagnostic\"" : config ? ",\"entity_category\":\"config\"" : "");
         string st(string obj, bool cmd = true) => ",\"state_topic\":\"" + Base + "/" + obj + "\"" + (cmd ? ",\"command_topic\":\"" + Base + "/" + obj + "/set\"" : "");
@@ -259,7 +264,7 @@ static partial class Bridge
                     if (slow) {
                         PublishSlow(full); SetState("connected", ""); nextSlow = now + SlowSeconds * 1000L;
                         var counts = keyEvents.Select((_, i) => Interlocked.Exchange(ref keyEvents[i], 0)).ToArray();
-                        if (counts.Any(c => c > 0)) Log("changes in the last minute: power " + counts[0] + ", input " + counts[1] + ", app " + counts[2] + ", input list " + counts[3]);
+                        if (counts.Any(c => c > 0)) Log("changes in the last minute: power " + counts[0] + ", input " + counts[1] + ", app " + counts[2] + ", name " + counts[3] + ", input list " + counts[4]);
                     }
                     if (full) nextFull = now + 300_000;
                 }

@@ -16,10 +16,10 @@ public sealed partial class SilentGlass
     static string PortGlyph(int type, int watch, int play) => type == watch ? "tv" : type == play ? "gamecontroller" : type == 0 ? "antenna" : "hdmi";
     void CloseMenu() { if (popover == null) return; oLayer.Remove(popover); popover.Dispose(); popover = null; menu.Clear(); tiles.Clear(); }
 
-    // ---- Inputs: every input by the TV's name for it. The one on screen: a soft pill and a checkmark; a green dot when
-    // it has a picture (its device is on). The focus is the white pill. ----
+    // ---- Inputs: every input by the TV's name for it. The one on screen: a soft pill and a checkmark; a green dot on
+    // each input whose device is on (Tv.cs DeviceOn). The focus is the white pill. ----
     string inputsSig = "";
-    string InputsSignature() => lastSource + "|" + HasPicture + "|" + string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + i.Connected));
+    string InputsSignature() => lastSource + "|" + HasPicture + "|" + cecSig + "|" + string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + i.Connected));
     void OpenInputs()
     {
         bool refresh = mode == Mode.Inputs;  // already open: redraw in place, no fade
@@ -29,18 +29,19 @@ public sealed partial class SilentGlass
         int h = 24 + inputs.Count * MenuRowH, x = Math.Clamp(BarItemCentre("inputs") - PopW / 2, 40, 1880 - PopW), y = BarTop - PopGap - h;
         popover = Glass(x, y, PopW, h, PopR); oLayer.Add(popover);
         foreach (var s in inputs) {
-            bool cur = s.Type == lastSource, off = s.Known && !s.Connected && !cur, sub = s.Name != s.Port;
+            bool cur = s.Type == lastSource, off = s.Known && !s.Connected && !cur && !DeviceOn(s.Type), sub = s.Name != s.Port;
             var r = new MenuRow { Type = s.Type, Current = cur, Box = new View { Position2D = new Position2D(12, 12 + menu.Count * MenuRowH), Size2D = new Size2D(PopW - 24, MenuRowH), CornerRadius = Round(26), Opacity = off ? .45f : 1 } };
             r.Glyph = Sym(PortGlyph(s.Type, watchPort, playPort), 22, (MenuRowH - GlyphS) / 2, GlyphS); r.Box.Add(r.Glyph);
             r.Name = Label(s.Name, 80, sub ? 10 : 0, PopW - 24 - 80 - 110, sub ? 44 : MenuRowH, 30, White, "Semibold"); r.Box.Add(r.Name);
             if (sub) { r.Port = Label(s.Port, 80, 50, 300, 30, 22, Faint); r.Box.Add(r.Port); }
-            if (cur && HasPicture) r.Box.Add(Dot(PopW - 24 - 92, (MenuRowH - 12) / 2, 12, Live));
+            if (DeviceOn(s.Type)) r.Box.Add(Dot(PopW - 24 - 92, (MenuRowH - 12) / 2, 12, Live));
             if (cur) { r.Check = Sym("check", PopW - 24 - 62, (MenuRowH - 34) / 2, 34); r.Box.Add(r.Check); }
             popover.Add(r.Box); menu.Add(r);
         }
         menuSel = Math.Max(0, menu.FindIndex(r => r.Type == keep));
         inputsSig = InputsSignature();
         FocusMenu(); if (!refresh) FadeIn(popover); Note(refresh ? "inputs:refresh" : "inputs");
+        RefreshDevices();
     }
     void FocusMenu()
     {

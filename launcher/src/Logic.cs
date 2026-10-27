@@ -37,6 +37,20 @@ public static class Logic
     // ---- preferences (the app's data directory, so they survive reboots); unknown keys keep their defaults ----
     public const int Hdmi1 = 13, Hdmi4 = 16;
     public static bool IsHdmi(int type) => type >= Hdmi1 && type <= Hdmi4;
+    // ---- which inputs have a device that is on, from HDMI-CEC (Cec.cs): a player the TV lists on that port. CEC drops
+    // a device that sleeps. Plugged straight into the TV it must also not answer "standby" to the port's power query;
+    // behind a receiver (soundbar) that query answers for the receiver, so being listed is the signal. ----
+    public static HashSet<int> DevicesOn(IEnumerable<(int port, string type)> devices, Func<int, int> power)
+    {
+        var on = new HashSet<int>(); var receivers = new HashSet<int>(); var players = new List<int>();
+        foreach (var (port, type) in devices) {
+            if (port < 1 || port > 4 || string.IsNullOrEmpty(type) || type.StartsWith("TV")) continue;
+            if (type.StartsWith("AUDIO")) receivers.Add(port); else if (!players.Contains(port)) players.Add(port);
+        }
+        foreach (int p in players)
+            if (receivers.Contains(p) || power(p) is not (1 or 3)) on.Add(Hdmi1 - 1 + p);
+        return on;
+    }
     public sealed class Prefs
     {
         public int Watch, Play;            // 0 = Automatic (by the TV's input name)

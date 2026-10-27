@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 
 static class CatalogTests
 {
@@ -134,6 +135,12 @@ static class CatalogTests
         True(q.GetLength(0) == 29 && q[0, 0] && q[6, 6] && !q[7, 7], "QR version 3 with finders");
         True(Qr.Svg(q).StartsWith("<svg") && Qr.Svg(q).Contains("h1v1h-1z"), "QR svg");
         // sunrise / sunset
+        // CEC: a listed player is on; straight into the TV it must not answer standby; behind a soundbar, listed is enough
+        var cec = Logic.DevicesOn(new[] { (3, "PLAYBACK_DEVICE1"), (3, "AUDIO_SYSTEM"), (1, "PLAYBACK_DEVICE2"), (2, "RECORDER_DEVICE1"), (4, "TV"), (9, "PLAYBACK_DEVICE3") },
+            p => p == 3 ? 1 : p == 2 ? 1 : p == 1 ? 0 : -1);
+        True(string.Join(",", cec.OrderBy(x => x)) == "13,15", "cec devices on " + string.Join(",", cec));
+        True(Logic.DevicesOn(new[] { (1, "PLAYBACK_DEVICE1") }, p => -1).Contains(13), "cec: no power answer still counts");
+        True(Logic.DevicesOn(new (int, string)[0], p => 0).Count == 0, "cec: nothing listed");
         // New York, 25 Oct 2026: 11:18 / 22:00 UTC (astral)
         var (rise, set) = Logic.SunTimes(new DateTime(2026, 10, 25, 12, 0, 0, DateTimeKind.Utc), 40.7, -74.0);
         True(Math.Abs(rise - (11 * 60 + 18)) <= 5 && Math.Abs(set - (22 * 60 + 0)) <= 5, "sun times " + rise + " " + set);

@@ -10,7 +10,7 @@ SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soun
   not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
   because it exists.
 
-## SilentGlass (v42k)
+## SilentGlass (v42l)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -25,9 +25,10 @@ at level Top ([`Overlay.cs`](../../launcher/src/Overlay.cs)) above the TV viewer
 playing; nothing touches the video plane.
 
 - **Bar** (bottom): **Watch** and **Play** with the device each opens underneath (the TV's input name; a green dot
-  on the one with a picture), Inputs, Controls, Apps (unless hidden) and Info. Left/Right move, Select (or Up on a
+  when its device is on: the picture on the current input, HDMI-CEC for the others - [`Cec.cs`](../../launcher/src/Cec.cs)), Inputs, Controls, Apps (unless hidden) and Info. Left/Right move, Select (or Up on a
   menu item) opens. Over a picture, Home toggles it; Back closes it; it steps aside after 45 idle seconds.
-- **Inputs** (menu above its bar item): every input by the TV's name, a checkmark on the current one.
+- **Inputs** (menu above its bar item): every input by the TV's name, a checkmark on the current one, the same green
+  dots. A device without HDMI-CEC (or with it off) only gets one while it is on screen.
 - **Apps** (above the bar): the TV's apps and Samsung Home, as artwork; they are backups - the SHIELD has the real ones.
 - **Controls** (panel on the right, replacing the bar; translucent so the picture shows the change): Brightness,
   Contrast, Volume (Select mutes); Picture Mode, Sound Mode, Sound Output, Game Mode (Automatic / Always / Never -
@@ -87,7 +88,7 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   path, native callbacks posted to the UI thread, interrupted animations land on their end state.
 
 Deploy: `launcher-deploy/update-vN.sh` (refuses unless the installed DLL is the previous version; keeps SMACK labels;
-verifies every file) and its inverse. The published pair upgrades from v32a (`update-v42k.sh` / `restore-v32a.sh`).
+verifies every file) and its inverse. The published pair upgrades from v32a (`update-v42l.sh` / `restore-v32a.sh`).
 Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
 then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).
 A first install: [docs/install.md](../../docs/install.md).
