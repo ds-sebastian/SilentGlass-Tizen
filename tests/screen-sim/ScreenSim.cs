@@ -107,6 +107,7 @@ sealed class FakeTv : IScreen
     public bool OverlayShown => Overlay;
     public bool BackdropShown => Bd;
     public bool SetupOpen => Overlay && Mode == "setup";
+    public bool HomeKeyJustPressed => T - homeKeyAt < 300; long homeKeyAt = long.MinValue / 2;
     public long OverlayClosedAt => closedAt; long closedAt = long.MinValue / 2, openedAt = long.MinValue / 2;
     public readonly Random Rnd = new(7);
     public int ReadSignal() => SignalVconf;
@@ -216,6 +217,7 @@ sealed class FakeTv : IScreen
                 // launch requests (Screen.EchoMs / AfterCloseMs): either outcome is fine
                 if (T - openedAt < Screen.EchoMs || T - closedAt < Screen.AfterCloseMs) homeCheck = false;
                 if (Front == Art) { SetFront(Csfs); break; }  // Ambient's Home key opens Samsung Home
+                if (Overlay && Focused) homeKeyAt = T + 140;  // the key reaches the focused bar just before its launch request
                 Later(150, () => Amd(Self, null));
                 // seen on the TV (event log, v41b): the remote's Home reaches the app twice, the second launch request
                 // 0.4-1 s after the first

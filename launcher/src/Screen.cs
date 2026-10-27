@@ -19,6 +19,7 @@ public interface IScreen
     bool BackdropShown { get; }
     bool SetupOpen { get; }
     long OverlayClosedAt { get; }   // clock ms when the overlay last closed
+    bool HomeKeyJustPressed { get; } // the Home key itself reached our window (the bar was up): a real press
     int ReadSignal();
     int ReadSource();
     string ReadForeground();
@@ -68,7 +69,8 @@ public sealed class Screen
         // 0.7-2.2 s after the bar closes on a remote key (Back, Watch, Home) - each reopened the bar (the "bounce",
         // seen in the event log). A plain Home within 1.2 s of the last one, or 2.6 s of the bar closing, is ignored.
         long now = clock();
-        if (!own && open == "" && (now - lastHome < EchoMs || !ui.OverlayShown && now - ui.OverlayClosedAt < AfterCloseMs)) { ui.Note(why + ":echo"); return; }
+        // A request right after the Home key itself reached us is a real press, whatever the timing.
+        if (!own && open == "" && !ui.HomeKeyJustPressed && (now - lastHome < EchoMs || !ui.OverlayShown && now - ui.OverlayClosedAt < AfterCloseMs)) { ui.Note(why + ":echo"); return; }
         if (open == "") lastHome = now;
         // a press while going to the picture first: this press decides, the pending relaunch is dropped
         if (!own && homeAfterViewer) { homeAfterViewer = false; ++homeGen; }

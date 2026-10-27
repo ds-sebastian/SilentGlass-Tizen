@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -15,7 +16,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42a";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42b";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -54,7 +55,8 @@ public sealed partial class SilentGlass : NUIApplication
         base.OnAppControlReceived(e);
         var x = e.ReceivedAppControl.ExtraData;
         string caller = null; try { caller = e.ReceivedAppControl.CallerApplicationId; } catch { }
-        Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller));
+        string keys = ""; try { keys = string.Join(",", x.GetKeys().Where(n => !n.StartsWith("__AUL_") && !n.StartsWith("__APP_SVC_"))); } catch { }
+        Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller) + (keys.Length > 0 ? " [" + keys + "]" : ""));
         // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
         if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }
         if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
@@ -71,8 +73,11 @@ public sealed partial class SilentGlass : NUIApplication
     string lastKey = ""; long lastKeyAt, keyCount, keyTicksMax;
     void OnKey(object sender, Window.KeyEventArgs e)
     {
-        if (e.Key == null || e.Key.State != Key.StateType.Down) return;
+        if (e.Key == null) return;
         string k = e.Key.KeyPressedName; long now = Environment.TickCount64;
+        if (e.Key.State == Key.StateType.Up) { KeyReleased(k); return; }
+        if (e.Key.State != Key.StateType.Down) return;
+        held[k] = now; if (k == "XF86Home") homeKeyAt = now;
         bool arrow = k == "Up" || k == "Down" || k == "Left" || k == "Right";
         if (k == lastKey && now - lastKeyAt < (arrow ? 90 : 300)) return;  // drop auto-repeat floods only
         lastKey = k; lastKeyAt = now; lastActivity = now;
@@ -81,6 +86,29 @@ public sealed partial class SilentGlass : NUIApplication
         try { HandleKey(k, arrow); } catch (Exception ex) { Note("key-error:" + ex.GetType().Name); }
         keyCount++; keyTicksMax = Math.Max(keyTicksMax, Stopwatch.GetTimestamp() - t0);
         Note("key " + k);  // coalesced: the state file is written later by a timer, never here
+    }
+    // ---- hide on release: the remote sends press and release separately; if our windows hide on the press, the TV
+    // gets the release with nothing of ours up and relaunches the Home app (the stray launch requests that reopened
+    // the bar). So whatever a key hides waits until that key is released (at most 1.5 s). ----
+    readonly Dictionary<string, long> held = new();
+    readonly List<Action> afterRelease = new();
+    Tizen.NUI.Timer releaseTimer;
+    long homeKeyAt = long.MinValue / 2;
+    void WhenReleased(Action a)
+    {
+        long now = Environment.TickCount64;
+        foreach (var k in held.Where(h => now - h.Value > 1500).Select(h => h.Key).ToList()) held.Remove(k);
+        if (held.Count == 0) { a(); return; }
+        afterRelease.Add(a);
+        if (releaseTimer == null) { releaseTimer = new Tizen.NUI.Timer(1500); releaseTimer.Tick += (s, e) => { held.Clear(); RunReleased(); return false; }; }
+        releaseTimer.Stop(); releaseTimer.Start();
+    }
+    void KeyReleased(string k) { if (held.Remove(k) && held.Count == 0 && afterRelease.Count > 0) { Note("released " + k); RunReleased(); } }
+    void RunReleased()
+    {
+        releaseTimer?.Stop();
+        var todo = afterRelease.ToArray(); afterRelease.Clear();
+        foreach (var a in todo) try { a(); } catch (Exception ex) { Note("release-error:" + ex.GetType().Name); }
     }
     static bool IsBack(string k) => k == "XF86Back" || k == "Back" || k == "Escape" || k == "XF86Exit";
     static bool IsSelect(string k) => k == "Return" || k == "KP_Enter";

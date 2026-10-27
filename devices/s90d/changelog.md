@@ -6,6 +6,13 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42b**: Home ignored for a few seconds after closing the bar. That was the 2.6 s guard against the TV's stray
+  launch requests. Likely cause of the strays: the remote sends press and release separately; SilentGlass hid its
+  windows on the press, so the release reached the TV with nothing of ours up, and the TV relaunched the Home app
+  (Home Assistant's keys, pressed and released together, never caused them). Whatever a key hides now waits for that
+  key's release (at most 1.5 s), and a launch request right after the Home key itself reached the bar is always a
+  real press. The guard stays until the event log shows no strays (`released <key>` marks a deferred hide; launch
+  requests log their extra keys). Deploy pair `update-v42b.sh` / `restore-v32a.sh`.
 - **v42a** + **bridge 2.4** + **re-apply**: Advanced settings.
   - Info: Home Assistant is a status line (Connected / Not set up / Can't connect / Not running); the last row,
     **Advanced settings**, opens the phone sheet (QR + code). The Thread border router switch moved to the phone.
@@ -17,8 +24,7 @@ records. Conf keys mentioned in older entries may since have been removed - the 
   - Privacy said aov-dashboard was on: a Samsung app update (22:53, v1.24.443) reinstalled it enabled. A registry
     edit was not enough - pkginfo-server kept the updated app's info cached as enabled - so `cleanup/reapply-apply.sh`
     re-disables anything on the privacy list through `pkgcmd -D` (the TV's own app disable), with a backup and
-    record per run; `reapply-restore.sh` undoes the latest run with `pkgcmd -A`. Deploy pair `update-v42a.sh` /
-    `restore-v32a.sh`; bridge installer regenerated (2.4).
+    record per run; `reapply-restore.sh` undoes the latest run with `pkgcmd -A`. Bridge installer regenerated (2.4).
 - **v41g**: after the TV woke with SHIELD coming on through the soundbar, the screen stayed black while the TV
   reported SHIELD selected with a picture. Watch only closed the bar ("already watching"); Inputs > SHIELD - a real
   input selection - brought the picture up. Watch and Play now always select their input, exactly like Inputs. The

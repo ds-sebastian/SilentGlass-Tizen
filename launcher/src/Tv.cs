@@ -202,7 +202,8 @@ public sealed partial class SilentGlass : IScreen
     int IScreen.ReadSource() { try { return vconf_get_int(SourceKey, out int n) == 0 ? n : -1; } catch { return -1; } }
     string IScreen.ReadForeground() => Foreground();
     void IScreen.ShowBackdrop() => ShowBackdrop();
-    void IScreen.HideBackdrop() => HideBackdrop();
+    // hiding waits for the key that caused it to be released (WhenReleased in SilentGlass.cs)
+    void IScreen.HideBackdrop() => WhenReleased(HideBackdrop);
     void IScreen.OpenBar(bool keepFocus) => OpenBar(keepFocus);
     void IScreen.OpenPart(string part)
     {
@@ -214,8 +215,9 @@ public sealed partial class SilentGlass : IScreen
             case "setup": OpenInfo(); OpenSetup(); break;
         }
     }
-    void IScreen.CloseOverlay(string why) => CloseOverlay(why);
-    void IScreen.Launch(string appId) => Launch(appId);
+    void IScreen.CloseOverlay(string why) => WhenReleased(() => CloseOverlay(why));
+    void IScreen.Launch(string appId) => WhenReleased(() => Launch(appId));
+    bool IScreen.HomeKeyJustPressed => Environment.TickCount64 - homeKeyAt < 300;
     bool IScreen.ConnectSource(int type) { try { return connect_source(type); } catch { return false; } }
     void IScreen.Wake() => Wake();
     void IScreen.TvChanged() => OnTvChanged();
