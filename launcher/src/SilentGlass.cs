@@ -16,7 +16,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42f";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42j";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -56,19 +56,21 @@ public sealed partial class SilentGlass : NUIApplication
         var x = e.ReceivedAppControl.ExtraData;
         string caller = null; try { caller = e.ReceivedAppControl.CallerApplicationId; } catch { }
         string keys = ""; try { keys = string.Join(",", x.GetKeys().Where(n => !n.StartsWith("__AUL_") && !n.StartsWith("__APP_SVC_"))); } catch { }
-        Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller) + (keys.Length > 0 ? " [" + keys + "]" : ""));
+        string stamp = ""; try { x.TryGet("__K_APP_LAUNCH_START_TIME", out stamp); } catch { }
+        Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller) + " t=" + stamp + (keys.Length > 0 ? " [" + keys + "]" : ""));
         // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
         if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }
         if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
         // from the bridge or Home Assistant: open one part directly
         x.TryGet("sg_open", out string open);
-        Home(open ?? "", "launch");
+        screen.Home(open ?? "", "launch", stamp ?? "", x.TryGet("sg_self", out string _));
     }
 
     // The Home button: Screen.cs decides (bar over the picture, the wallpaper behind it, or picture first from Ambient)
     void Home(string open, string why) => screen.Home(open, why);
 
     // ---- keys: both windows route here ----
+    long homeKeyAt = long.MinValue / 2;
     string lastKey = ""; long lastKeyAt, keyCount, keyTicksMax;
     void OnKey(object sender, Window.KeyEventArgs e)
     {
@@ -92,7 +94,6 @@ public sealed partial class SilentGlass : NUIApplication
     readonly Dictionary<string, long> held = new();
     readonly List<Action> afterRelease = new();
     Tizen.NUI.Timer releaseTimer;
-    long homeKeyAt = long.MinValue / 2;
     void WhenReleased(Action a)
     {
         long now = Environment.TickCount64;

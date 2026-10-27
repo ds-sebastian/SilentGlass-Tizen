@@ -10,7 +10,7 @@ SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soun
   not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
   because it exists.
 
-## SilentGlass (v42f)
+## SilentGlass (v42j)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).

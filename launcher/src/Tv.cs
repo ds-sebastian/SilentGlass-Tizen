@@ -116,9 +116,9 @@ public sealed partial class SilentGlass
         try { sourceListCallback = (t, d) => OnUi(() => OnInputsChanged(true)); register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero); } catch { }
         try { sourceTypeCallback = (n, d) => OnUi(screen.SourceChanged); vconf_notify_key_changed(SourceKey, sourceTypeCallback, IntPtr.Zero); } catch { }
         try { signalCallback = (n, d) => OnUi(screen.SignalFlapped); vconf_notify_key_changed(SignalKey, signalCallback, IntPtr.Zero); } catch { }
-        try { foregroundCallback = (n, d) => OnUi(() => screen.Foreground(Foreground())); vconf_notify_key_changed(ForegroundKey, foregroundCallback, IntPtr.Zero); } catch { }
+        try { foregroundCallback = (n, d) => OnUi(() => { HideParkedUnderApp(); PlaceholderGuard(); screen.Foreground(Foreground()); }); vconf_notify_key_changed(ForegroundKey, foregroundCallback, IntPtr.Zero); } catch { }
         try {
-            pmCallback = (n, d) => OnUi(() => { if (vconf_get_int(PmKey, out int v) == 0 && v >= 3) screen.Standby(); });
+            pmCallback = (n, d) => OnUi(() => { if (vconf_get_int(PmKey, out int v) == 0 && v >= 3) { screen.Standby(); HideParked("standby"); } });
             vconf_notify_key_changed(PmKey, pmCallback, IntPtr.Zero);
         } catch { }
         RefreshInputs(); screen.Start(); ResolvePorts();
@@ -162,6 +162,7 @@ public sealed partial class SilentGlass
                 if (r == 0) r = app_control_add_extra_data(c, "__K_EX_FORCE_BOOST", "enable");
                 if (r == 0) r = app_control_add_extra_data(c, "__K_SPLASH_SCREEN", "LA_UI_VR_TRANSPARENT");
             }
+            if (r == 0 && id == SelfId) r = app_control_add_extra_data(c, "sg_self", "1");
             if (r == 0) r = app_control_send_launch_request(c, IntPtr.Zero, IntPtr.Zero);
             Note("launch:" + id + (menuItem == null ? "" : ":" + menuItem) + ":" + r);
         } finally { app_control_destroy(c); }
@@ -216,9 +217,9 @@ public sealed partial class SilentGlass : IScreen
     }
     void IScreen.CloseOverlay(string why) => WhenReleased(() => CloseOverlay(why));
     void IScreen.Launch(string appId) => WhenReleased(() => Launch(appId));
-    bool IScreen.HomeKeyJustPressed => Environment.TickCount64 - homeKeyAt < 300;
     bool IScreen.ConnectSource(int type) { try { return connect_source(type); } catch { return false; } }
     void IScreen.Wake() => Wake();
+    bool IScreen.HomePressedOnBar => Environment.TickCount64 - homeKeyAt < 300;
     void IScreen.TvChanged() => OnTvChanged();
     readonly HashSet<Tizen.NUI.Timer> afterTimers = new();  // referenced until they fire
     void IScreen.After(int ms, Action action)

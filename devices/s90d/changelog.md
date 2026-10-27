@@ -6,6 +6,22 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42g-v42j**: the bar no longer flashes over a picture, and every Home press counts.
+  - Window traces (`enlightenment_info -topvwins` every ~29 ms) showed what Controls (never flashing) didn't do:
+    each open *showed* the bar's window, and the compositor drew a newly shown window in software for ~70 ms before
+    moving it to a hardware layer over the video - the double/triple flash. Over the wallpaper there is no video
+    under it, so nothing showed. Now, over the picture, a closed bar's window is **parked**: emptied, unable to take
+    focus (the remote goes back to the viewer), still on screen; it goes up parked whenever the viewer comes to the
+    front, and is really hidden only when another app or standby takes over. Opening is a content change, like
+    Controls. (The TV still hides its own OSD layer ~0.5 s after each Home launch; registering SilentGlass as a
+    "partial" app in `.app-context.db` did not change that and was reverted.)
+  - The 1.2 s window that dropped key-less Home requests after an opening press is gone: since the window stays up
+    no repeated request has been seen, and fast real presses were being dropped. A request is dropped only if it
+    repeats the TV's launch stamp (`__K_APP_LAUNCH_START_TIME`). SilentGlass's own relaunch (after going to the
+    picture first) carries `sg_self`, so it is never taken for a press.
+  - A cold launch (first Home after SilentGlass restarted) over the picture left Samsung's near-black launch
+    placeholder in front, holding the remote. When SilentGlass is the front app with nothing full screen of its own,
+    it now brings the viewer back after 0.4 s (the input re-syncs once) and the open bar takes the remote again.
 - **Undo scripts tested offline**: every restore script was run in a sandbox on the Pi against copies of the tested
   TV's files (registry, settings, owner units, markers, launcher, all 6,328 backup files), one at a time and as one
   chain back to stock (45 disabled apps -> 1, the one the Thread undo re-enables; Home and startup back to Samsung's).

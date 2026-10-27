@@ -52,8 +52,25 @@ public sealed partial class SilentGlass
         backdropShown = false; mainUp = false; Wake(); Note("backdrop:hide");
         // end the dim first and hide the window a few frames later, so its last frame is the plain wallpaper - what
         // the next Show draws anyway (the window is black underneath: emptying it first would flash black)
-        mainHide ??= ClearThenHide(() => { if (backdropShown) return; try { Window.Default.Hide(); } catch { } backdrop.Hide(); });
+        mainHide ??= ClearThenHide(HideMainNow);
         mainHide.Stop(); mainHide.Start();
+    }
+    void HideMainNow() { if (backdropShown) return; try { Window.Default.Hide(); } catch { } backdrop.Hide(); }
+    // A cold launch (the first Home after SilentGlass restarted) makes it the TV's front app, and the TV keeps it
+    // there with a near-black launch placeholder under its hidden main window - over the picture, holding the remote.
+    // Whenever SilentGlass is the front app with nothing of its own full screen, the viewer is brought back; an open
+    // bar takes the remote again once the viewer is in front.
+    int placeholderGen;
+    void PlaceholderGuard()
+    {
+        string f = Foreground();
+        if (f == Viewer && overlayShown && !backdropShown) { ow.Raise(); try { ow.Activate(); } catch { } return; }
+        if (f != SelfId || backdropShown || mainUp) return;
+        int g = ++placeholderGen;
+        ((IScreen)this).After(400, () => {
+            if (g != placeholderGen || backdropShown || mainUp || Foreground() != SelfId) return;
+            Note("placeholder:viewer"); Launch(Viewer);
+        });
     }
     void UpdateClock() { clock.Text = DateTime.Now.ToString("h:mm tt"); }
     void CheckWallpaper()

@@ -160,6 +160,19 @@ are ordinary optional features rather than trackers.
   remote's keys until the app's main window has been shown. Hiding the main window in `OnCreate` leaves the
   placeholder in charge, so a notification window opened later appears but never receives a key. Let the main
   window show, then hide it.
+- **Showing a window over video flashes it:** a newly shown window is drawn in software for a few frames
+  (`enlightenment_info -topvwins`: HWC state `CL`), then moved to a hardware layer (`DV`). Over the video that
+  handoff flashes; over an opaque window it doesn't show. Changing what an already-shown window draws, or resizing
+  it, doesn't flash. Keep an overlay window up and empty, with `SetAcceptFocus(false)` so the remote goes back to the
+  viewer, instead of hiding it.
+- **Home launches:** each Home press reaches the Home app as a launch request with a new
+  `__K_APP_LAUNCH_START_TIME`; tell presses apart by it, not by timing. Each launch also makes the viewer drop its
+  OSD layer (`tv-viewer-graphics`) about 0.5 s later. Which apps the TV treats as overlays (`ui_type=partial`) comes
+  from `<app-context>` in their manifests, stored in `/opt/dbspace/.app-context.db` (`managed_app`) and read by
+  `tvctx-manager` (`app-context-manager.service`); adding a row there didn't change the OSD drop.
+- **Cold launch over the picture:** the first launch after a restart makes the app the front app, and the TV keeps
+  its near-black `[WIND]` placeholder up while the app's main window is hidden. Launching `org.tizen.tv-viewer`
+  brings the picture back (the input re-syncs once).
 - **Pause:** the TV pauses an app whenever its main window is hidden, even if one of its notification windows is up
   and focused. Use the foreground app (`memory/appfw/current_fullscreen_appid`), not `OnPause`, to decide that
   another app has taken over.

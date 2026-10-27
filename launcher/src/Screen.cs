@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 // What SilentGlass puts on screen - the wallpaper backdrop, the bar over the picture, or nothing - decided with no NUI
 // types, so tests/screen-sim drives this exact code against a simulated TV (inputs waking and resyncing, Ambient,
@@ -18,7 +19,6 @@ public interface IScreen
     bool OverlayShown { get; }
     bool BackdropShown { get; }
     bool SetupOpen { get; }
-    bool HomeKeyJustPressed { get; } // the Home key itself reached our window (the bar was up): a real press
     int ReadSignal();
     int ReadSource();
     string ReadForeground();
@@ -27,6 +27,7 @@ public interface IScreen
     void OpenBar(bool keepFocus);
     void OpenPart(string part);  // controls, info, apps, inputs, setup
     void CloseOverlay(string why);
+    bool HomePressedOnBar { get; }  // the Home key itself just reached the open bar (pressed while it showed)
     void Launch(string appId);
     bool ConnectSource(int type);
     void Wake();                 // ends the OLED dim
@@ -46,9 +47,10 @@ public sealed class Screen
     public string LastOther = "";         // the last app in front other than us
     string previous = "";
     int settleGen, homeGen, pollGen; bool homeAfterViewer, directHome; string pendingOpen;
-    public const int BackdropPollMs = 1000, EchoMs = 1200;
-    bool selfLaunch; long lastOpenHome = long.MinValue / 2;  // the next launch request is our own relaunch, not a Home press
-    void LaunchSelf() { selfLaunch = true; ui.Launch(Self); }
+    public const int BackdropPollMs = 1000, OwnOpenMs = 600;
+    long ownOpenedAt = long.MinValue / 2;
+    readonly Queue<string> stamps = new();  // the TV's launch stamps of recent requests (a duplicate can come after a newer press)
+    void LaunchSelf() => ui.Launch(Self);  // its request carries sg_self: our own relaunch, not a Home press
     long pictureLostAt = long.MinValue / 2; int pictureLostOn = -1;
     public bool HasPicture => Signal == 1;
     // over the picture: the viewer is the app behind us and its input shows a picture, or did a moment ago
@@ -61,16 +63,21 @@ public sealed class Screen
     void NoteForeground(string id) { if (!string.IsNullOrEmpty(id) && id != Self) LastOther = id; }
 
     // The Home button. Over a picture it toggles the bar; with nothing to draw over, the wallpaper comes up behind it.
-    public void Home(string open, string why)
+    public void Home(string open, string why, string stamp = "", bool own = false)
     {
-        bool own = selfLaunch; selfLaunch = false;
-        // The TV can send the Home app a second launch request 0.4-1 s after a press that opened the bar; taken as a
-        // press, it toggled the bar again (the "bounce"). A real press while the bar is up reaches it as a Home key
-        // just before its request, so only a request with no key within 1.2 s of an opening press is dropped. Closing
-        // starts no window: Home right after a close reopens at once (an after-close window swallowed real presses).
-        long now = clock();
-        if (!own && open == "" && !ui.HomeKeyJustPressed && now - lastOpenHome < EchoMs) { ui.Note(why + ":echo"); return; }
-        if (open == "" && !ui.OverlayShown) lastOpenHome = now;  // our own relaunch opens the bar too
+        // our own relaunch (to open the bar after going to the picture first) finds the bar already open: a press
+        // got there first and decides
+        if (own && open == "" && ui.OverlayShown) { ui.Note(why + ":own_already_open"); return; }
+        // and a press just after our own relaunch opened it meant to open it too
+        // (the key did not reach the bar: it was pressed before the bar showed)
+        if (!own && open == "" && ui.OverlayShown && !ui.HomePressedOnBar && clock() - ownOpenedAt < OwnOpenMs) { ui.Note(why + ":with_own_open"); return; }
+        if (own) ownOpenedAt = clock();
+        // Every press counts, at any speed. The TV used to send a second launch request 0.4-1 s after a press that
+        // showed the bar's window (taken as a press, it closed the bar again: the "bounce"), so requests in the 1.2 s
+        // after an opening press were dropped - and fast real presses with them. Since the window stays up (parked)
+        // no such request has been seen; one that repeats the TV's launch stamp is still a duplicate and dropped.
+        if (!own && stamp != "" && stamps.Contains(stamp)) { ui.Note(why + ":duplicate"); return; }
+        if (stamp != "") { stamps.Enqueue(stamp); if (stamps.Count > 16) stamps.Dequeue(); }
         // a press while going to the picture first: this press decides, the pending relaunch is dropped
         if (!own && homeAfterViewer) { homeAfterViewer = false; ++homeGen; }
         ui.Wake();

@@ -45,12 +45,20 @@ public sealed partial class SilentGlass
     // Hidden windows keep their last frame, and the compositor shows it again on the next Show, before our first new
     // frame: the old bar flashed at full opacity, then the new one faded in from nothing. So a window is cleared,
     // given a few frames to present the empty scene, and only then hidden (ClearThenHide).
-    Tizen.NUI.Timer overlayHide;
+    // Over a picture, showing a window flashed it two or three times: the compositor draws a newly shown window in
+    // software for a few frames, then moves it to a hardware layer over the video. Opening Controls inside the shown
+    // window never flashed. So over the picture a closed bar's window is parked instead of hidden: emptied, unable to
+    // take focus (the remote goes back to the viewer), still on screen. It is really hidden only when another app or
+    // standby takes over (HideParked).
+    Tizen.NUI.Timer overlayHide; bool overlayParked;
     void ShowOverlay()
     {
         if (overlayShown) return;
         overlayHide?.Stop();
-        ow.Show(); ow.Raise(); try { ow.Activate(); } catch { }
+        if (!overlayParked) ow.Show();
+        overlayParked = false;
+        try { ow.SetAcceptFocus(true); } catch { }
+        ow.Raise(); try { ow.Activate(); } catch { }
         overlayShown = true;
     }
     void CloseOverlay(string why)
@@ -58,9 +66,28 @@ public sealed partial class SilentGlass
         if (!overlayShown) return;
         overlayShown = false; overlayIdle?.Stop(); infoTimer?.Stop(); CloseSetupServer();
         ClearOverlay();
-        overlayHide ??= ClearThenHide(() => { if (!overlayShown) try { ow.Hide(); } catch { } });
-        overlayHide.Stop(); overlayHide.Start();
+        string fg = Foreground();
+        if (fg == Viewer || fg == SelfId) { try { ow.SetAcceptFocus(false); } catch { } overlayParked = true; }
+        else {
+            overlayHide ??= ClearThenHide(() => { if (!overlayShown) { overlayParked = false; try { ow.Hide(); } catch { } } });
+            overlayHide.Stop(); overlayHide.Start();
+        }
         if (why != null) Note(why);
+    }
+    // the picture came to the front: the window goes up empty and unfocusable, so the first open is smooth too
+    void Preparked()
+    {
+        if (ow == null || overlayShown || overlayParked) return;
+        overlayHide?.Stop();
+        try { ow.SetAcceptFocus(false); ow.Show(); } catch { return; }
+        overlayParked = true; Note("overlay:preparked");
+    }
+    void HideParkedUnderApp() { string f = Foreground(); if (f == Viewer) Preparked(); else if (f != SelfId) HideParked("fg:" + f); }
+    void HideParked(string why)
+    {
+        if (!overlayParked || overlayShown) return;
+        overlayParked = false; try { ow.Hide(); } catch { }
+        Note("overlay:hidden:" + why);
     }
     // over a picture the bar steps aside by itself; over the wallpaper it stays (the backdrop dims instead)
     void OverlayActivity()

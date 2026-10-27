@@ -113,8 +113,8 @@ sealed class FakeTv : IScreen
     public bool OverlayShown => Overlay;
     public bool BackdropShown => Bd;
     public bool SetupOpen => Overlay && Mode == "setup";
-    public bool HomeKeyJustPressed => T - homeKeyAt < 300; long homeKeyAt = long.MinValue / 2;
-    long closedAt = long.MinValue / 2, openedAt = long.MinValue / 2;
+    long closedAt = long.MinValue / 2;
+    public bool HomePressedOnBar => T - homeKeyAt < 300; long homeKeyAt = long.MinValue / 2;
     public readonly Random Rnd = new(7);
     public int ReadSignal() => SignalVconf;
     public int ReadSource() => Src;
@@ -128,7 +128,7 @@ sealed class FakeTv : IScreen
     }
     public void OpenBar(bool keep)
     {
-        if (!Overlay) { Overlay = true; openedAt = T; Focused = Front == Self && Power; }  // ShowOverlay: Show, Raise, Activate
+        if (!Overlay) { Overlay = true; Focused = Front == Self && Power; }  // ShowOverlay: Show, Raise, Activate
         Mode = "bar"; lastActivity = T;
     }
     public void OpenPart(string part) { Mode = part; }
@@ -141,7 +141,7 @@ sealed class FakeTv : IScreen
         CloseOverlayNow(why);
     }
     void CloseOverlayNow(string why) { if (!Overlay) return; Overlay = false; closedAt = T; Focused = false; Mode = ""; if (why != null) Note(why); }
-    public void Launch(string id) => Later(150, () => Amd(id, null));
+    public void Launch(string id) => Later(150, () => Amd(id, id == Self ? "self" : null));
     public bool ConnectSource(int t)
     {
         if (!Power || t != 15 && t != 13) return false;
@@ -189,13 +189,14 @@ sealed class FakeTv : IScreen
         if (id != Self) { LastNonSelf = id; Focused = false; if (wasSelf) Later(30, () => App.Paused()); }
         Fg();
     }
-    void Amd(string id, string extra)
+    long stampSeq;
+    void Amd(string id, string extra, string stamp = null)
     {
         if (!Power) return;
         if (id != Self) { SetFront(id); return; }
         SetFront(Self);
         if (Overlay) Focused = true;  // we are the app in front again: our focusable window has the keys
-        if (extra == null) App.Home("", "launch");
+        if (extra == null || extra == "self") App.Home("", "launch", stamp ?? (++stampSeq).ToString(), extra == "self");
         else if (extra.StartsWith("src:")) App.SelectSource(int.Parse(extra.Substring(4)));
     }
     void SetSource(int t)
@@ -220,18 +221,16 @@ sealed class FakeTv : IScreen
                 homeCheck = true; homeAt = T; homeExpectClose = Overlay && Focused && !Bd && Front != Art && Front != Csfs;
                 // over a live picture with the bar closed, this press itself must open it (no waiting, no rescue by a
                 // later duplicate request)
-                homeQuick = Power && !Overlay && !Bd && InputHasPicture && Front != Art && Front != Csfs && T - openedAt >= Screen.EchoMs;
+                homeQuick = Power && !Overlay && !Bd && InputHasPicture && Front != Art && Front != Csfs;
                 homeNoPicture = !homeExpectClose && !InputHasPicture && T - pictureSeenAt > 6000;
-                // a press that doesn't reach the bar (not focused) within 1.2 s of it opening may be taken for the TV's
-                // duplicate request (Screen.EchoMs): either outcome is fine. Every other press must count.
-                if (T - openedAt < Screen.EchoMs && !(Overlay && Focused)) homeCheck = false;
                 if (Front == Art) { SetFront(Csfs); break; }  // Ambient's Home key opens Samsung Home
                 if (Overlay && Focused) homeKeyAt = T + 140;  // the key reaches the focused bar just before its launch request
-                Later(150, () => Amd(Self, null));
-                // seen on the TV (event log, v41b): a Home that opens the bar can reach the app twice, the second launch
-                // request 0.4-1 s later and with no key event
+                string stamp = (++stampSeq).ToString();
+                Later(150, () => Amd(Self, null, stamp));
+                // seen on the TV (event log, v41b): a Home that opens the bar could reach the app twice, the second
+                // launch request 0.4-1 s later with no key event - modelled as a repeat of the same request (its stamp)
                 if (!(Overlay && Focused))
-                    Later(150 + 400 + Rnd.Next(600), () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
+                    Later(150 + 400 + Rnd.Next(600), () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null, stamp); });
                 break;
             case "HA Home": Later(150, () => Amd(Self, null)); break;
             case "HA input SHIELD": Later(150, () => Amd(Self, "src:15")); break;
