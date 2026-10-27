@@ -45,7 +45,7 @@ def main():
         if n != 1:
             sys.exit(f"{name}: {n} blocks matched")
         print(f"{name}: {len(data)} bytes {digest[:16]}")
-    INSTALLER.write_text(text)
+    INSTALLER.write_text(text, newline="\n")  # runs on the TV: LF even when built on Windows
 
 
 if __name__ == "__main__":

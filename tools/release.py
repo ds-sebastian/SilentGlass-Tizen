@@ -87,7 +87,7 @@ def main():
         shutil.copyfile(installer, out / "ha-bridge-install.sh")
         shutil.copyfile(installer.with_name("ha-bridge-restore.sh"), out / "ha-bridge-restore.sh")
         lines = [f"{sha256(p)}  {p.name}" for p in sorted(out.iterdir())]
-        (out / "SHA256SUMS").write_text("\n".join(lines) + "\n")
+        (out / "SHA256SUMS").write_text("\n".join(lines) + "\n", newline="\n")
         print("\n".join(lines))
         print(f"launcher BixbyPromotion.dll sha256 {sha256(package / 'BixbyPromotion.dll')}")
         print(f"-> {out}")

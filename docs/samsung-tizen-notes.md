@@ -56,6 +56,12 @@ are ordinary optional features rather than trackers.
   path work.
 - **Samsung TV Plus**: `HEPsqFNie0.tvplusstandalone`. It was started at boot by `org.tizen.litewebappservice` with
   `backgroundAtStartup`; the `slive-provider-daemon` stop marker keeps its provider down.
+- **Remote app buttons** (reported on an S90F and an S90C, [Quiet Tizen PR #14](https://github.com/jss8649/quiet-tizen/pull/14)):
+  the dedicated Netflix / Prime / YouTube / TV Plus buttons send `XF86Netflix`, `XF86Amazon`, `XF86KeyYouTube`,
+  `XF86KeyTVPlus`, and `tvctx-manager` (`libapp-context-manager.so`, `CPKey::HandleKey`) launches the app, not
+  `key_filter` or `hotkey-service`. Disabling the target app does not disable its button: the launch hangs, and with
+  TV Plus disabled its button froze the remote, Home included, for about 30 s. An exclusive key grab
+  (`KeyGrabUtilVd`, from an app holding the keygrab privilege) can take a button over. Not checked on the S90D.
 
 ## Stopping vendor services
 
@@ -233,6 +239,11 @@ are ordinary optional features rather than trackers.
   the owner user, so an app-side service can read and set datasets.
   - Only replace the active dataset with Thread stopped (`thread stop; ifconfig down`). Committing on a running
     node pushes the change to the whole mesh.
+
+- **Native Settings popups** (reported on a DU6900, Tizen 8, [Quiet Tizen PR #8](https://github.com/jss8649/quiet-tizen/pull/8)):
+  arrows stopped moving between buttons inside Bluetooth and confirmation popups while a launcher window kept
+  keyboard focus; the keypad directions still worked. Yielding focus while the native menu is open fixed it. Not
+  seen on the S90D, where SilentGlass only holds focus while its own overlay is up.
 
 ## Security boundaries seen
 

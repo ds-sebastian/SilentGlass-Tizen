@@ -1,0 +1,2 @@
+# The TV runs these files as they are: LF line endings on every checkout, Windows included
+* text=auto eol=lf

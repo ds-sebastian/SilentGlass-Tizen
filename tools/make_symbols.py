@@ -87,7 +87,7 @@ SYMBOLS = {
 
 def main():
     for name, body in SYMBOLS.items():
-        (OUT / f"sym-{name}.svg").write_text(svg(body))
+        (OUT / f"sym-{name}.svg").write_text(svg(body), newline="\n")
     print(f"wrote {len(SYMBOLS)} symbols to {OUT}")
 
 
