@@ -22,6 +22,10 @@ jobs:
         run: |
           python3 tools/bridge_installer.py .local/build/ha-bridge
           git diff --exit-code devices/s90d/device/ha-bridge/ha-bridge-install.sh
+      - name: Home Assistant's notification client and the bridge's reader (notice test uses them)
+        run: |
+          pip install notifications-android-tv==0.1.5
+          dotnet build tests/notice-harness/NoticeHarness.csproj -c Release -o .local/notice-harness
       - name: Python tests and recipe syntax
         run: python3 -m unittest discover -s tests -v
       - name: Test native catalog logic without Samsung references
