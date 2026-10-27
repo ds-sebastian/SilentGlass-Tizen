@@ -1,21 +1,13 @@
-"""Undo scripts: syntax, and the rules the offline sandbox run found mattered on the tested TV."""
+"""Undo scripts: the rules the offline sandbox run found mattered on the tested TV (syntax: tests/test_package.py)."""
 import re
-import subprocess
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 D = ROOT / "devices/s90d/device"
-RESTORES = sorted(D.glob("*/*restore*.sh")) + sorted(ROOT.glob("recipes/restore-*.sh"))
 
 
 class UndoTests(unittest.TestCase):
-    def test_every_restore_script_parses(self):
-        self.assertGreater(len(RESTORES), 15)
-        for f in RESTORES:
-            r = subprocess.run(["sh", "-n"], stdin=f.open(), capture_output=True, text=True)
-            self.assertEqual(r.returncode, 0, f"{f.name}: {r.stderr}")
-
     def test_privacy_restore_follows_its_recorded_sql_and_allows_removed_apps(self):
         # the TV's hash-checked restore.sql demands all 19 apps; Samsung removed one (Amazon Alexa), so restore.sh
         # carries the same SQL with "present => must match its recorded row; absent => skipped"

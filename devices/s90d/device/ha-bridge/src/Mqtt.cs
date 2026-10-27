@@ -5,7 +5,8 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-// Minimal MQTT 3.1.1 client: CONNECT (with will), PUBLISH QoS 0, SUBSCRIBE QoS 0, PINGREQ, incoming PUBLISH.
+// Minimal MQTT 3.1.1 client: CONNECT (with will), PUBLISH QoS 0, SUBSCRIBE QoS 0, PINGREQ, incoming PUBLISH. A broker
+// that answers nothing for 90 s (a ping goes out every 30 s) is gone: a lost network leaves no reset to read.
 sealed class Mqtt
 {
     readonly TcpClient tcp; readonly NetworkStream s; readonly object w = new(); readonly Action<string, string> onMessage;
@@ -31,7 +32,7 @@ sealed class Mqtt
             int rc = body.Length > 1 ? body[1] : -1; tcp.Close();
             throw new Exception(rc == 4 ? "wrong username or password" : rc == 5 ? "not authorized" : rc == 2 ? "client id rejected" : "refused (" + rc + ")");
         }
-        s.ReadTimeout = Timeout.Infinite;
+        s.ReadTimeout = 90000;
         new Thread(Reader) { IsBackground = true }.Start();
         new Thread(() => { while (alive) { Thread.Sleep(30000); try { Send(0xC0, new List<byte>()); } catch { Die(); } } }) { IsBackground = true }.Start();
     }

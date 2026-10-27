@@ -16,17 +16,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - name: Build the Home Assistant bridge (setup-page test uses it)
+      - name: Build the Home Assistant bridge (the setup-page test runs it)
         run: python3 tools/build.py bridge
       - name: The committed bridge installer is this source, byte for byte
         run: |
           python3 tools/bridge_installer.py .local/build/ha-bridge
           git diff --exit-code devices/s90d/device/ha-bridge/ha-bridge-install.sh
-      - name: Home Assistant's notification client and the bridge's reader (notice test uses them)
+      - name: Tests (they also build and run the C# checks, the screen simulation and the notification harness)
         run: |
-          pip install notifications-android-tv==0.1.5
-          dotnet build tests/notice-harness/NoticeHarness.csproj -c Release -o .local/notice-harness
-      - name: Python tests and recipe syntax
-        run: python3 -m unittest discover -s tests -v
-      - name: Test native catalog logic without Samsung references
-        run: dotnet run --project tests/CatalogTests.csproj -- launcher/assets/apps.json
+          pip install notifications-android-tv==0.1.5 qrcode==8.2
+          python3 -m unittest discover -s tests -v

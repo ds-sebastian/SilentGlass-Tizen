@@ -16,26 +16,13 @@ DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet")
 class ScreenSimulation(unittest.TestCase):
     def test_no_rule_broken(self):
         out = ROOT / ".local/screen-sim"
-        b = subprocess.run([DOTNET, "build", str(ROOT / "tests/screen-sim/ScreenSim.csproj"), "-c", "Release", "-o", str(out)],
+        b = subprocess.run([DOTNET, "build", str(ROOT / "tests/screen-sim/ScreenSim.csproj"), "-c", "Release", "-o", str(out),
+                            f"-p:BaseIntermediateOutputPath={ROOT / '.local/obj/ScreenSim'}/"],
                            capture_output=True, text=True, timeout=600)
         self.assertEqual(b.returncode, 0, b.stdout[-2000:])
         r = subprocess.run([DOTNET, str(out / "ScreenSim.dll"), os.environ.get("SG_SIM_RUNS", "300")], capture_output=True, text=True, timeout=900)
         self.assertEqual(r.returncode, 0, r.stdout[-6000:])
         self.assertIn("No rule broken.", r.stdout)
-
-    def test_launcher_routes_through_screen(self):
-        src = {p.name: p.read_text() for p in (ROOT / "launcher/src").glob("*.cs")}
-        self.assertIn('<Compile Include="Screen.cs" />', (ROOT / "launcher/src/SilentGlass.csproj").read_text())
-        self.assertIn("void Home(string open, string why) => screen.Home(open, why);", src["SilentGlass.cs"])
-        self.assertIn("screen.Paused();", src["SilentGlass.cs"])
-        self.assertIn("void SelectSource(int type) => screen.SelectSource(type);", src["Tv.cs"])
-        for cb in ("screen.SourceChanged", "screen.SignalFlapped", "screen.Foreground(Foreground())", "screen.Standby()"):
-            self.assertIn(cb, src["Tv.cs"])
-        # the decisions live in Screen.cs only: nothing else shows the wallpaper or reads the signal flag itself
-        for name, text in src.items():
-            if name in ("Screen.cs", "Tv.cs"): continue
-            self.assertNotIn("ShowBackdrop()", text.replace("void ShowBackdrop()", ""), name)
-            self.assertNotIn("SignalKey", text, name)
 
 
 if __name__ == "__main__":

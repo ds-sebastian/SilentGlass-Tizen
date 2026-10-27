@@ -49,11 +49,11 @@ public sealed partial class SilentGlass
             Choice("picture", "Picture Mode", () => SettingName("picturemode"), d => CycleSetting("picturemode", d)),
             Choice("waveform", "Sound Mode", () => SettingName("external-sound-mode"), d => CycleSetting("external-sound-mode", d)),
             Choice("soundbar", "Sound Output", Output, d => SetSetting("soundoutput", Setting("soundoutput") == "0" ? "2" : "0")),
-            Choice("gamecontroller", "Game Mode", () => Logic.GameName(SettingName("game-mode-auto")), d => CycleSetting("game-mode-auto", d)),
+            Choice("gamecontroller", "Game Mode", () => Shared.GameName(SettingName("game-mode-auto")), d => CycleSetting("game-mode-auto", d)),
             Choice("moon", "Sleep Timer", () => SettingName("sleeptimer"), d => CycleSetting("sleeptimer", d)),
             Toggle("pixelshift", "Pixel Shift", () => Setting("pixel-shift-menu") == "1", on => SetSetting("pixel-shift-menu", on ? "1" : "0")),
             null,
-            Open("artframe", "Ambient", () => OpenApp("org.tizen.art-app")),
+            Open("artframe", "Ambient", () => OpenApp(Shared.Art)),
             Open("bluetooth", "Bluetooth", () => OpenTvMenu("add-bluetooth-keyboard")),
             Open("network", "Network", () => OpenTvMenu("networksettings")),
             Open("gear", "TV Settings", () => OpenTvMenu(null)),
@@ -100,7 +100,6 @@ public sealed partial class SilentGlass
         if (i == null) return ("Offline", Amber);
         bool wifi = i.StartsWith("wlan");
         string detail = wifi ? (InfoStats.WifiLevel(i) is int dbm ? dbm + " dBm" : null) : InfoStats.LinkSpeed(i);
-        if (detail != null) { int d = detail.IndexOf(" full", StringComparison.Ordinal); if (d < 0) d = detail.IndexOf(" half", StringComparison.Ordinal); if (d > 0) detail = detail.Substring(0, d); }
         return ((wifi ? "Wi-Fi" : "Wired") + (detail != null ? " · " + detail : ""), Live);
     }
     (string, Color) ThreadStatus()
@@ -118,14 +117,14 @@ public sealed partial class SilentGlass
         var up = InfoStats.Uptime(); int? t = InfoStats.ChipTemperature();
         return ((up.HasValue ? "Up " + InfoStats.Duration(up.Value) : "Running") + (t.HasValue ? " · " + t + " °C" : ""), Live);
     }
-    // written by the bridge (data/bridge-status.txt) whenever its state changes and every minute
+    // written by the bridge whenever its state changes and every minute
     (string, Color) BridgeStatus()
     {
         try {
-            var f = new FileInfo(DataFile("bridge-status.txt"));
+            var f = new FileInfo(DataFile(Shared.BridgeStatus));
             if (!f.Exists || (DateTime.UtcNow - f.LastWriteTimeUtc).TotalMinutes > 3) return ("Not running", Grey);
-            var c = Logic.ParseConf(File.ReadAllText(f.FullName));
-            return c.GetValueOrDefault("mqtt") switch { "connected" => ("Connected", Live), "unconfigured" => ("Not set up", Grey), _ => ("Can't connect", Amber) };
+            return Shared.ParseConf(File.ReadAllText(f.FullName)).GetValueOrDefault("mqtt") switch {
+                "connected" => ("Connected", Live), "connecting" => ("Connecting…", Grey), "unconfigured" => ("Not set up", Grey), _ => ("Can't connect", Amber) };
         } catch { return ("Not running", Grey); }
     }
 

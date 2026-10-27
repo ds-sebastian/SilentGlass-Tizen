@@ -11,6 +11,7 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../../../../launcher/src/Shared.cs" />
     <EmbeddedResource Include="setup.html" LogicalName="setup.html" />
   </ItemGroup>
 </Project>

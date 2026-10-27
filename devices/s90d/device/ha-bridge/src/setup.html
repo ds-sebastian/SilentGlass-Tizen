@@ -21,12 +21,13 @@ h2{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--sub);marg
 .row input[type=password],.row input:not([type]){flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;text-align:right;padding:11px 0;outline:0}
 .row input::placeholder{color:var(--sub)}
 .foot{color:var(--sub);font-size:13px;margin:7px 16px 0}
-.btnrow{justify-content:center;color:var(--accent);cursor:pointer;user-select:none}
+.btnrow{justify-content:center;width:100%;border:0;background:none;font:inherit;color:var(--accent);cursor:pointer;user-select:none}
 .btnrow.busy{opacity:.5;pointer-events:none}
 .seg{display:flex;background:rgba(118,118,128,.12);border-radius:9px;padding:2px;margin:10px 16px;gap:2px}
 .seg button{flex:1;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;white-space:nowrap;padding:7px 4px;border-radius:7px}
 .seg button.on{background:var(--segon);box-shadow:0 3px 8px rgba(0,0,0,.12)}
 .switch{position:relative;display:block;flex:0 0 51px;width:51px;height:31px;margin-left:auto}
+label.row{cursor:pointer}
 .switch input{opacity:0;width:0;height:0}
 .switch span{position:absolute;inset:0;background:rgba(120,120,128,.32);border-radius:16px;transition:.2s}
 .switch span::after{content:"";position:absolute;width:27px;height:27px;left:2px;top:2px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15);transition:.2s}
@@ -39,7 +40,7 @@ textarea{width:100%;border:0;background:transparent;color:var(--text);font:13px 
 .hidden,#gate.hidden{display:none}
 body.locked main,body.locked #save{display:none}
 .row select{flex:1;min-width:0;border:0;background:transparent;color:var(--sub);font:inherit;text-align:right;text-align-last:right;padding:11px 0;outline:0;-webkit-appearance:none;appearance:none}
-.row>span{flex:1}
+.row>span:not(.switch){flex:1}
 .row input[type=time]{flex:1;min-width:0;border:0;background:transparent;color:var(--sub);font:inherit;text-align:right;padding:11px 0;outline:0;-webkit-appearance:none;appearance:none}
 #save{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));height:52px;border:0;border-radius:14px;background:var(--accent);color:#fff;font:600 17px -apple-system,BlinkMacSystemFont,sans-serif}
 #save:disabled{opacity:.5}
@@ -53,9 +54,9 @@ body.locked main,body.locked #save{display:none}
 <div id="gate" class="hidden">
   <h1>SilentGlass</h1>
   <p style="color:var(--sub)">Advanced settings. Enter the code shown on the TV.</p>
-  <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+  <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" aria-label="Code shown on the TV">
   <button onclick="unlock()">Continue</button>
-  <p id="gateerr" style="color:var(--red)"></p>
+  <p id="gateerr" role="alert" style="color:var(--red)"></p>
 </div>
 <main>
 <header><h1>Advanced settings</h1><p id="tvname">Living Room TV</p></header>
@@ -64,41 +65,41 @@ body.locked main,body.locked #save{display:none}
 <div class="group">
   <div class="row"><label for="watch">Watch</label><select id="watch"></select></div>
   <div class="row"><label for="play">Play</label><select id="play"></select></div>
-  <div class="row"><span>Apps in the bar</span><label class="switch"><input type="checkbox" id="apps"><span></span></label></div>
-  <div class="row"><span>Dim when idle</span><label class="switch"><input type="checkbox" id="dim"><span></span></label></div>
-  <div class="seg" id="wallseg"><button data-w="auto" class="on">Follows sunset</button><button data-w="day">Day</button><button data-w="night">Night</button></div>
-  <div class="row"><label for="lat">Latitude</label><input id="lat" inputmode="decimal" placeholder="40.7"></div>
-  <div class="row"><label for="lon">Longitude</label><input id="lon" inputmode="decimal" placeholder="-74.0"></div>
+  <label class="row"><span>Apps in the bar</span><span class="switch"><input type="checkbox" id="apps"><span></span></span></label>
+  <label class="row"><span>Dim when idle</span><span class="switch"><input type="checkbox" id="dim"><span></span></span></label>
+  <div class="seg" id="wallseg"><button type="button" data-w="auto" class="on">Follows sunset</button><button type="button" data-w="day">Day</button><button type="button" data-w="night">Night</button></div>
+  <div class="row"><label for="lat">Latitude</label><input id="lat" inputmode="decimal" placeholder="from the time zone"></div>
+  <div class="row"><label for="lon">Longitude</label><input id="lon" inputmode="decimal" placeholder="from the time zone"></div>
 </div>
 <p class="foot">Watch and Play are the two inputs on the bar. The wallpaper follows sunset at this location (city level is plenty; without one, the TV's time zone is used).</p>
 
 <h2>Notifications</h2>
 <div class="group">
-  <div class="row"><span>Show on the TV</span><label class="switch"><input type="checkbox" id="notify"><span></span></label></div>
+  <label class="row"><span>Show on the TV</span><span class="switch"><input type="checkbox" id="notify"><span></span></span></label>
   <div class="row"><label for="npos">Position</label><select id="npos"><option value="">As sent</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="center">Center</option></select></div>
   <div class="row"><label for="nsize">Size</label><select id="nsize"><option value="">As sent</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
   <div class="row"><label for="ndur">On screen</label><select id="ndur"><option value="">As sent</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
-  <div class="row"><span>Pictures</span><label class="switch"><input type="checkbox" id="nimg"><span></span></label></div>
-  <div class="row"><span>Quiet hours</span><label class="switch"><input type="checkbox" id="nquiet"><span></span></label></div>
+  <label class="row"><span>Pictures</span><span class="switch"><input type="checkbox" id="nimg"><span></span></span></label>
+  <label class="row"><span>Quiet hours</span><span class="switch"><input type="checkbox" id="nquiet"><span></span></span></label>
   <div id="nquietrows" class="hidden">
     <div class="row"><label for="nqfrom">From</label><input type="time" id="nqfrom" value="22:00"></div>
     <div class="row"><label for="nqto">Until</label><input type="time" id="nqto" value="07:00"></div>
   </div>
   <div class="row"><label for="from">Also from</label><input id="from" placeholder="addresses, optional" autocapitalize="off"></div>
-  <div class="row btnrow" id="ntest" onclick="testNotice()">Send a test notification</div>
+  <button type="button" class="row btnrow" id="ntest" onclick="testNotice()">Send a test notification</button>
 </div>
 <p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. "As sent" keeps what each automation asks for. Pictures are camera snapshots and other images. In quiet hours notifications are dropped, not saved for later. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV. The test uses the settings on this page, before you save.</p>
 
 <div id="threadsec">
 <h2>Thread border router</h2>
 <div class="group">
-  <div class="row"><span>Border router</span><label class="switch"><input type="checkbox" id="thon"><span></span></label></div>
+  <label class="row"><span>Border router</span><span class="switch"><input type="checkbox" id="thon"><span></span></span></label>
   <div class="status"><span class="dot" id="thdot"></span><span id="thstate">Checking…</span></div>
-  <div class="seg" id="thseg"><button data-m="keep" class="on">Keep network</button><button data-m="ha">Home Assistant</button><button data-m="tlv">Paste dataset</button></div>
+  <div class="seg" id="thseg"><button type="button" data-m="keep" class="on">Keep network</button><button type="button" data-m="ha">Home Assistant</button><button type="button" data-m="tlv">Paste dataset</button></div>
   <div id="th-ha" class="hidden">
     <div class="row"><label for="haurl">Address</label><input id="haurl" placeholder="http://homeassistant.local:8123" autocapitalize="off" autocorrect="off"></div>
     <div class="row"><label for="hatoken">Token</label><input id="hatoken" type="password" placeholder="long-lived access token"></div>
-    <div class="row btnrow" id="hafetch" onclick="fetchHa()">Get Home Assistant's network</div>
+    <button type="button" class="row btnrow" id="hafetch" onclick="fetchHa()">Get Home Assistant's network</button>
   </div>
   <div id="th-tlv" class="hidden"><textarea id="tlv" placeholder="Active dataset (hex TLVs)" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>
 </div>
@@ -112,12 +113,12 @@ body.locked main,body.locked #save{display:none}
   <div class="row"><label for="port">Port</label><input id="port" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="1883"></div>
   <div class="row"><label for="user">Username</label><input id="user" autocapitalize="off" autocorrect="off" placeholder="optional"></div>
   <div class="row"><label for="password">Password</label><input id="password" type="password" placeholder="optional"></div>
-  <div class="row btnrow" id="test" onclick="testMqtt()">Test connection</div>
+  <button type="button" class="row btnrow" id="test" onclick="testMqtt()">Test connection</button>
 </div>
 <p class="foot">Your MQTT broker (Home Assistant's Mosquitto add-on, or your own). The TV appears in Home Assistant by itself. The password stays on the TV; leave it empty to keep the current one.</p>
 <div class="group" style="margin-top:14px">
   <div class="row"><span>Check volume and names every</span></div>
-  <div class="seg" id="updseg"><button data-u="2">2 s</button><button data-u="5">5 s</button><button data-u="10" class="on">10 s</button><button data-u="30">30 s</button><button data-u="60">1 min</button></div>
+  <div class="seg" id="updseg"><button type="button" data-u="2">2 s</button><button type="button" data-u="5">5 s</button><button type="button" data-u="10" class="on">10 s</button><button type="button" data-u="30">30 s</button><button type="button" data-u="60">1 min</button></div>
 </div>
 <p class="foot">Power, input and the app on screen are sent the moment they change. Volume, mute and input names are checked this often; longer saves the TV a little work. Temperature and picture settings: every minute.</p>
 
@@ -128,7 +129,7 @@ body.locked main,body.locked #save{display:none}
 <p class="foot">The TV's own name, the same as Settings › General › System Manager › Device Name: what phones, SmartThings, Bluetooth and Home Assistant show.</p>
 </main>
 
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 <button id="save" onclick="save()">Save</button>
 
 <script>
@@ -137,13 +138,15 @@ let code = '';  // typed on the code screen; never part of the address
 let threadMode = 'keep', haReady = false, wall = 'auto', update = 10;
 
 async function api(path, body) {
-  const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-Code': code, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  let r;
+  try { r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-Code': code, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { toast('Can\'t reach the TV. Is Advanced settings still open on it?'); throw e; }
   if (r.status === 403) { gate('That code did not match. Check the TV.'); throw new Error('code'); }
   if (r.status === 410) { toast('Closed on the TV. Open it again from Info › Advanced settings.'); throw new Error('closed'); }
   return r.json();
 }
-function gate(err) { document.body.classList.add('locked'); $('gate').classList.remove('hidden'); $('gateerr').textContent = err || ''; $('code').focus(); }
-function unlock() { code = $('code').value.replace(/\D/g, ''); if (code.length === 6) load(); }
+function gate(err) { document.body.classList.add('locked'); $('gate').classList.remove('hidden'); $('gateerr').textContent = err || ''; $('code').value = ''; $('code').focus(); }
+function unlock() { code = $('code').value.replace(/\D/g, ''); if (code.length === 6) load(); else $('gateerr').textContent = 'The code has 6 digits.'; }
 $('code').addEventListener('input', () => { if ($('code').value.replace(/\D/g, '').length === 6) unlock(); });
 function toast(text, ms) { const t = $('toast'); t.textContent = text; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms || 5000); }
 function dot(el, s) { el.className = 'dot' + (s === true ? ' ok' : s === false ? ' bad' : ''); }
@@ -172,9 +175,10 @@ function show(s) {
 async function load() {
   try { const s = await api('/api/state'); $('gate').classList.add('hidden'); document.body.classList.remove('locked'); show(s); } catch (e) {}
 }
-function setUpdate(u) { update = u; document.querySelectorAll('#updseg button').forEach(x => x.classList.toggle('on', +x.dataset.u === u)); }
+function pick(seg, on) { document.querySelectorAll(seg + ' button').forEach(x => { x.classList.toggle('on', on(x)); x.setAttribute('aria-pressed', on(x)); }); }
+function setUpdate(u) { update = u; pick('#updseg', x => +x.dataset.u === u); }
 document.querySelectorAll('#updseg button').forEach(b => b.onclick = () => setUpdate(+b.dataset.u));
-function setWall(w) { wall = w; document.querySelectorAll('#wallseg button').forEach(x => x.classList.toggle('on', x.dataset.w === w)); }
+function setWall(w) { wall = w; pick('#wallseg', x => x.dataset.w === w); }
 document.querySelectorAll('#wallseg button').forEach(b => b.onclick = () => setWall(b.dataset.w));
 function fillInputs(sel, list, value) {
   sel.innerHTML = '';
@@ -183,8 +187,7 @@ function fillInputs(sel, list, value) {
 }
 
 document.querySelectorAll('#thseg button').forEach(b => b.onclick = () => {
-  threadMode = b.dataset.m;
-  document.querySelectorAll('#thseg button').forEach(x => x.classList.toggle('on', x === b));
+  threadMode = b.dataset.m; pick('#thseg', x => x === b);
   $('th-ha').classList.toggle('hidden', threadMode !== 'ha'); $('th-tlv').classList.toggle('hidden', threadMode !== 'tlv');
 });
 

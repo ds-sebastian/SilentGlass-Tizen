@@ -29,7 +29,7 @@ public sealed partial class SilentGlass
         int h = 24 + inputs.Count * MenuRowH, x = Math.Clamp(BarItemCentre("inputs") - PopW / 2, 40, 1880 - PopW), y = BarTop - PopGap - h;
         popover = Glass(x, y, PopW, h, PopR); oLayer.Add(popover);
         foreach (var s in inputs) {
-            bool cur = s.Type == lastSource, off = s.Known && !s.Connected && !cur && !DeviceOn(s.Type), sub = s.Name != s.Port;
+            bool cur = s.Type == lastSource, off = inputsKnown && !s.Connected && !cur && !DeviceOn(s.Type), sub = s.Name != s.Port;
             var r = new MenuRow { Type = s.Type, Current = cur, Box = new View { Position2D = new Position2D(12, 12 + menu.Count * MenuRowH), Size2D = new Size2D(PopW - 24, MenuRowH), CornerRadius = Round(26), Opacity = off ? .45f : 1 } };
             r.Glyph = Sym(PortGlyph(s.Type, watchPort, playPort), 22, (MenuRowH - GlyphS) / 2, GlyphS); r.Box.Add(r.Glyph);
             r.Name = Label(s.Name, 80, sub ? 10 : 0, PopW - 24 - 80 - 110, sub ? 44 : MenuRowH, 30, White, "Semibold"); r.Box.Add(r.Name);

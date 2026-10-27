@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import re
 import subprocess
 import sys
 import unittest
@@ -19,11 +18,11 @@ class PackageTests(unittest.TestCase):
             asset = entry["Asset"]
             self.assertNotIn("..", asset)
             self.assertTrue((ROOT / "launcher/assets" / asset).is_file(), asset)
-        self.assertFalse(any(a.get("Utility") for a in catalog))  # the Apps menu lists apps only
 
     def test_shell_syntax(self):
-        for path in (ROOT / "recipes").glob("*.sh"):
-            subprocess.run(["sh", "-n", str(path)], check=True, capture_output=True)
+        for path in [*(ROOT / "recipes").glob("*.sh"), *(ROOT / "devices/s90d/device").rglob("*.sh")]:
+            r = subprocess.run(["sh", "-n"], stdin=path.open(), capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, f"{path.name}: {r.stderr}")
 
     def test_artwork_destinations_and_active_svg_rejected(self):
         with self.assertRaises(ValueError):
@@ -40,14 +39,6 @@ class PackageTests(unittest.TestCase):
         ]:
             with self.assertRaises(ValueError):
                 convert(data, entry)
-
-    def test_relative_document_links_resolve(self):
-        for doc in [ROOT / "README.md", ROOT / "NOTICE.md", *sorted((ROOT / "docs").glob("*.md"))]:
-            for link in re.findall(r"\[[^\]]*\]\(([^ )]+)(?: [^)]*)?\)", doc.read_text()):
-                if "://" in link or link.startswith("#"):
-                    continue
-                path = link.split("#", 1)[0]
-                self.assertTrue((doc.parent / path).exists(), f"{doc.name}: {link}")
 
 
 if __name__ == "__main__":

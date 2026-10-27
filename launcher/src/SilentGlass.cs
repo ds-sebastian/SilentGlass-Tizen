@@ -12,37 +12,40 @@ using Tizen.NUI;
 //               viewer, which keeps playing untouched; Menus.cs (Inputs, Apps), Panels.cs (Controls, Info),
 //               Setup.cs (phone setup sheet) all live in that window
 //  Notice.cs    notifications from Home Assistant and short toasts, in their own non-focusable window
-//  Tv.cs        the TV underneath (settings, inputs, picture, apps); Logic.cs and Qr.cs are NUI-free and tested off the TV
+//  Screen.cs    what is on screen (wallpaper, bar or nothing), NUI-free and run against a simulated TV (tests/screen-sim)
+//  Tv.cs        the TV underneath (settings, inputs, picture, apps); Cec.cs which devices are on
+//  Shared.cs    what SilentGlass and the Home Assistant bridge agree on; Logic.cs, Qr.cs and InfoStats.cs are tested off the TV
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42l";
+    public const string SelfId = Shared.Self, Viewer = Shared.Viewer, ModVersion = "v43a";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
-    Tizen.NUI.Timer minuteTimer;
+    Tizen.NUI.Timer tickTimer, privacyTimer;
 
     protected override void OnCreate()
     {
         base.OnCreate();
         ui = System.Threading.SynchronizationContext.Current;
         try { FontClient.Instance.AddCustomFontDirectory(Res + "fonts"); } catch { }
-        try { library = AppLibrary.Load(Res + "apps.json").FindAll(a => !a.Utility); } catch { }
-        if (!library.Exists(a => a.Id == "com.samsung.tv.csfs"))
-            library.Add(new LibraryApp { Name = "Samsung Home", Id = "com.samsung.tv.csfs", Asset = "tile-samsung-home.svg", Fit = "cover", Background = "#1C2638", Width = 640, Height = 360 });
+        try { library = AppLibrary.Load(Res + "apps.json"); } catch { }
+        if (!library.Exists(a => a.Id == Shared.SamsungHome))
+            library.Add(new LibraryApp { Name = "Samsung Home", Id = Shared.SamsungHome, Asset = "tile-samsung-home.svg", Background = "#1C2638", Width = 640, Height = 360 });
         try { SetRenderRefreshRate(1); } catch { }  // DALi draws every 2nd vsync here by default: 60 fps
         LoadPrefs();
         BuildBackdrop();  // hidden until there is nothing to draw over; never flashes over the picture
         EnsureOverlay();  // created while the app's main window is still up (as v31 did), so it can take focus later
         WatchTv(); WatchData();
-        minuteTimer = new Tizen.NUI.Timer(30000);
-        minuteTimer.Tick += (s, e) => { MinuteTick(); return true; };
-        minuteTimer.Start();
+        tickTimer = new Tizen.NUI.Timer(30000);
+        tickTimer.Tick += (s, e) => { Tick(); return true; };
+        tickTimer.Start();
         // started by the bridge only to show a notification: stay hidden, the picture stays in front
         if (NoticePending()) { HideBackdrop(); TakeNotice("start"); }
         Note("created");
-        var privacy = new Tizen.NUI.Timer(8000); privacy.Tick += (s, e) => { PrivacyStatus(); Note("privacy:" + privacyGaps); return false; }; privacy.Start(); privacyTimer = privacy;
+        privacyTimer = new Tizen.NUI.Timer(8000);
+        privacyTimer.Tick += (s, e) => { PrivacyStatus(); Note("privacy:" + privacyGaps); return false; };
+        privacyTimer.Start();
     }
-    Tizen.NUI.Timer privacyTimer;
     // AMD resumes us for every launch request; what to show is decided in OnAppControlReceived
     protected override void OnResume() { base.OnResume(); Note("resumed fg=" + Foreground()); }
     // The TV also pauses us whenever our main window is hidden - i.e. whenever only the overlay is up - so a pause
@@ -59,15 +62,13 @@ public sealed partial class SilentGlass : NUIApplication
         string stamp = ""; try { x.TryGet("__K_APP_LAUNCH_START_TIME", out stamp); } catch { }
         Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller) + " t=" + stamp + (keys.Length > 0 ? " [" + keys + "]" : ""));
         // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
-        if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }
-        if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
-        // from the bridge or Home Assistant: open one part directly
-        x.TryGet("sg_open", out string open);
-        screen.Home(open ?? "", "launch", stamp ?? "", x.TryGet("sg_self", out string _));
+        if (x.TryGet(Shared.ExtraNotice, out string _)) { TakeNotice("launch"); return; }
+        if (x.TryGet(Shared.ExtraSource, out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
+        // the Home button (or anyone opening one part directly): Screen.cs decides - the bar over the picture, the
+        // wallpaper behind it, or the picture first from Ambient
+        x.TryGet(Shared.ExtraOpen, out string open);
+        screen.Home(open ?? "", "launch", stamp ?? "", x.TryGet(Shared.ExtraSelf, out string _));
     }
-
-    // The Home button: Screen.cs decides (bar over the picture, the wallpaper behind it, or picture first from Ambient)
-    void Home(string open, string why) => screen.Home(open, why);
 
     // ---- keys: both windows route here ----
     long homeKeyAt = long.MinValue / 2;
@@ -120,7 +121,7 @@ public sealed partial class SilentGlass : NUIApplication
         OverlayKey(k, arrow);
     }
 
-    void MinuteTick()
+    void Tick()  // every 30 s
     {
         if (backdropShown) { UpdateClock(); CheckWallpaper(); IdleTick(); }
         if (overlayShown && mode == Mode.Bar && PortsChanged()) OpenBar(true);  // a renamed input fires no event
@@ -128,7 +129,7 @@ public sealed partial class SilentGlass : NUIApplication
 
     // ---- diagnostics for the Pi-side checks and the bridge's app sensor: /tmp/silentglass-state.txt. Coalesced
     // (one write per 600 ms at most, never on the key path). ----
-    const string StateFile = "/tmp/silentglass-state.txt";
+    const string StateFile = Shared.StateFile;
     Tizen.NUI.Timer stateTimer; string activity = "";
     readonly Queue<string> trail = new();  // the last few events, for diagnosing on the TV
     void Note(string what)
@@ -164,7 +165,7 @@ public sealed partial class SilentGlass : NUIApplication
         Put("focus", FocusName()); Put("key", lastKey); Put("key_count", keyCount);
         Put("key_ms_max", (keyTicksMax * 1000.0 / Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
         Put("source", lastSource); Put("signal", screen.Signal); Put("ports", watchPort + "," + playPort + "(" + prefs.Watch + "," + prefs.Play + ")");
-        Put("inputs", string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + (i.Known ? i.Connected ? "1" : "0" : "?"))));
+        Put("inputs", string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + (inputsKnown ? i.Connected ? "1" : "0" : "?"))));
         Put("prefs", Logic.FormatPrefs(prefs).Trim().Replace('\n', ','));
         Put("brightness", Setting("brightness")); Put("contrast", Setting("contrast")); Put("picturemode", Setting("picturemode"));
         Put("game", Setting("game-mode-auto")); Put("volume", volume);

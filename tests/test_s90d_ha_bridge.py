@@ -1,6 +1,8 @@
+"""The Home Assistant bridge: the rules in its source that matter on the TV, and the installer that carries it there.
+Its behaviour off the TV: tests/test_s90d_setup.py (the phone page) and tests/test_s90d_notice.py (notifications)."""
 import base64
-import lzma
 import hashlib
+import lzma
 import re
 import unittest
 from pathlib import Path
@@ -10,67 +12,64 @@ DIR = ROOT / "devices/s90d/device/ha-bridge"
 SRC = "\n".join(p.read_text() for p in sorted((DIR / "src").glob("*.cs")))
 
 
+def member(start, end):
+    return SRC[SRC.index(start):SRC.index(end, SRC.index(start))]
+
+
 class HaBridgeTests(unittest.TestCase):
     def test_commands_are_a_fixed_allowlist(self):
-        handler = SRC.split("static void OnMessage(")[1].split("static void LaunchApp(")[0]
+        handler = member("static void OnMessage(", "static void SetOption(")
         cases = {c for line in re.findall(r"case ([^:]+?)(?: when |:)", handler) for c in re.findall(r'"([a-z_0-9/]+)"', line)}
         self.assertEqual(cases, {"input/set", "home/press", "ambient/press", "resync/press", "thread_switch/set", "volume/set", "mute/set",
                                  "brightness/set", "contrast/set", "power/set", "picture_mode/set", "sound_mode/set", "sleep_timer/set",
                                  "sound_output/set", "game_mode/set", "notifications/set"})
         self.assertIn('Regex.Match(cmd, "^hdmi([1-4])_name/set$")', handler)  # the only other command: renaming a port
         self.assertNotIn("/bin/sh", SRC)  # no shell: launch_app, dbus-send and ot-ctl run directly
-        # input requests only for an input the TV lists, by exact name; options only from the TV's own lists
+        # inputs only by exact name from the TV's list; options only from the TV's own lists
         self.assertIn("Inputs().Where(i => i.Name == payload)", handler)
         self.assertIn("opts.Where(x => x.name == name)", SRC)
         # power: a virtual Power key, pressed only when the TV is not already in the requested state
-        self.assertIn('if ((payload == "ON") != ScreenOn) { PressPower();', handler)
+        self.assertRegex(handler, r'if \(\(payload == "ON"\) != ScreenOn\) \{ PressPower\(\);')
 
-    def test_names_are_written_to_the_default_slot(self):
+    def test_power_key_is_a_uinput_device_with_only_the_power_key(self):
+        self.assertIn('open("/dev/uinput", 1 | 2048)', SRC)
+        self.assertEqual(SRC.count("ioctl(fd, UiSetKeyBit,"), 1)  # it can press nothing but Power
+        self.assertIn("const int KeyPower = 116;", SRC)
+
+    def test_names_go_to_the_default_slot_and_resync_keeps_them(self):
         # index 0 is a separate, unused name slot: writes there never show up in the source list
         self.assertIn("const int Mbr = -2;", SRC)
-        self.assertIn("set_edit_name(12 + int.Parse(m.Groups[1].Value), name, Mbr)", SRC)
         self.assertNotRegex(SRC, r"set_edit_name\([^)]*, 0\)")
+        resync = member("static void ResyncNames()", "// ---- settings")
+        # a new detected name makes the TV reset the port's own name: put it back
+        self.assertRegex(resync, r"if \(ok && i\.Edit\.Length > 0\) kept = set_edit_name\(i\.Type, i\.Edit, Mbr\);")
+        # never clears a detected name while the TV (and its devices) are in standby
+        self.assertIn('on ? "" : i.Detected', resync)
+        self.assertNotRegex(SRC, r"\"input_\"|input_\d")  # input names come from the TV, not the config
 
     def test_source_list_cache_is_kept_current(self):
         # without a GLib loop the library never sees the change signals and renames stay invisible to the bridge
         self.assertIn("register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero);", SRC)
         self.assertIn("g_main_loop_run(g_main_loop_new(IntPtr.Zero, false));", SRC)
 
-    def test_power_key_is_a_uinput_device_with_only_the_power_key(self):
-        self.assertIn('open("/dev/uinput", 1 | 2048)', SRC)
-        self.assertEqual(SRC.count("ioctl(fd, UiSetKeyBit,"), 1)  # it can press nothing but Power
-        self.assertIn("const int KeyPower = 116;", SRC)
-        self.assertFalse((DIR / "ha-power-automation.yaml").exists())  # no Home Assistant automation needed
-
-    def test_input_names_come_from_the_tv(self):
-        self.assertNotRegex(SRC, r"\"input_\"|input_\d")  # no config labels
-        self.assertIn('i.Name = i.Edit.Length > 0 ? i.Edit : i.Detected.Length > 0 ? i.Detected : i.Port;', SRC)
-        # changing a detected name makes the TV reset the port's own name: resync must restore it
-        self.assertIn("if (ok && i.Edit.Length > 0) kept = set_edit_name(i.Type, i.Edit, Mbr);", SRC)
-        # resync never clears a detected name while the TV (and its devices) are in standby
-        self.assertIn('string want = live.TryGetValue(i.Type, out var n) ? n : on ? "" : i.Detected;', SRC)
-
-    def test_thread_switch_works_like_the_info_switch(self):
-        # the marker gates the units; the trigger file is what quiet-otbr-switch.path watches
-        self.assertIn('Data + "/thread-off"', SRC)
-        self.assertIn('Data + "/thread-switch"', SRC)
-        watched = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-switch.path").read_text()
-        self.assertIn("bixby-promotion/data/thread-switch", watched)
-
-    def test_launcher_accepts_source_requests_only_for_listed_inputs(self):
-        home = (ROOT / "launcher/src/SilentGlass.cs").read_text()
-        self.assertIn('if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }', home)
-
     def test_availability_uses_a_retained_last_will(self):
         self.assertIn('Base + "/availability", "offline"', SRC)
         self.assertIn("0x02 | 0x04 | 0x20", SRC)  # clean session, will flag, will retain
+        self.assertNotIn("Timeout.Infinite", member("public Mqtt(", "static void Str("))  # a silent broker is noticed
+
+    def test_notifications_never_wake_the_tv_and_come_only_from_home_assistant(self):
+        handle = member("static string HandleNotice(", "public static Dictionary<string, byte[]> ParseMultipart(")
+        for why in ('!ScreenOn ? "the TV is off"', 'Shared.IsAmbient(fg) ? "Ambient is on"', "!test && !NoticesOn", "!test && InQuietHours("):
+            self.assertIn(why, handle)
+        self.assertNotIn("PressPower", handle)
+        # SilentGlass is started only over the TV viewer (it would push another app to the background)
+        self.assertIn("if (onScreen != Shared.Viewer && fg != Shared.Self)", handle)
+        self.assertIn("if (!NoticeAllowed(peer))", SRC)
+        self.assertIn('conf.GetValueOrDefault("host", "") + "," + conf.GetValueOrDefault("notify_from", "")', SRC)
 
     def test_installer_ships_the_built_bridge_and_no_credentials(self):
         inst = (DIR / "ha-bridge-install.sh").read_text()
-        for dest in ("$Q/silentglass-ha.runtimeconfig.json", "$UD/$N"):
-            self.assertIn(dest + '.new" <<', inst)
-        # the DLL travels xz-packed: the TV runner takes at most 64 KiB per command
-        self.assertIn('base64 -d <<\'B64_EOF\' | xz -dc > "$Q/silentglass-ha.dll.new"', inst)
+        self.assertIn('base64 -d <<\'B64_EOF\' | xz -dc > "$Q/silentglass-ha.dll.new"', inst)  # xz: the TV runner takes 64 KiB
         self.assertLess(len(inst.encode()), 64 * 1024)
         self.assertIn("N=silentglass-ha.service", inst)
         blocks = re.findall(r"<<'B64_EOF'[^\n]*\n(.*?)\nB64_EOF\n\[ \"\$\(sha256sum [^)]*\)\" = ([0-9a-f]{64}) \]", inst, re.S)
@@ -85,8 +84,12 @@ class HaBridgeTests(unittest.TestCase):
         self.assertNotIn("User=", unit)  # owner session, never root
         example = (DIR / "silentglass-ha.conf.example").read_text()
         self.assertIn("password=change-me", example)
-        self.assertNotIn("input_", example)
         self.assertFalse(re.search(r"10\.3\.26\.", inst + example))
+
+    def test_thread_switch_is_the_file_the_path_unit_watches(self):
+        watched = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-switch.path").read_text()
+        self.assertIn("bixby-promotion/data/thread-switch", watched)
+        self.assertIn('ThreadSwitch = "thread-switch"', (ROOT / "launcher/src/Shared.cs").read_text())
 
 
 if __name__ == "__main__":

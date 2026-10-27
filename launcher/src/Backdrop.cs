@@ -67,7 +67,7 @@ public sealed partial class SilentGlass
         if (f == Viewer && overlayShown && !backdropShown) { ow.Raise(); try { ow.Activate(); } catch { } return; }
         if (f != SelfId || backdropShown || mainUp) return;
         int g = ++placeholderGen;
-        ((IScreen)this).After(400, () => {
+        After(400, () => {
             if (g != placeholderGen || backdropShown || mainUp || Foreground() != SelfId) return;
             Note("placeholder:viewer"); Launch(Viewer);
         });

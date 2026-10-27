@@ -4,16 +4,9 @@ using System.Globalization;
 using System.Text.Json;
 
 // SilentGlass logic with no NUI types, so tests/CatalogTests.cs runs it off the TV: preferences, Watch / Play input
-// choices, the TV's Game Mode names, notification layout and sunrise / sunset for the wallpaper.
+// choices, which devices are on (HDMI-CEC), notification layout and sunrise / sunset for the wallpaper.
 public static class Logic
 {
-    // ---- key=value text (preferences, small status files) ----
-    public static Dictionary<string, string> ParseConf(string text)
-    {
-        var d = new Dictionary<string, string>();
-        foreach (var line in (text ?? "").Split('\n')) { int i = line.IndexOf('='); if (i > 0) d[line.Substring(0, i).Trim()] = line.Substring(i + 1).Trim(); }
-        return d;
-    }
     public static bool Flag(Dictionary<string, string> c, string key, bool fallback) => c.TryGetValue(key, out var v) ? v == "1" : fallback;
     public static double Num(Dictionary<string, string> c, string key, double fallback) =>
         c.TryGetValue(key, out var v) && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double n) && double.IsFinite(n) ? n : fallback;
@@ -34,9 +27,6 @@ public static class Logic
         public long Long(string key) => long.TryParse(this[key], out var n) ? n : 0;
     }
 
-    // ---- preferences (the app's data directory, so they survive reboots); unknown keys keep their defaults ----
-    public const int Hdmi1 = 13, Hdmi4 = 16;
-    public static bool IsHdmi(int type) => type >= Hdmi1 && type <= Hdmi4;
     // ---- which inputs have a device that is on, from HDMI-CEC (Cec.cs): a player the TV lists on that port. CEC drops
     // a device that sleeps. Plugged straight into the TV it must also not answer "standby" to the port's power query;
     // behind a receiver (soundbar) that query answers for the receiver, so being listed is the signal. ----
@@ -48,9 +38,10 @@ public static class Logic
             if (type.StartsWith("AUDIO")) receivers.Add(port); else if (!players.Contains(port)) players.Add(port);
         }
         foreach (int p in players)
-            if (receivers.Contains(p) || power(p) is not (1 or 3)) on.Add(Hdmi1 - 1 + p);
+            if (receivers.Contains(p) || power(p) is not (1 or 3)) on.Add(Shared.Hdmi1 - 1 + p);
         return on;
     }
+    // ---- preferences (silentglass-prefs.txt in the data directory, so they survive reboots); unknown keys keep their defaults ----
     public sealed class Prefs
     {
         public int Watch, Play;            // 0 = Automatic (by the TV's input name)
@@ -65,8 +56,8 @@ public static class Logic
     public static readonly string[] WallModes = { "auto", "day", "night" };
     public static Prefs ParsePrefs(string text)
     {
-        var c = ParseConf(text);
-        int Port(string k) => c.TryGetValue(k, out var v) && int.TryParse(v, out int n) && (n == 0 || IsHdmi(n)) ? n : 0;
+        var c = Shared.ParseConf(text);
+        int Port(string k) => c.TryGetValue(k, out var v) && int.TryParse(v, out int n) && (n == 0 || Shared.IsHdmi(n)) ? n : 0;
         return new Prefs { Watch = Port("watch"), Play = Port("play"), HideApps = Flag(c, "hideapps", false), Dim = Flag(c, "dim", true),
             Wall = Pick(c, "wall", "auto", WallModes), Lat = Math.Clamp(Num(c, "lat", DefaultLat), -90, 90), Lon = Math.Clamp(Num(c, "lon", DefaultLon), -180, 180) };
     }
@@ -79,13 +70,11 @@ public static class Logic
     // Watch / Play: dir +1 cycles Automatic -> HDMI 1..4 -> Automatic (dir -1 backwards), skipping the other one's input
     public static int NextPort(int current, int other, int dir = 1)
     {
+        const int first = Shared.Hdmi1, last = Shared.Hdmi4;
         int n = current;
-        do n = dir >= 0 ? (n == 0 ? Hdmi1 : n >= Hdmi4 ? 0 : n + 1) : (n == 0 ? Hdmi4 : n <= Hdmi1 ? 0 : n - 1); while (n != 0 && n == other);
+        do n = dir >= 0 ? (n == 0 ? first : n >= last ? 0 : n + 1) : (n == 0 ? last : n <= first ? 0 : n - 1); while (n != 0 && n == other);
         return n;
     }
-
-    // ---- the TV's one Game Mode setting (Off / On / Auto) in plain words ----
-    public static string GameName(string tvName) => tvName switch { "Auto" => "Automatic", "On" => "Always", "Off" => "Never", _ => tvName };
 
     // ---- notification banner geometry (tools/overlay_mockup.py draws the same) ----
     public const int NoticeMargin = 56;

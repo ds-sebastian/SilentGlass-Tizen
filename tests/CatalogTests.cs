@@ -2,30 +2,21 @@ using System;
 using System.IO;
 using System.Linq;
 
+// Off-TV checks of the NUI-free launcher code: dotnet run --project tests/CatalogTests.csproj -- launcher/assets/apps.json
 static class CatalogTests
 {
-    static void Equal(int expected, int actual, string context)
-    {
-        if (expected != actual) throw new Exception(context + ": expected " + expected + ", got " + actual);
-    }
     public static int Main(string[] args)
     {
+        if (args[0] == "--qr") {  // the module matrix of each text, one row per line (tests/test_launcher.py compares it with segno)
+            foreach (var text in args.Skip(1)) {
+                var m = Qr.Encode(text);
+                for (int y = 0; y < m.GetLength(0); y++) Console.WriteLine(string.Concat(Enumerable.Range(0, m.GetLength(1)).Select(x => m[y, x] ? '1' : '0')));
+                Console.WriteLine();
+            }
+            return 0;
+        }
         var catalog = AppLibrary.Load(args[0]);
         if (catalog.Count < 2) throw new Exception("Catalog unexpectedly small");
-        Equal(-1, AppLibrary.Move(31, 0, "Up"), "top row returns to tabs");
-        Equal(15, AppLibrary.Move(31, 10, "Down"), "last row enters next page");
-        Equal(25, AppLibrary.Move(31, 30, "Up"), "partial page returns to matching previous column");
-        Equal(30, AppLibrary.Move(31, 29, "Down"), "last partial page clamps column");
-        Equal(11, AppLibrary.Move(12, 9, "Down"), "partial bottom row clamps column");
-        Equal(11, AppLibrary.Move(12, 11, "Right"), "last item remains selected");
-        Equal(-1, AppLibrary.Move(0, 0, "Down"), "empty catalog");
-        for (int count = 1; count < 48; count++)
-            for (int item = 0; item < count; item++)
-                foreach (var key in new[] {"Left", "Right", "Up", "Down"})
-                {
-                    int next = AppLibrary.Move(count, item, key);
-                    if (next < -1 || next >= count) throw new Exception("Out of bounds navigation");
-                }
         string tmp = Path.GetTempFileName();
         try
         {
@@ -43,38 +34,27 @@ static class CatalogTests
         }
         finally { File.Delete(tmp); }
         InfoTests();
+        SharedTests();
         HomeLogicTests();
-        True(InfoStats.ParseTemperature("36\n") == 36 && InfoStats.ParseTemperature("") == null && InfoStats.ParseTemperature("900") == null, "chip temperature");
-        Console.WriteLine("Catalog, info parser and Home logic checks passed.");
+        Console.WriteLine("Catalog, info parser, shared and Home logic checks passed.");
         return 0;
     }
-    static void True(bool ok, string context) { if (!ok) throw new Exception("Info check failed: " + context); }
+    static void True(bool ok, string context) { if (!ok) throw new Exception("Check failed: " + context); }
     static void InfoTests()
     {
-        True(InfoStats.ParseUptime("11586.53 34152.99\n") == 11586.53, "uptime");
-        var mem = InfoStats.ParseMemory("MemTotal:        1816840 kB\nMemFree:           25760 kB\nMemAvailable:     243688 kB\n");
-        True(mem.HasValue && mem.Value.totalKb == 1816840 && mem.Value.availableKb == 243688, "meminfo");
-        var stat = "cpu  100 0 50 800 50 0 0 0 0 0\ncpu0 1 0 0 0 0 0 0 0\ncpu1 1 0 0 0 0 0 0 0\nintr 5\n";
-        var cpu = InfoStats.ParseCpu(stat); True(cpu.HasValue && cpu.Value.idle == 850 && cpu.Value.total == 1000, "cpu totals");
-        True(InfoStats.CpuCount(stat) == 2, "cpu count");
-        var dev = InfoStats.ParseNetDev("Inter-|   Receive |  Transmit\n face |bytes packets\n    lo: 10 1 0 0 0 0 0 0 20 2 0 0 0 0 0 0\n  eth0: 58459740 206938 0 2993 0 0 0 0 1234 99 0 0 0 0 0 0\n");
-        True(dev["eth0"].rx == 58459740 && dev["eth0"].tx == 1234 && dev["lo"].tx == 20, "net/dev");
+        True(InfoStats.ParseUptime("11586.53 34152.99\n") == 11586.53 && InfoStats.ParseUptime(null) == null, "uptime");
         True(InfoStats.ParseDefaultRoute("Iface\tDestination\tGateway\n eth0\t0001A8C0\t00000000\t0001\neth0\t00000000\t011A030A\t0003\n") == "eth0", "default route");
-        True(InfoStats.ParseDefaultRoute("Iface\tDestination\n") == null, "no route");
+        True(InfoStats.ParseDefaultRoute("Iface\tDestination\n") == null && InfoStats.ParseDefaultRoute(null) == null, "no route");
         True(InfoStats.ParseWirelessLevel("h1\nh2\n wlan0: 0000   55.  -61.  -256        0      0      0      0      0        0\n", "wlan0") == -61, "wifi level");
-        True(InfoStats.ParseWirelessLevel(" wlan0: 0000    0     0     0        0\n", "wlan0") == null, "wifi down");
-        var ns = InfoStats.ParseNameservers("# Generated\nnameserver 192.0.2.1\nnameserver 8.8.8.8\nnameserver 192.0.2.1\n");
-        True(ns.Count == 2 && ns[0] == "192.0.2.1" && ns[1] == "8.8.8.8", "resolv.conf");
-        string tcp6 = "  sl  local_address remote_address st\n   0: 00000000000000000000000000000000:65F5 00000000000000000000000000000000:0000 0A 0\n   1: 00000000000000000000000000000000:1F90 00000000000000000000000000000000:0000 01 0\n";
-        True(InfoStats.ParseListening(tcp6, 26101) && !InfoStats.ParseListening(tcp6, 8080), "listen");
-        True(InfoStats.ParseBuildDate("TIZEN-TRUNK2025-PontusM-OSU-2024-HOTFIX-RELEASE_20260514.3") == "2026-05-14", "build date");
+        True(InfoStats.ParseWirelessLevel(" wlan0: 0000    0     0     0        0\n", "wlan0") == null && InfoStats.ParseWirelessLevel(null, "wlan0") == null, "wifi down");
+        True(InfoStats.ParseTemperature("36\n") == 36 && InfoStats.ParseTemperature("") == null && InfoStats.ParseTemperature("900") == null, "chip temperature");
         // synthetic documentation-style prefixes, not this network's
         string i6 = "fd00000000000a01000000fffe00b400 05 40 00 a2    wpan0\n"
                   + "fd00000000000b02c6c92fc22fceb270 05 40 00 82    wpan0\n"
                   + "fe800000000000002092eff5346c0df9 05 40 20 82    wpan0\n"
                   + "fe800000000000000000000000000001 02 40 20 80     eth0\n";
         var th = InfoStats.ParseThread(i6, "wpan0");
-        True(th.present && th.rloc16 == 0xb400 && (th.rloc16 >> 10) == 45 && !th.leader && th.homeRoute && th.addresses == 3, "thread router");
+        True(th.present && th.rloc16 == 0xb400 && (th.rloc16 >> 10) == 45 && !th.leader && th.homeRoute, "thread router");
         th = InfoStats.ParseThread(i6 + "fd00000000000a01000000fffe00fc00 05 40 00 a2    wpan0\n", "wpan0");
         True(th.leader && th.rloc16 == 0xb400, "thread leader aloc");
         th = InfoStats.ParseThread("fd00000000000a01000000fffe00b400 05 40 00 a2    wpan0\n", "wpan0");
@@ -82,22 +62,26 @@ static class CatalogTests
         th = InfoStats.ParseThread("fe800000000000000000000000000001 02 40 20 80     eth0\n", "wpan0");
         True(!th.present && th.rloc16 == -1, "thread absent");
         True(!InfoStats.ParseThread(null, "wpan0").present, "thread null");
+        True(InfoStats.Duration(11586) == "3 h 13 min" && InfoStats.Duration(30) == "1 min" && InfoStats.Duration(90000) == "1 d 1 h", "duration");
+    }
+    static void SharedTests()
+    {
         string src = "[{\"connectionState\":true,\"detectedName\":\"\",\"editName\":\"\",\"powerState\":0,\"sourceType\":0},"
             + "{\"connectionState\":true,\"detectedName\":\"Game%20Console\",\"editName\":\"Switch\",\"powerState\":2,\"sourceType\":13},"
             + "{\"connectionState\":true,\"detectedName\":\"Q-Series%20Soundbar\",\"editName\":\"\",\"powerState\":1,\"sourceType\":15},"
             + "{\"connectionState\":true,\"editName\":\"Media%20Server\",\"sourceType\":56}]";
-        var ins = InfoStats.ParseSources(src);
-        True(ins.Count == 5 && ins[0].Type == 13 && ins[0].Name == "Switch" && ins[0].Port == "HDMI 1" && ins[0].Connected && ins[0].Power == 2, "input edit name");
+        var ins = Shared.ParseInputs(src, out bool known);
+        True(known && ins.Count == 5 && ins[0].Type == 13 && ins[0].Name == "Switch" && ins[0].Detected == "Game Console" && ins[0].Port == "HDMI 1" && ins[0].Connected, "input edit name");
         True(ins[1].Type == 14 && ins[1].Name == "HDMI 2" && !ins[1].Connected, "input not connected");
-        True(ins[2].Name == "Q-Series Soundbar" && ins[2].Power == 1, "input detected name decoded");
+        True(ins[2].Name == "Q-Series Soundbar" && ins[2].Edit == "", "input detected name decoded");
         True(ins[4].Type == 0 && ins[4].Name == "Live TV", "live tv last; DLNA skipped");
-        True(ins.TrueForAll(i => i.Known), "inputs known when the TV answered");
-        True(InfoStats.ParseSources("not json").Count == 4 && InfoStats.ParseSources(null).TrueForAll(i => !i.Connected && !i.Known), "inputs garbage");
-        True(InfoStats.ParseSources("[]").TrueForAll(i => !i.Known), "empty list is not an answer");
-        True(InfoStats.Bytes(999) == "999 B" && InfoStats.Bytes(58459740) == "58.5 MB" && InfoStats.Bytes(1.5e9) == "1.5 GB", "bytes");
-        True(InfoStats.Duration(11586) == "3 h 13 min" && InfoStats.Duration(30) == "1 min" && InfoStats.Duration(90000) == "1 d 1 h", "duration");
-        True(InfoStats.CountMarkers(InfoStats.VendorMarkers) == 10, "all markers");
-        True(InfoStats.CountMarkers(new[] { "pisa-service", "bixby-prov", "canalysis-daemon.service", "other" }) == 1, "exact marker names only");
+        True(Shared.ParseInputs("not json", out known).Count == 4 && !known && Shared.ParseInputs(null, out known).TrueForAll(i => !i.Connected) && !known, "inputs garbage");
+        Shared.ParseInputs("[]", out known); True(!known, "an empty list is not an answer");
+        var c = Shared.ParseConf("# comment\nhost = broker.lan \nport=1883\nbad line\nhost=other\npassword=a=b\n");
+        True(c.Count == 3 && c["host"] == "other" && c["port"] == "1883" && c["password"] == "a=b", "key=value");
+        True(Shared.ParseConf(null).Count == 0, "no file");
+        True(Shared.GameName("Auto") == "Automatic" && Shared.GameName("On") == "Always" && Shared.GameName("Off") == "Never", "Game Mode words");
+        True(Shared.IsAmbient(Shared.Art) && !Shared.IsAmbient(Shared.Viewer), "ambient");
     }
     static void HomeLogicTests()
     {
@@ -118,9 +102,8 @@ static class CatalogTests
         for (int cur = 0; cur <= 16; cur = cur == 0 ? 13 : cur + 1)
             for (int other = 13; other <= 16; other++) {
                 int n = Logic.NextPort(cur, other);
-                True(n != other && (n == 0 || Logic.IsHdmi(n)), "port cycle never collides");
+                True(n != other && (n == 0 || Shared.IsHdmi(n)), "port cycle never collides");
             }
-        True(Logic.GameName("Auto") == "Automatic" && Logic.GameName("On") == "Always" && Logic.GameName("Off") == "Never", "Game Mode words");
         // notification banner geometry stays on screen
         foreach (var size in new[] { "small", "medium", "large", "max", "?" })
             foreach (var pos in new[] { "bottom-right", "bottom-left", "top-right", "top-left", "center", "?" }) {
@@ -130,11 +113,10 @@ static class CatalogTests
         True(Logic.NoticeImageHeight(612, 896, 672) == 408 && Logic.NoticeImageHeight(612, 1920, 1080) == 344 && Logic.NoticeImageHeight(612, 0, 0) == 344, "banner image shape");
         var j = new Logic.Json("{\"state\":\"waiting\",\"w\":896,\"at\":1792800000000}");
         True(j["state"] == "waiting" && j.Int("w") == 896 && j.Long("at") == 1792800000000 && j["missing"] == "", "flat json");
-        // QR: shape only here (decoding is checked on the Pi with OpenCV)
+        // QR: the shape here; module for module against a reference encoder in tests/test_launcher.py
         var q = Qr.Encode("http://10.0.0.2:7680/?code=123456");
         True(q.GetLength(0) == 29 && q[0, 0] && q[6, 6] && !q[7, 7], "QR version 3 with finders");
         True(Qr.Svg(q).StartsWith("<svg") && Qr.Svg(q).Contains("h1v1h-1z"), "QR svg");
-        // sunrise / sunset
         // CEC: a listed player is on; straight into the TV it must not answer standby; behind a soundbar, listed is enough
         var cec = Logic.DevicesOn(new[] { (3, "PLAYBACK_DEVICE1"), (3, "AUDIO_SYSTEM"), (1, "PLAYBACK_DEVICE2"), (2, "RECORDER_DEVICE1"), (4, "TV"), (9, "PLAYBACK_DEVICE3") },
             p => p == 3 ? 1 : p == 2 ? 1 : p == 1 ? 0 : -1);

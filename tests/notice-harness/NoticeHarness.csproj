@@ -1,13 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Off-TV check of the bridge's notification endpoint: serves ONE request on 127.0.0.1:7676 with the bridge's own
-       reader/parser and prints what SilentGlass would get. Driven by tests/test_s90d_notice.py with Home Assistant's
-       notifications-android-tv 0.1.5 client. -->
+  <!-- Off-TV check of the bridge's notification endpoint: serves requests on 127.0.0.1:7676 with the bridge's own
+       reader/parser and prints what SilentGlass would get. Built and driven by tests/test_s90d_notice.py with Home
+       Assistant's notifications-android-tv 0.1.5 client. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>disable</Nullable>
     <StartupObject>NoticeHarness</StartupObject>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../devices/s90d/device/ha-bridge/src/*.cs" /><EmbeddedResource Include="../../devices/s90d/device/ha-bridge/src/setup.html" LogicalName="setup.html" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="Harness.cs" />
+    <Compile Include="../../devices/s90d/device/ha-bridge/src/*.cs" />
+    <Compile Include="../../launcher/src/Shared.cs" />
+    <EmbeddedResource Include="../../devices/s90d/device/ha-bridge/src/setup.html" LogicalName="setup.html" />
+  </ItemGroup>
 </Project>

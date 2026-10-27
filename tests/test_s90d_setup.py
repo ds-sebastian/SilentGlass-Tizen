@@ -10,7 +10,7 @@ DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet") or "dotnet"
 
 
 class FakeBroker:
-    """Accepts MQTT CONNECT; refuses with code 4 when the password is 'wrong'. Records client ids and credentials."""
+    """Accepts MQTT CONNECT; refuses with code 4 (after a second) when the password is 'wrong'. Records client ids and credentials."""
     def __init__(self):
         self.sock = socket.socket(); self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("127.0.0.1", 0)); self.sock.listen(8); self.port = self.sock.getsockname()[1]
@@ -40,6 +40,7 @@ class FakeBroker:
             user = s() if flags & 128 else None
             pw = s() if flags & 64 else None
             self.connects.append((cid, user, pw))
+            if pw == "wrong": time.sleep(1)  # a broker on the network takes a moment to refuse
             c.sendall(bytes([0x20, 2, 0, 4 if pw == "wrong" else 0]))
             while c.recv(64): pass
         except Exception: pass
@@ -158,6 +159,17 @@ class SetupPageTests(unittest.TestCase):
         st, page = self.api("/")
         self.assertIn(b"Advanced settings", page); self.assertIn(b"z-index:10", page)
         self.assertNotIn(b"location.search", page)  # the code is never read from the address
+
+    def test_new_settings_report_their_own_outcome(self):
+        # connected first; then a wrong password must not be reported with the old connection's "Connected"
+        code = self.open_page()
+        good = {"host": "127.0.0.1", "port": str(self.broker.port), "user": "tv", "password": "secret", "notifications": True, "thread": "keep"}
+        r = json.loads(self.api("/api/save", good, code)[1])
+        self.assertTrue(r["ok"], r); self.assertIn("Connected", r["message"])
+        r = json.loads(self.api("/api/save", dict(good, password="wrong"), code)[1])
+        self.assertFalse(r["ok"], r); self.assertIn("wrong username or password", r["message"])
+        self.assertIn("mqtt=error", (self.data / "bridge-status.txt").read_text())
+        self.assertEqual(self.status()["state"], "error")
 
     def test_wrong_codes_close_the_page(self):
         code = self.open_page(); wrong = "%06d" % ((int(code) + 1) % 1000000)

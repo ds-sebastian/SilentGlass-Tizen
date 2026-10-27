@@ -98,13 +98,12 @@ public sealed partial class SilentGlass
     void ChangeVolume(int dir) { if (sound_manager_get_master_volume(out int n) == 0) sound_manager_set_master_volume(Math.Clamp(n + dir, 0, 100)); RefreshSettings(); }
     void ToggleMute() { if (sound_manager_get_master_mute(out int n) == 0) sound_manager_set_master_mute(n == 1 ? 0 : 1); RefreshSettings(); }
 
-    // ---- inputs: Samsung's source list (names, connected) and the current source, pushed by the TV.
-    // The source list's powerState is never used: devices behind the soundbar report Off. A device is on when the
-    // input on screen has a picture (memory/tv-viewer/mainscreen_signal_state) or HDMI-CEC lists it (Logic.DevicesOn),
-    // read in the background when the bar or Inputs opens. ----
+    // ---- inputs: Samsung's source list (Shared.ParseInputs) and the current source, pushed by the TV. A device is on
+    // when the input on screen has a picture (memory/tv-viewer/mainscreen_signal_state) or HDMI-CEC lists it
+    // (Logic.DevicesOn), read in the background when the bar or Inputs opens. ----
     const string SignalKey = "memory/tv-viewer/mainscreen_signal_state", SourceKey = "memory/system/source_type", ForegroundKey = "memory/appfw/current_fullscreen_appid";
     const string PmKey = "memory/pm/state";  // 1 on, 2 dim, 3 screen off, 4 standby
-    List<InfoStats.InputSource> inputs = new();
+    List<Shared.Input> inputs = new(); bool inputsKnown;
     int watchPort = 15, playPort = 13;
     // what is on screen (wallpaper / bar / nothing) is decided in Screen.cs; it keeps the current input and the
     // settled signal flag
@@ -125,7 +124,7 @@ public sealed partial class SilentGlass
         } catch { }
         RefreshInputs(); screen.Start(); ResolvePorts();
     }
-    void RefreshInputs() => inputs = InfoStats.Sources();
+    void RefreshInputs() => inputs = InfoStats.Inputs(out inputsKnown);
     // devices that are on (input types), from CEC; refreshed off the UI thread, at most every 1.5 s
     HashSet<int> devicesOn = new(); string cecSig = ""; bool cecBusy; long cecAt = -10000;
     bool DeviceOn(int type) => type == lastSource && HasPicture || devicesOn.Contains(type);
@@ -149,11 +148,11 @@ public sealed partial class SilentGlass
     }
     void OnInputsChanged(bool announce)
     {
-        var before = inputs; RefreshInputs(); ResolvePorts();
-        if (announce)
+        var before = inputs; bool knew = inputsKnown; RefreshInputs(); ResolvePorts();
+        if (announce && knew && inputsKnown)
             foreach (var now in inputs) {
                 var was = before.Find(i => i.Type == now.Type);
-                if (was != null && was.Known && now.Known && was.Connected != now.Connected) { Toast(now.Name + (now.Connected ? " connected" : " unplugged")); break; }
+                if (was != null && was.Connected != now.Connected) { Toast(now.Name + (now.Connected ? " connected" : " unplugged")); break; }
             }
         OnTvChanged();
     }
@@ -163,8 +162,8 @@ public sealed partial class SilentGlass
         watchPort = prefs.Watch != 0 ? prefs.Watch : PortNamed("shield", 15);
         playPort = prefs.Play != 0 ? prefs.Play : PortNamed("switch", 13);
     }
-    int PortNamed(string word, int fallback) { var m = inputs.Find(i => i.Known && Logic.IsHdmi(i.Type) && i.Name.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0); return m != null ? m.Type : fallback; }
-    string InputName(int type) { var i = inputs.Find(x => x.Type == type); return i != null && i.Known && !string.IsNullOrWhiteSpace(i.Name) ? i.Name : type == 0 ? "Live TV" : "HDMI " + (type - 12); }
+    int PortNamed(string word, int fallback) => inputs.Find(i => Shared.IsHdmi(i.Type) && i.Name.Contains(word, StringComparison.OrdinalIgnoreCase))?.Type ?? fallback;
+    string InputName(int type) => inputs.Find(i => i.Type == type)?.Name ?? (type == 0 ? "Live TV" : "HDMI " + (type - 12));
     string PortChoice(int chosen, int resolved) => chosen == 0 ? "Auto · " + InputName(resolved) : InputName(chosen);
     void CyclePort(bool watch, int dir)
     {
@@ -185,7 +184,7 @@ public sealed partial class SilentGlass
                 if (r == 0) r = app_control_add_extra_data(c, "__K_EX_FORCE_BOOST", "enable");
                 if (r == 0) r = app_control_add_extra_data(c, "__K_SPLASH_SCREEN", "LA_UI_VR_TRANSPARENT");
             }
-            if (r == 0 && id == SelfId) r = app_control_add_extra_data(c, "sg_self", "1");
+            if (r == 0 && id == SelfId) r = app_control_add_extra_data(c, Shared.ExtraSelf, "1");
             if (r == 0) r = app_control_send_launch_request(c, IntPtr.Zero, IntPtr.Zero);
             Note("launch:" + id + (menuItem == null ? "" : ":" + menuItem) + ":" + r);
         } finally { app_control_destroy(c); }
@@ -195,24 +194,22 @@ public sealed partial class SilentGlass
 
     // ---- switches shared through the data directory (the bridge and the owner's systemd units read them) ----
     static string DataFile(string name) => Path.Combine(Tizen.Applications.Application.Current.DirectoryInfo.Data, name);
-    const string ThreadUnits = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    static bool ThreadInstalled => File.Exists(ThreadUnits);
-    static bool ThreadOn => !File.Exists(DataFile("thread-off"));
-    // switched from the phone page or Home Assistant (the bridge writes thread-off / thread-switch)
-    static bool NoticesOn => !File.Exists(DataFile("notify-off"));
-    void SetNotices(bool on) { try { if (on) File.Delete(DataFile("notify-off")); else File.WriteAllText(DataFile("notify-off"), ""); } catch { } }
+    static bool ThreadInstalled => File.Exists(Shared.ThreadUnit);
+    static bool ThreadOn => !File.Exists(DataFile(Shared.ThreadOff));  // switched from the phone page or Home Assistant
+    static bool NoticesOn => !File.Exists(DataFile(Shared.NotifyOff));
+    void SetNotices(bool on) { try { if (on) File.Delete(DataFile(Shared.NotifyOff)); else File.WriteAllText(DataFile(Shared.NotifyOff), ""); } catch { } }
 
     // ---- preferences ----
     Logic.Prefs prefs = new();
     void LoadPrefs()
     {
         string text = null;
-        foreach (var f in new[] { "silentglass-prefs.txt", "quiet-home-prefs.txt" }) try { text = File.ReadAllText(DataFile(f)); break; } catch { }
+        foreach (var f in new[] { Shared.PrefsFile, "quiet-home-prefs.txt" }) try { text = File.ReadAllText(DataFile(f)); break; } catch { }  // the pre-v40 name
         prefs = Logic.ParsePrefs(text);
         // the wallpaper's location comes from the phone setup page (written by the bridge)
-        try { var c = Logic.ParseConf(File.ReadAllText(DataFile("location.txt"))); prefs.Lat = Logic.Num(c, "lat", prefs.Lat); prefs.Lon = Logic.Num(c, "lon", prefs.Lon); } catch { }
+        try { var c = Shared.ParseConf(File.ReadAllText(DataFile(Shared.LocationFile))); prefs.Lat = Logic.Num(c, "lat", prefs.Lat); prefs.Lon = Logic.Num(c, "lon", prefs.Lon); } catch { }
     }
-    void SavePrefs() { try { File.WriteAllText(DataFile("silentglass-prefs.txt"), Logic.FormatPrefs(prefs)); File.Delete(DataFile("quiet-home-prefs.txt")); } catch { } }
+    void SavePrefs() { try { File.WriteAllText(DataFile(Shared.PrefsFile), Logic.FormatPrefs(prefs)); File.Delete(DataFile("quiet-home-prefs.txt")); } catch { } }
 }
 
 // Screen.cs talks to the windows through this
@@ -244,12 +241,14 @@ public sealed partial class SilentGlass : IScreen
     void IScreen.Wake() => Wake();
     bool IScreen.HomePressedOnBar => Environment.TickCount64 - homeKeyAt < 300;
     void IScreen.TvChanged() => OnTvChanged();
-    readonly HashSet<Tizen.NUI.Timer> afterTimers = new();  // referenced until they fire
-    void IScreen.After(int ms, Action action)
+    void IScreen.After(int ms, Action action) => After(ms, action);
+    void IScreen.Note(string what) => Note(what);
+    // a one-shot timer, referenced until it fires (an unreferenced NUI timer can be collected before it does)
+    readonly HashSet<Tizen.NUI.Timer> afterTimers = new();
+    void After(int ms, Action action)
     {
         var t = new Tizen.NUI.Timer((uint)Math.Max(1, ms)); afterTimers.Add(t);
         t.Tick += (s, e) => { afterTimers.Remove(t); try { action(); } catch (Exception ex) { Note("after-error:" + ex.GetType().Name); } return false; };
         t.Start();
     }
-    void IScreen.Note(string what) => Note(what);
 }

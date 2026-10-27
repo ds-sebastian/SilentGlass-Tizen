@@ -55,7 +55,8 @@ static partial class Bridge
         try { if (system_info_get_platform_string("http://tizen.org/system/model_name", out var p) == 0 && p != IntPtr.Zero) { model = Marshal.PtrToStringUTF8(p) ?? ""; free(p); } } catch { }
         return model ??= "";
     }
-    static readonly string[] WatchedKeys = { "memory/pm/state", "memory/eden/source/current_source", "memory/appfw/current_fullscreen_appid", TvNameKey };
+    const string PmKey = "memory/pm/state", SourceKey = "memory/eden/source/current_source", ForegroundKey = "memory/appfw/current_fullscreen_appid";
+    static readonly string[] WatchedKeys = { PmKey, SourceKey, ForegroundKey, TvNameKey };
     static SourceListChangedCallback sourceListCallback;  // kept alive: native code holds the pointers
     static readonly List<VconfChangedCallback> keyCallbacks = new();
     static readonly int[] keyEvents = new int[5];  // per watched key + source list, logged once a minute when nonzero
@@ -116,51 +117,25 @@ static partial class Bridge
     static int VInt(string k) => vconf_get_int(k, out int v) == 0 ? v : -1;
     static string VStr(string k) { var p = vconf_get_str(k); if (p == IntPtr.Zero) return ""; var s = Marshal.PtrToStringUTF8(p); free(p); return s ?? ""; }
 
-    public static bool ThreadInstalled => File.Exists(ThreadUnit);
-    static bool ThreadWanted => !File.Exists(Data + "/thread-off");
-    static bool ScreenOn => VInt("memory/pm/state") is int pm && pm >= 0 && pm != 4;
+    public static bool ThreadInstalled => File.Exists(Shared.ThreadUnit);
+    static bool ThreadWanted => !File.Exists(DataFile(Shared.ThreadOff));
+    static bool ScreenOn => VInt(PmKey) is int pm && pm >= 0 && pm != 4;  // 1 on, 2 dim, 3 screen off, 4 standby
 
-    // ---- inputs: names come from the TV (name set on the TV, else the HDMI-CEC name, else the port) ----
-    public sealed class Input { public int Type; public string Port, Edit = "", Detected = "", Name; public bool Connected; }
-    public static List<Input> ParseSources(string json)
+    // ---- inputs (Shared.ParseInputs); two ports with the same name would make the selector ambiguous: they get the port ----
+    public static List<Shared.Input> Unique(List<Shared.Input> list)
     {
-        var seen = new Dictionary<int, Input>();
-        try {
-            using var doc = JsonDocument.Parse(json ?? "");
-            foreach (var e in doc.RootElement.EnumerateArray()) {
-                int t = e.TryGetProperty("sourceType", out var st) && st.TryGetInt32(out var v) ? v : -1;
-                if (t != 0 && (t < 13 || t > 16)) continue;
-                string S(string k) { if (!e.TryGetProperty(k, out var p) || p.ValueKind != JsonValueKind.String) return ""; try { return Uri.UnescapeDataString(p.GetString()).Trim(); } catch { return p.GetString().Trim(); } }
-                seen[t] = new Input { Type = t, Edit = S("editName"), Detected = S("detectedName"), Connected = e.TryGetProperty("connectionState", out var c) && c.ValueKind == JsonValueKind.True };
-            }
-        } catch { }
-        var list = new List<Input>();
-        for (int t = 13; t <= 16; t++) {
-            var i = seen.TryGetValue(t, out var x) ? x : new Input { Type = t };
-            i.Port = "HDMI " + (t - 12);
-            i.Name = i.Edit.Length > 0 ? i.Edit : i.Detected.Length > 0 ? i.Detected : i.Port;
-            list.Add(i);
-        }
-        if (seen.ContainsKey(0)) list.Add(new Input { Type = 0, Port = "TV", Name = "Live TV", Connected = true });
-        // two ports with the same name would make the selector ambiguous: add the port
         foreach (var g in list.GroupBy(i => i.Name).Where(g => g.Count() > 1)) foreach (var i in g) i.Name += " (" + i.Port + ")";
         return list;
     }
-    static List<Input> Inputs() { lock (tv) { try { return ParseSources(get_source_list()); } catch { return ParseSources(null); } } }
+    static List<Shared.Input> Inputs() { string json = null; lock (tv) try { json = get_source_list(); } catch { } return Unique(Shared.ParseInputs(json, out _)); }
     public static int SourceId(string json)
     {
         var m = Regex.Match(json ?? "", "SOURCE_TYPE_HDMI(\\d)");
         if (m.Success) return 12 + int.Parse(m.Groups[1].Value);
         return Regex.IsMatch(json ?? "", "SOURCE_TYPE_(ATV|DTV|TV)") ? 0 : -1;
     }
-    public static string AppName(string id, string input) => id switch {
-        Launcher => "SilentGlass Home",
-        "org.tizen.tv-viewer" => input,
-        "com.samsung.tv.csfs" => "Samsung Home",
-        ArtApp or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte" => "Ambient",
-        "" => "None",
-        _ => id,
-    };
+    public static string AppName(string id, string input) =>
+        id == Shared.Self ? "SilentGlass Home" : id == Shared.Viewer ? input : id == Shared.SamsungHome ? "Samsung Home" : Shared.IsAmbient(id) ? "Ambient" : id.Length == 0 ? "None" : id;
 
     // HDMI-CEC: re-scan, then read which device answers on which port
     static string Cec(string method, params string[] args) =>
@@ -225,8 +200,7 @@ static partial class Bridge
     }
     static readonly (string value, string name)[] Outputs = { ("0", "TV Speaker"), ("2", "Soundbar") };
     // Game Mode is one three-way setting (game-mode-auto: Auto / On / Off); "game-mode" only mirrors whether it is engaged
-    public static string GameName(string tvName) => tvName switch { "Auto" => "Automatic", "On" => "Always", "Off" => "Never", _ => tvName };
-    static List<(string value, string name)> GameOptions() => Options("game-mode-auto", false).Select(o => (o.value, GameName(o.name))).ToList();
+    static List<(string value, string name)> GameOptions() => Options("game-mode-auto", false).Select(o => (o.value, Shared.GameName(o.name))).ToList();
     static string OptionName(List<(string value, string name)> opts, string v) => opts.Where(o => o.value == v).Select(o => o.name).FirstOrDefault() ?? "";
 
     static string Run(string file, string args, int ms)
@@ -249,8 +223,8 @@ static partial class Bridge
     // names it; report the app it last saw in front instead (its state file: ui=, backdrop=, fg=)
     public static string OnScreenApp(string fg, string state = null)
     {
-        if (fg != Launcher) return fg;
-        string V(string key) { var m = Regex.Match(state ?? Read("/tmp/silentglass-state.txt"), "(?m)^" + key + "=(.*)$"); return m.Success ? m.Groups[1].Value.Trim() : ""; }
+        if (fg != Shared.Self) return fg;
+        string V(string key) { var m = Regex.Match(state ?? Read(Shared.StateFile), "(?m)^" + key + "=(.*)$"); return m.Success ? m.Groups[1].Value.Trim() : ""; }
         string other = V("fg");
         return V("ui") == "none" && V("backdrop") == "hidden" && Regex.IsMatch(other, @"^[\w.\-]+$") ? other : fg;
     }

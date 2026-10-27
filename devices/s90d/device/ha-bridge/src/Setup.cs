@@ -45,8 +45,8 @@ static partial class Bridge
         } catch (Exception e) { Log("setup watch: " + e.Message + " (checking every second)"); }
         while (true) {
             try {
-                if (File.Exists(Data + "/setup-close")) { File.Delete(Data + "/setup-close"); CloseSetup("closed on the TV"); }
-                if (File.Exists(Data + "/setup-request")) { File.Delete(Data + "/setup-request"); OpenSetup(); }
+                if (File.Exists(DataFile(Shared.SetupClose))) { File.Delete(DataFile(Shared.SetupClose)); CloseSetup("closed on the TV"); }
+                if (File.Exists(DataFile(Shared.SetupRequest))) { File.Delete(DataFile(Shared.SetupRequest)); OpenSetup(); }
                 bool open, expired; lock (setupGate) { open = setupListener != null; expired = open && DateTime.UtcNow > setupUntil; }
                 if (expired) { CloseSetup("timed out"); open = false; }
                 setupKick.WaitOne(!watching ? 1000 : open ? 5000 : 30000);
@@ -84,7 +84,8 @@ static partial class Bridge
     {
         string code, url; lock (setupGate) { code = setupCode; url = setupUrl; }
         var json = JsonSerializer.Serialize(new Dictionary<string, string> { ["state"] = state, ["url"] = state == "closed" ? "" : url, ["code"] = state == "closed" ? "" : code, ["message"] = message });
-        try { File.WriteAllText(Data + "/setup.json.new", json); File.Move(Data + "/setup.json.new", Data + "/setup.json", true); } catch { }
+        string file = DataFile(Shared.SetupFile);
+        try { File.WriteAllText(file + ".new", json); File.Move(file + ".new", file, true); } catch { }
     }
     // the address phones reach the TV on: the interface that holds the default route
     static string LanAddress()
@@ -163,14 +164,14 @@ static partial class Bridge
 
     static object SetupState()
     {
-        var c = LoadConf(); var loc = LoadLocation(); var p = LoadPrefs();
+        var c = LoadConf(); var loc = ReadConf(DataFile(Shared.LocationFile)); var p = ReadConf(DataFile(Shared.PrefsFile));
         return new {
             name = TvName, host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
             has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""), update = UpdateSeconds(c),
             notify_position = c.GetValueOrDefault("notify_position", ""), notify_size = c.GetValueOrDefault("notify_size", ""),
             notify_duration = c.GetValueOrDefault("notify_duration", ""), notify_images = c.GetValueOrDefault("notify_images", "1") != "0",
             notify_quiet = c.GetValueOrDefault("notify_quiet", ""),
-            notifications = !File.Exists(Data + "/notify-off"), lat = loc.lat, lon = loc.lon,
+            notifications = NoticesOn, lat = loc.GetValueOrDefault("lat", ""), lon = loc.GetValueOrDefault("lon", ""),
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
             thread_on = ThreadWanted,
             // SilentGlass's own settings (the launcher reloads its prefs file when it changes)
@@ -178,12 +179,6 @@ static partial class Bridge
             hideapps = p.GetValueOrDefault("hideapps", "0") == "1", dim = p.GetValueOrDefault("dim", "1") != "0",
             inputs = Inputs().Where(i => i.Type != 0).Select(i => new { type = i.Type, name = i.Name == i.Port ? i.Port : i.Name + " · " + i.Port }).ToList(),
         };
-    }
-    const string PrefsFile = "/silentglass-prefs.txt";
-    static Dictionary<string, string> LoadPrefs() { try { return ParseConf(File.ReadAllLines(Data + PrefsFile)); } catch { return new(); } }
-    static (string lat, string lon) LoadLocation()
-    {
-        try { var l = ParseConf(File.ReadAllLines(Data + "/location.txt")); return (l.GetValueOrDefault("lat", ""), l.GetValueOrDefault("lon", "")); } catch { return ("", ""); }
     }
 
     // ---- checks: everything from the phone is validated before it reaches the config file or a command line ----
@@ -286,13 +281,13 @@ static partial class Bridge
         if (password.Length > 0) c["password"] = password; else if (hostChanged || user.Length == 0) c.Remove("password");
         try { SaveConf(c); } catch (Exception e) { return (false, "Could not save (" + e.Message + ")."); }
         try {
-            if (S("notifications") == "true") File.Delete(Data + "/notify-off"); else File.WriteAllText(Data + "/notify-off", "");
-            if (lat.Length > 0 && lon.Length > 0) File.WriteAllText(Data + "/location.txt", "lat=" + lat + "\nlon=" + lon + "\n"); else File.Delete(Data + "/location.txt");
-            if (watch.Length > 0) {
-                var p = LoadPrefs();
+            SetMarker(Shared.NotifyOff, S("notifications") != "true");
+            if (lat.Length > 0 && lon.Length > 0) File.WriteAllText(DataFile(Shared.LocationFile), "lat=" + lat + "\nlon=" + lon + "\n"); else File.Delete(DataFile(Shared.LocationFile));
+            if (watch.Length > 0) {  // SilentGlass's own file: these keys change, the rest stays
+                var p = ReadConf(DataFile(Shared.PrefsFile));
                 p["watch"] = watch; p["play"] = play; p["wall"] = wall.Length > 0 ? wall : "auto";
                 p["hideapps"] = S("hideapps") == "1" ? "1" : "0"; p["dim"] = S("dim") == "0" ? "0" : "1";
-                File.WriteAllText(Data + PrefsFile, string.Concat(p.Select(kv => kv.Key + "=" + kv.Value + "\n")));
+                File.WriteAllText(DataFile(Shared.PrefsFile), string.Concat(p.Select(kv => kv.Key + "=" + kv.Value + "\n")));
             }
         } catch { }
         bool threadStarting = false;
@@ -303,12 +298,12 @@ static partial class Bridge
         Log("setup saved" + (dataset.Length > 0 ? " (thread)" : ""));
         string threadResult = dataset.Length > 0 ? ApplyThread(dataset) : "";
         lock (setupGate) haTlv = "";
-        // reconnect with the new settings and report how that went
-        string before = mqttState; reload = true; changed.Set();
+        // reconnect with the new settings and report how that went (the main loop leaves "connecting" when it knows)
         string result = "Saved.";
+        if (host.Length > 0) SetState("connecting", "");
+        reload = true; changed.Set();
         if (host.Length > 0) {
-            for (int i = 0; i < 40 && (reload || mqttState == before && before != "connected"); i++) Thread.Sleep(250);
-            for (int i = 0; i < 40 && mqttState != "connected" && mqttState != "error"; i++) Thread.Sleep(250);
+            for (int i = 0; i < 100 && (reload || mqttState == "connecting"); i++) Thread.Sleep(250);
             result = mqttState == "connected" ? "Saved. Connected to " + host + "." : "Saved, but can't connect yet: " + (mqttError.Length > 0 ? mqttError : "no answer") + ".";
         }
         if (threadResult.Length > 0) result += " " + threadResult;

@@ -21,7 +21,7 @@ static partial class Bridge
     const int NoticePort = 7676, NoticeMaxBody = 12 << 20;
     static readonly object noticeGate = new();
     static long noticeSeq;
-    static bool NoticesOn => !File.Exists(Data + "/notify-off");
+    static bool NoticesOn => !File.Exists(DataFile(Shared.NotifyOff));
     static bool NoticeAllowed(IPAddress peer)
     {
         if (IPAddress.IsLoopback(peer)) return true;
@@ -116,31 +116,30 @@ static partial class Bridge
         } catch { }
         return (0, 0);
     }
-    static bool IsAmbient(string app) => app is ArtApp or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
     // hand the notice to SilentGlass: data/notice.json (+ image). Taking the file is its acknowledgement.
     // Returns why it was not shown, or null. A test (from the phone page) ignores the on/off switch and quiet hours.
     static string HandleNotice(NoticeData n, bool test = false)
     {
         if (n == null) { Log("notifications: empty request (or a picture with pictures off)"); return "nothing to show"; }
-        string fg = VStr("memory/appfw/current_fullscreen_appid"), what = "'" + (n.Title.Length > 0 ? n.Title : n.Message.Length > 40 ? n.Message.Substring(0, 40) : n.Message) + "'";
-        string why = !test && !NoticesOn ? "notifications are off" : !ScreenOn ? "the TV is off" : IsAmbient(fg) ? "Ambient is on" :
+        string fg = VStr(ForegroundKey), what = "'" + (n.Title.Length > 0 ? n.Title : n.Message.Length > 40 ? n.Message.Substring(0, 40) : n.Message) + "'";
+        string why = !test && !NoticesOn ? "notifications are off" : !ScreenOn ? "the TV is off" : Shared.IsAmbient(fg) ? "Ambient is on" :
             !test && InQuietHours(conf.GetValueOrDefault("notify_quiet", ""), DateTime.Now.TimeOfDay) ? "quiet hours" : null;
         if (why != null) { Log("notifications: " + what + " not shown (" + why + ")"); return why; }
         foreach (var f in Directory.GetFiles(Data, "notice-*")) try { File.Delete(f); } catch { }
         long id = ++noticeSeq; string image = n.Image != null ? "notice-" + id + "." + n.Ext : "";
-        if (image.Length > 0) File.WriteAllBytes(Data + "/" + image, n.Image);
+        if (image.Length > 0) File.WriteAllBytes(DataFile(image), n.Image);
         var json = JsonSerializer.Serialize(new Dictionary<string, object> {
             ["title"] = n.Title, ["message"] = n.Message, ["size"] = n.Size, ["position"] = n.Position, ["duration"] = n.Duration,
             ["image"] = image, ["w"] = n.W, ["h"] = n.H, ["at"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
-        string file = Data + "/notice.json";
+        string file = DataFile(Shared.NoticeFile);
         File.WriteAllText(file + ".tmp", json); File.Move(file + ".tmp", file, true);
         bool Taken(int ms) { for (int i = 0; i < ms / 100 && File.Exists(file); i++) Thread.Sleep(100); return !File.Exists(file); }
         if (Taken(1500)) { Log("notifications: " + what + " shown"); return null; }
         // SilentGlass is not running (it is closed in standby): start it for the notice - only over the TV viewer,
         // where starting it hidden is invisible; over another app it would send that app to the background
         string onScreen = OnScreenApp(fg);
-        if (onScreen != "org.tizen.tv-viewer" && fg != Launcher) { File.Delete(file); Log("notifications: " + what + " not shown (SilentGlass not running over " + onScreen + ")"); return "an app is on screen and SilentGlass is not running"; }
-        LaunchApp(Launcher, "sg_notice", "1");
+        if (onScreen != Shared.Viewer && fg != Shared.Self) { File.Delete(file); Log("notifications: " + what + " not shown (SilentGlass not running over " + onScreen + ")"); return "an app is on screen and SilentGlass is not running"; }
+        LaunchApp(Shared.Self, Shared.ExtraNotice, "1");
         bool taken = Taken(8000);
         Log("notifications: " + what + (taken ? " shown (started SilentGlass)" : " NOT taken"));
         if (File.Exists(file)) File.Delete(file);

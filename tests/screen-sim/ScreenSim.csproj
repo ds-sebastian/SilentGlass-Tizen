@@ -6,6 +6,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>disable</Nullable>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../launcher/src/Screen.cs" /><Compile Include="../../launcher/src/Logic.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="ScreenSim.cs" /><Compile Include="../../launcher/src/Screen.cs" /><Compile Include="../../launcher/src/Shared.cs" /></ItemGroup>
 </Project>

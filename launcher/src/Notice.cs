@@ -15,7 +15,7 @@ public sealed partial class SilentGlass
     string noticeState = "none";
     const int NoticeR = 36, NoticePad = 14, NoticeTextPad = 26, NoticeMaxAgeMs = 30000;
 
-    static string NoticeFile => DataFile("notice.json");
+    static string NoticeFile => DataFile(Shared.NoticeFile);
     // a notice waiting at start-up means the bridge started us for it (we stay hidden)
     static bool NoticePending() { try { var f = new FileInfo(NoticeFile); return f.Exists && (DateTime.UtcNow - f.LastWriteTimeUtc).TotalSeconds < 15; } catch { return false; } }
     void TakeNotice(string via)

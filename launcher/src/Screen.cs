@@ -38,7 +38,7 @@ public interface IScreen
 
 public sealed class Screen
 {
-    public const string Viewer = "org.tizen.tv-viewer", Self = "com.samsung.tv.bixby-promotion", SamsungHome = "com.samsung.tv.csfs";
+    public const string Viewer = Shared.Viewer, Self = Shared.Self, SamsungHome = Shared.SamsungHome;
     public const int SettleMs = 800, DropoutGraceMs = 4000, ViewerWaitMs = 3000;
     readonly IScreen ui; readonly Func<long> clock;
     public Screen(IScreen ui, Func<long> clock) { this.ui = ui; this.clock = clock; }
@@ -56,8 +56,7 @@ public sealed class Screen
     // over the picture: the viewer is the app behind us and its input shows a picture, or did a moment ago
     bool OverPicture() => (LastOther == Viewer || LastOther == "") &&
         (HasPicture || pictureLostOn == Source && clock() - pictureLostAt < DropoutGraceMs);
-    public static bool IsAmbient(string id) => id == "org.tizen.art-app" || id == "com.samsung.tv.home.art" || id == "com.samsung.tv.ambientfte";
-    static bool RealInput(int n) => n == 0 || Logic.IsHdmi(n);
+    static bool RealInput(int n) => n == 0 || Shared.IsHdmi(n);
 
     public void Start() { int s = ui.ReadSource(); if (RealInput(s)) Source = s; Signal = ui.ReadSignal(); NoteForeground(ui.ReadForeground()); }
     void NoteForeground(string id) { if (!string.IsNullOrEmpty(id) && id != Self) LastOther = id; }
@@ -85,7 +84,7 @@ public sealed class Screen
         pendingOpen = null;
         bool direct = directHome; directHome = false;
         // over Ambient (Home Assistant's Home button): to the picture first, as for Ambient's Home key
-        if (!direct && IsAmbient(LastOther)) { PictureFirst(open, why); return; }
+        if (!direct && Shared.IsAmbient(LastOther)) { PictureFirst(open, why); return; }
         if (open == "" && ui.OverlayShown && !ui.BackdropShown) { ui.CloseOverlay(why + ":close"); return; }
         bool keep = open == "" && ui.OverlayShown;
         if (OverPicture()) { ui.HideBackdrop(); if (!HasPicture) WallpaperIfNoPictureReturns(); }
@@ -117,7 +116,7 @@ public sealed class Screen
         else if (now == Viewer && ui.BackdropShown) { ui.CloseOverlay("foreground:viewer"); ui.HideBackdrop(); }
         // Ambient's Home key always opens Samsung Home (hard-coded). Go to the picture instead, let its signal flag
         // settle (it is stale while Ambient runs), then open SilentGlass as for any Home press.
-        if (now == SamsungHome && IsAmbient(before)) PictureFirst("", "ambient_home");
+        if (now == SamsungHome && Shared.IsAmbient(before)) PictureFirst("", "ambient_home");
         if (now == Viewer && homeAfterViewer) {
             homeAfterViewer = false; int g = ++homeGen;
             ui.After(SettleMs + 300, () => { if (g == homeGen) LaunchSelf(); });

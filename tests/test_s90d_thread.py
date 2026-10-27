@@ -2,7 +2,6 @@
 import base64
 import hashlib
 import re
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -22,11 +21,6 @@ def embedded_units(install):
 
 
 class ThreadBorderRouterRecipe(unittest.TestCase):
-    def test_scripts_parse(self):
-        for name in ("otbr-install.sh", "otbr-restore.sh", "otbr-switch-update.sh", "otbr-switch-restore.sh", "otbr-join.sh",
-                     "otbr-standby-update.sh", "otbr-standby-restore.sh"):
-            subprocess.run(["sh", "-n", str(DIR / name)], check=True, capture_output=True)
-
     def test_installer_embeds_the_published_units(self):
         self.assertTrue(UNITS)
         embedded = embedded_units((DIR / "otbr-install.sh").read_text())
