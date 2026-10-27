@@ -216,8 +216,9 @@ class LauncherTests(unittest.TestCase):
     def test_setup_sheet(self):
         s = (SRC / "Setup.cs").read_text()
         # the QR is the address only: the code must always be typed on the phone
-        self.assertIn('File.WriteAllText(file, Qr.Svg(Qr.Encode(url)));', s)
+        self.assertIn('File.WriteAllText(file, Qr.Svg(Qr.Encode(url + "?s=" + session)));', s)
         self.assertNotIn('?code=', s)
+        self.assertIn('url + "?s=" + session', s)  # a fresh address per sheet: phones reuse a tab with the same one
         self.assertIn('string file = DataFile("setup-qr-" + (++qrN) + ".svg");', s)  # DALi caches by URL
         self.assertIn("if (back) CloseSetup();", (SRC / "Overlay.cs").read_text())
         # closing the overlay any way also closes the phone page

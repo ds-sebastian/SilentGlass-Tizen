@@ -147,6 +147,7 @@ class SetupPageTests(unittest.TestCase):
         # the page never carries the code in its address: the QR is the address only, the code is typed
         st, page = self.api("/")
         self.assertIn(b"Advanced settings", page); self.assertIn(b"z-index:10", page)
+        self.assertNotIn(b"location.search", page)  # the code is never read from the address
 
     def test_wrong_codes_close_the_page(self):
         code = self.open_page(); wrong = "%06d" % ((int(code) + 1) % 1000000)

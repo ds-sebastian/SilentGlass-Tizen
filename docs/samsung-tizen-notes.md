@@ -180,6 +180,12 @@ are ordinary optional features rather than trackers.
   0.4-1 s later. Treat a Home launch within ~1.2 s of the last one as the same press, or the second undoes the first.
   After the Home app hides its windows on a physical-remote key (Back, Enter, Home), it gets one or two more launch
   requests 0.7-2.2 s later; Home Assistant's keys did not cause them.
+- **Four automatic-update switches, two of them hidden** (vconf, S90D 2026 firmware): `db/apps/auto_update` (menu
+  "Auto update apps", read by `org.tizen.was-appupdate`), `db/built-in-app-upgrader/server_upgrade` (no menu; read by
+  `org.tizen.was-builtinupgrade`, which updates Samsung's built-in apps even with the menu setting off; `was-reset`
+  reads it too, so a reset likely turns it back on), `db/menu/support/softwareupdate/autoupdate` (menu firmware Auto
+  update) and `db/SyncML/ivi-oma-dm-service/software-update/autoupdate/setting` (OMA-DM firmware path). Set with
+  `vconftool set -f -t bool|int KEY 0`.
 - **App updates re-enable apps:** a Samsung store update reinstalls the app enabled. Disabling by editing
   `package_app_info.app_disable` is then not enough: `pkginfo-server` caches the updated app's info as enabled. Use
   `pkgcmd -D -t app -n <appid> --global` (inverse `-A`), which updates the registry and the cache.

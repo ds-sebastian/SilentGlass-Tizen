@@ -6,14 +6,23 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42d** + **bridge 2.4.1** + **batch G**:
+  - The phone's code screen still looked see-through: the phone had switched to its old tab (same address) instead
+    of loading the new page. The QR now carries a fresh `?s=` per sheet (not the code), so phones load it anew. The
+    page no longer reads a code from its address at all.
+  - Apps updated with "Auto update apps" off: that menu setting (`db/apps/auto_update`) is read by
+    `was-appupdate`, but `was-builtinupgrade` updates Samsung's built-in apps on its own key,
+    `db/built-in-app-upgrader/server_upgrade` (was on). `cleanup/batchg-apply.sh` turns it off, and the OMA-DM
+    firmware auto-update (`db/SyncML/ivi-oma-dm-service/software-update/autoupdate/setting`, separate from the
+    menu's), with the old values saved; `batchg-restore.sh` puts them back (round trip tested). The drift check
+    now verifies all four update keys. Deploy pair `update-v42d.sh` / `restore-v32a.sh`.
 - **v42c**: a double/triple flash when the bar appears. A window trace (`enlightenment_info -topvwins` every ~40 ms)
   shows a warm open is one clean step - overlay hidden -> shown, nothing else moves - so the flash is the overlay's
   own content. Likely cause: the window was hidden before it was cleared, so it kept the old bar as its last frame,
   and the compositor showed that frame again on the next Show before SilentGlass's first new frame (old bar at full
   opacity, then the new one fading in from nothing). Now the overlay is cleared, given 80 ms (~5 frames) to present
   the empty scene, then hidden; a reopen inside that time just cancels the hide. The main window ends the dim first
-  and hides after 80 ms (it is black underneath, so it keeps the wallpaper rather than emptying). Deploy pair
-  `update-v42c.sh` / `restore-v32a.sh`.
+  and hides after 80 ms (it is black underneath, so it keeps the wallpaper rather than emptying).
 - **v42b**: Home ignored for a few seconds after closing the bar. That was the 2.6 s guard against the TV's stray
   launch requests. Likely cause of the strays: the remote sends press and release separately; SilentGlass hid its
   windows on the press, so the release reached the TV with nothing of ours up, and the TV relaunched the Home app

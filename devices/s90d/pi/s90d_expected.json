@@ -50,7 +50,7 @@
     "com.samsung.tv.aria-dummy"
   ],
   "quiet_home_dlls": [
-    "8c999f01989a296f1840537030d78a8ee105a889c51f44428c9afdd7e908445c"
+    "f7581477247f82c6ccd69697a6051ef1b0e1d81f14ff452674265422313bd2c5"
   ],
   "user_units": [
     "quiet-recog-off.service",
@@ -61,5 +61,11 @@
     "quiet-otbr-usbpower.service",
     "quiet-csfs-off.service",
     "silentglass-ha.service"
-  ]
+  ],
+  "settings": {
+    "db/apps/auto_update": "False",
+    "db/built-in-app-upgrader/server_upgrade": "False",
+    "db/menu/support/softwareupdate/autoupdate": "0",
+    "db/SyncML/ivi-oma-dm-service/software-update/autoupdate/setting": "0"
+  }
 }

@@ -58,14 +58,16 @@ public sealed partial class SilentGlass
         try { c = new Logic.Json(File.ReadAllText(DataFile("setup.json"))); } catch { return; }
         setupState = c["state"];
         string url = c["url"], code = c["code"];
-        if (url.Length > 0 && code.Length == 6 && url != setupUrl) {
-            setupUrl = url;
+        if (url.Length > 0 && code.Length == 6 && url + code != setupUrl) {
+            setupUrl = url + code;
             try {
                 // a new file name each time: DALi caches images by URL
                 foreach (var old in Directory.GetFiles(System.IO.Path.GetDirectoryName(DataFile("x")), "setup-qr-*.svg")) File.Delete(old);
                 string file = DataFile("setup-qr-" + (++qrN) + ".svg");
-                // the address only: the phone always asks for the code, which is only on this screen
-                File.WriteAllText(file, Qr.Svg(Qr.Encode(url)));
+                // the address only: the phone always asks for the code, which is only on this screen. A new ?s= each
+                // time, so the phone loads the page fresh instead of switching to an old tab with the same address
+                string session = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(3)).ToLowerInvariant();
+                File.WriteAllText(file, Qr.Svg(Qr.Encode(url + "?s=" + session)));
                 setupQr.ResourceUrl = file;
             } catch (Exception e) { Note("qr-failed:" + e.GetType().Name); }
             setupAddress.Text = "Scan with your phone, or open\n" + url.Replace("http://", "").TrimEnd('/') + ", then enter";

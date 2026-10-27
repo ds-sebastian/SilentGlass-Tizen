@@ -13,6 +13,7 @@ MISS = Path.home() / ".cache" / "s90d-drift-misses"
 TV_ACCESS = "/home/dietpi/opt/samsung-tv-lab/src/s90c-tools/tools/tv_access/tv-access"
 
 ids = " ".join(EXP["disabled_apps"])
+keys = " ".join(EXP.get("settings", {}))
 body = f"""
 echo "up=$(cut -d. -f1 /proc/uptime)"
 echo "build=$(sed -n 's/^Build=//p' /etc/prd_info.ini 2>/dev/null | cut -d';' -f1)"
@@ -25,6 +26,7 @@ echo "dll=$(sha256sum /opt/usr/apps/com.samsung.tv.bixby-promotion/bin/BixbyProm
 U=/opt/usr/home/owner/.config/systemd/user/default.target.wants
 echo "units=$(ls $U 2>/dev/null | tr '\\n' ',')"
 echo "recog=$(systemctl show contents-recognition-service -p ActiveState --value)"
+for k in {keys}; do echo "set $k $(vconftool get $k 2>/dev/null | sed -n 's/.*value = \\([^ ]*\\) .*/\\1/p')"; done
 echo "##### END"
 """
 cmd = "cat <<'PH_EOF' | /bin/sh\n" + body + "PH_EOF"
@@ -48,9 +50,11 @@ if not r or r.returncode or "##### END" not in out:
     sys.exit(0)
 MISS.unlink(missing_ok=True)
 
-kv, apps = {}, {}
+kv, apps, sets = {}, {}, {}
 for line in out.splitlines():
-    if line.startswith("app "):
+    if line.startswith("set "):
+        _, k, v = (line.split(" ", 2) + [""])[:3]; sets[k] = v.strip()
+    elif line.startswith("app "):
         _, a, v = (line.split(" ", 2) + [""])[:3]; apps[a] = v.strip()
     elif "=" in line:
         k, v = line.split("=", 1); kv[k] = v.strip()
@@ -69,6 +73,8 @@ want(not missing, f"Vendor blocks missing: {', '.join(missing)}")
 back = sorted(a for a in EXP["disabled_apps"] if apps.get(a) not in ("true", ""))
 want(not back, f"Re-enabled apps: {', '.join(back)}")
 want(kv.get("dll") in EXP["quiet_home_dlls"], "Quiet Home was replaced or changed (DLL hash differs)")
+changed = sorted(k for k, v in EXP.get("settings", {}).items() if sets.get(k) != v)
+want(not changed, "Update settings changed (automatic updates back on?): " + ", ".join(f"{k}={sets.get(k)}" for k in changed))
 units = set(filter(None, kv.get("units", "").split(",")))
 gone = sorted(set(EXP["user_units"]) - units)
 want(not gone, f"Boot services missing: {', '.join(gone)}")

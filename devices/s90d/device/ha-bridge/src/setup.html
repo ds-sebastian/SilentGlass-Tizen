@@ -116,7 +116,7 @@ body.locked main,body.locked #save{display:none}
 
 <script>
 const $ = id => document.getElementById(id);
-let code = new URLSearchParams(location.search).get('code') || '';
+let code = '';  // typed on the code screen; never part of the address
 let threadMode = 'keep', haReady = false, wall = 'auto';
 
 async function api(path, body) {
