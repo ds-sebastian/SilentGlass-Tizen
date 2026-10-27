@@ -4,7 +4,7 @@
 built in, and a real Thread border router.**
 
 SilentGlass turns a Samsung **QN65S90D** (2024 OLED, Tizen) into a quiet display for the devices you actually use.
-Press Home and a glass bar slides up over whatever is playing - the picture keeps running underneath. Underneath
+Press Home and a glass bar fades in over whatever is playing - the picture keeps running underneath. Underneath
 that, the TV's recognition, voice and advertising services are switched off (each change reversible), the TV shows
 up in Home Assistant with notifications on any input, and its built-in Thread radio joins **your** smart-home network.
 
