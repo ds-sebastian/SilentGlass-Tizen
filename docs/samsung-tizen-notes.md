@@ -198,8 +198,9 @@ are ordinary optional features rather than trackers.
   first new frame. Clear (or reset) a window's content and let a few frames render before hiding it.
 - **Window effects:** the compositor animates app windows in and out unless the window sets the aux hint
   `wm.comp.win.effect.enable=0`; set it on every window you show and hide yourself, the main window included.
-- **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off, on any input, and the TV
-  turning on wakes the SHIELD. A device waking with One
+- **HDMI-CEC:** TV standby sleeps the SHIELD (CEC `<Standby>` broadcast), and the SHIELD waking turns the TV on
+  (`<Text View On>`). The SHIELD never sends `<Standby>` itself: when it sleeps for any reason, including its idle
+  timer, the TV turns off only through the SHIELD remote's IR power control, if the remote can see the TV. A device waking with One
   Touch Play switches the TV's input underneath any open app window; a notification window that had the keys loses
   them.
 - **The Home key could reach the Home app twice** (a second request 0.4-1 s later, with no key event) while the app
