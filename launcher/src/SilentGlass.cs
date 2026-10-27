@@ -16,7 +16,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42j";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42k";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;

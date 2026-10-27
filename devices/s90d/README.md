@@ -10,7 +10,7 @@ SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soun
   not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
   because it exists.
 
-## SilentGlass (v42j)
+## SilentGlass (v42k)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -87,7 +87,7 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   path, native callbacks posted to the UI thread, interrupted animations land on their end state.
 
 Deploy: `launcher-deploy/update-vN.sh` (refuses unless the installed DLL is the previous version; keeps SMACK labels;
-verifies every file) and its inverse. The published pair upgrades from v32a (`update-v42j.sh` / `restore-v32a.sh`).
+verifies every file) and its inverse. The published pair upgrades from v32a (`update-v42k.sh` / `restore-v32a.sh`).
 Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
 then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).
 A first install: [docs/install.md](../../docs/install.md).

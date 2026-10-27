@@ -6,6 +6,8 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42k** + **bridge 2.5.1**: no built-in location. Until one is set on the phone page, sunrise and sunset come from
+  the TV's time zone (standard offset x 15 degrees of longitude, latitude 40). Examples and tests use New York.
 - **bridge 2.5.0**: about a seventh of the CPU (per-thread `/proc/<pid>/task/*/stat` over 2 min with the picture on:
   ~0.4% of one core, was ~2.4-3%).
   - Power, input and the app in front are published when they change (vconf change notifications on the bridge's

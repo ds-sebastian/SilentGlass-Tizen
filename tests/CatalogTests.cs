@@ -105,7 +105,7 @@ static class CatalogTests
         var back = Logic.ParsePrefs(Logic.FormatPrefs(saved));
         True(back.Watch == 15 && back.Play == 0 && back.HideApps && !back.Dim && back.Wall == "night" && back.Lat == 51.5 && back.Lon == -0.1, "prefs round trip");
         var junk = Logic.ParsePrefs("watch=99\nplay=14\nwall=sepia\nlat=400\nlon=abc\n");
-        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == -74.0, "prefs reject junk");
+        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == Logic.DefaultLon, "prefs reject junk");
         var old = Logic.ParsePrefs("watch=0\nplay=0\nhideapps=1\nlive=0\noverlay=1\n");
         True(old.HideApps && old.Dim, "pre-v40 prefs load");
         True(!Logic.ParsePrefs(null).HideApps && Logic.ParsePrefs(null).Dim, "no prefs file = defaults");
@@ -134,6 +134,7 @@ static class CatalogTests
         True(q.GetLength(0) == 29 && q[0, 0] && q[6, 6] && !q[7, 7], "QR version 3 with finders");
         True(Qr.Svg(q).StartsWith("<svg") && Qr.Svg(q).Contains("h1v1h-1z"), "QR svg");
         // sunrise / sunset
+        // New York, 25 Oct 2026: 11:18 / 22:00 UTC (astral)
         var (rise, set) = Logic.SunTimes(new DateTime(2026, 10, 25, 12, 0, 0, DateTimeKind.Utc), 40.7, -74.0);
         True(Math.Abs(rise - (11 * 60 + 18)) <= 5 && Math.Abs(set - (22 * 60 + 0)) <= 5, "sun times " + rise + " " + set);
         True(!Logic.IsNight(new DateTime(2026, 10, 25, 16, 0, 0, DateTimeKind.Utc), 40.7, -74.0), "noon is day");
