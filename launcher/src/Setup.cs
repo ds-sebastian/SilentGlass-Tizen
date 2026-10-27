@@ -3,7 +3,7 @@ using System.IO;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
-// Setting up Home Assistant from a phone (Info > Home Assistant): SilentGlass asks the bridge to open its setup page
+// Advanced settings from a phone (Info > Advanced settings: Home Assistant, Thread, notifications, the home screen): SilentGlass asks the bridge to open its setup page
 // (data/setup-request); the bridge answers in data/setup.json with the address and a one-time code, and keeps it
 // current (phone connected, saved, error). The sheet shows a QR code of the address, the code to type on the phone, and the
 // state. Back closes it, and the bridge closes the page (data/setup-close). The page only works while this is open.
@@ -21,6 +21,7 @@ public sealed partial class SilentGlass
             void On(string name) {
                 if (name == "notice.json") OnUi(() => TakeNotice("watch"));
                 else if (name == "setup.json") OnUi(ReadSetup);
+                else if (name == "silentglass-prefs.txt" || name == "location.txt") OnUi(PrefsChanged);  // saved from the phone
             }
             dataWatch.Created += (s, e) => On(e.Name); dataWatch.Changed += (s, e) => On(e.Name); dataWatch.Renamed += (s, e) => On(e.Name);
             dataWatch.EnableRaisingEvents = true;
@@ -36,7 +37,7 @@ public sealed partial class SilentGlass
         setupSheet = Glass(x, y, w, h, 44, true); oLayer.Add(setupSheet);
         var tile = new View { Position2D = new Position2D(48, 48), Size2D = new Size2D(340, 340), CornerRadius = Round(28), BackgroundColor = White }; Corners(tile, 28, 340, 340);
         setupQr = new ImageView { Position2D = new Position2D(20, 20), Size2D = new Size2D(300, 300) }; tile.Add(setupQr); setupSheet.Add(tile);
-        var title = Label("Set up Home Assistant", 430, 48, w - 478, 104, 44, White, "Display"); title.MultiLine = true; setupSheet.Add(title);
+        var title = Label("Advanced settings", 430, 48, w - 478, 104, 44, White, "Display"); title.MultiLine = true; setupSheet.Add(title);
         setupAddress = Label("Scan with your phone, or open", 430, 166, w - 478, 76, 27, Faint); setupAddress.MultiLine = true; setupSheet.Add(setupAddress);
         setupCode = Label("", 430, 262, w - 478, 90, 72, White, "Display"); setupSheet.Add(setupCode);
         setupLight = Dot(48, h - 40 - 34 + 10, 14, Amber); setupSheet.Add(setupLight);
@@ -45,7 +46,7 @@ public sealed partial class SilentGlass
         FadeIn(setupSheet); setupState = "starting"; Note("setup");
         // the bridge answers within a second; if it does not, it is not installed or not running
         setupWait?.Stop(); setupWait = new Tizen.NUI.Timer(6000);
-        setupWait.Tick += (s, e) => { if (mode == Mode.Setup && setupState == "starting") SetupLine("The Home Assistant bridge is not running on this TV.", Amber); return false; };
+        setupWait.Tick += (s, e) => { if (mode == Mode.Setup && setupState == "starting") SetupLine("The SilentGlass service is not running on this TV.", Amber); return false; };
         setupWait.Start();
         ReadSetup();
     }
@@ -89,5 +90,11 @@ public sealed partial class SilentGlass
         setupState = "closed"; setupUrl = ""; setupWait?.Stop();
         try { File.WriteAllText(DataFile("setup-close"), DateTime.UtcNow.ToString("o") + "\n"); } catch { }
     }
-    void CloseSetup() { CloseSetupServer(); OpenInfo(); rowSel = rows.FindIndex(r => r.Name == "Home Assistant"); UpdatePanel(); }
+    void CloseSetup() { CloseSetupServer(); OpenInfo(); rowSel = rows.FindIndex(r => r.Name == "Advanced settings"); UpdatePanel(); }
+    void PrefsChanged()
+    {
+        LoadPrefs(); ResolvePorts(); CheckWallpaper();
+        if (!overlayShown) return;
+        if (mode == Mode.Bar) OpenBar(true); else if (mode == Mode.Info) UpdatePanel();
+    }
 }

@@ -66,6 +66,7 @@ public sealed partial class SilentGlass
         var list = new List<Row> {
             Status("Privacy", PrivacyStatus), Status("Network", NetworkStatus) };
         if (ThreadInstalled) list.Add(Status("Thread", ThreadStatus));
+        list.Add(Status("Home Assistant", BridgeStatus));
         list.Add(Status("This TV", TvStatus));
         list.Add(null);
         list.Add(Choice("tv", "Watch", () => PortChoice(prefs.Watch, watchPort), d => CyclePort(true, d)));
@@ -73,10 +74,10 @@ public sealed partial class SilentGlass
         list.Add(Toggle("apps", "Apps in the bar", () => !prefs.HideApps, on => { prefs.HideApps = !on; SavePrefs(); }));
         list.Add(Toggle("moon", "Dim when idle", () => prefs.Dim, on => { prefs.Dim = on; SavePrefs(); }));
         if (PhotoWall) list.Add(Choice("picture", "Wallpaper", () => Logic.WallName(prefs.Wall), d => { prefs.Wall = Logic.NextWall(prefs.Wall, d); SavePrefs(); CheckWallpaper(); }));
-        if (ThreadInstalled) list.Add(Toggle("thread", "Thread border router", () => ThreadOn, SetThread));
         list.Add(Toggle("bell", "Notifications", () => NoticesOn, SetNotices));
         list.Add(null);
-        list.Add(Open("homeassistant", "Home Assistant", OpenSetup, BridgeStatus));
+        // everything else (Home Assistant, the Thread border router, the wallpaper's location) is set from a phone
+        list.Add(Open("gear", "Advanced settings", OpenSetup));
         BuildPanel(Mode.Info, "SilentGlass " + ModVersion, true, list);
         infoTimer ??= new Tizen.NUI.Timer(3000);
         infoTimer.Tick -= InfoTick; infoTimer.Tick += InfoTick; infoTimer.Start();
@@ -118,14 +119,14 @@ public sealed partial class SilentGlass
         return ((up.HasValue ? "Up " + InfoStats.Duration(up.Value) : "Running") + (t.HasValue ? " · " + t + " °C" : ""), Live);
     }
     // written by the bridge (data/bridge-status.txt) whenever its state changes and every minute
-    string BridgeStatus()
+    (string, Color) BridgeStatus()
     {
         try {
             var f = new FileInfo(DataFile("bridge-status.txt"));
-            if (!f.Exists || (DateTime.UtcNow - f.LastWriteTimeUtc).TotalMinutes > 3) return "Not running";
+            if (!f.Exists || (DateTime.UtcNow - f.LastWriteTimeUtc).TotalMinutes > 3) return ("Not running", Grey);
             var c = Logic.ParseConf(File.ReadAllText(f.FullName));
-            return c.GetValueOrDefault("mqtt") switch { "connected" => "Connected", "unconfigured" => "Set up", _ => "Can't connect" };
-        } catch { return "Not running"; }
+            return c.GetValueOrDefault("mqtt") switch { "connected" => ("Connected", Live), "unconfigured" => ("Not set up", Grey), _ => ("Can't connect", Amber) };
+        } catch { return ("Not running", Grey); }
     }
 
     // ---- the panel ----

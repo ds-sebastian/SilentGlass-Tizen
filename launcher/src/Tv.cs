@@ -174,15 +174,7 @@ public sealed partial class SilentGlass
     const string ThreadUnits = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
     static bool ThreadInstalled => File.Exists(ThreadUnits);
     static bool ThreadOn => !File.Exists(DataFile("thread-off"));
-    // the owner's units skip starting while thread-off exists (survives reboots); a path unit applies a flip at once
-    // when thread-switch is rewritten
-    void SetThread(bool on)
-    {
-        try {
-            if (on) File.Delete(DataFile("thread-off")); else File.WriteAllText(DataFile("thread-off"), "");
-            File.WriteAllText(DataFile("thread-switch"), DateTime.UtcNow.ToString("o") + (on ? " on\n" : " off\n"));
-        } catch { }
-    }
+    // switched from the phone page or Home Assistant (the bridge writes thread-off / thread-switch)
     static bool NoticesOn => !File.Exists(DataFile("notify-off"));
     void SetNotices(bool on) { try { if (on) File.Delete(DataFile("notify-off")); else File.WriteAllText(DataFile("notify-off"), ""); } catch { } }
 

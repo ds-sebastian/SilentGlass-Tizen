@@ -6,12 +6,25 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42a** + **bridge 2.4** + **re-apply**: Advanced settings.
+  - Info: Home Assistant is a status line (Connected / Not set up / Can't connect / Not running); the last row,
+    **Advanced settings**, opens the phone sheet (QR + code). The Thread border router switch moved to the phone.
+  - The phone page is now Advanced settings: Home screen (Watch / Play inputs, Apps in the bar, Dim when idle,
+    wallpaper and its location), Notifications, Thread border router (on/off + network), Home Assistant (MQTT), the
+    TV's name. Home-screen settings go to SilentGlass's prefs file, which it reloads when it changes.
+  - The code screen was drawn under the settings rows (no stacking order) - the page looked garbled; it now covers
+    the page, which stays hidden until the code is accepted.
+  - Privacy said aov-dashboard was on: a Samsung app update (22:53, v1.24.443) reinstalled it enabled. A registry
+    edit was not enough - pkginfo-server kept the updated app's info cached as enabled - so `cleanup/reapply-apply.sh`
+    re-disables anything on the privacy list through `pkgcmd -D` (the TV's own app disable), with a backup and
+    record per run; `reapply-restore.sh` undoes the latest run with `pkgcmd -A`. Deploy pair `update-v42a.sh` /
+    `restore-v32a.sh`; bridge installer regenerated (2.4).
 - **v41g**: after the TV woke with SHIELD coming on through the soundbar, the screen stayed black while the TV
   reported SHIELD selected with a picture. Watch only closed the bar ("already watching"); Inputs > SHIELD - a real
   input selection - brought the picture up. Watch and Play now always select their input, exactly like Inputs. The
   setup QR code is now the address only, so the phone always asks for the 6-digit code shown on the TV (it used to
   carry the code). All launch requests, real presses and the TV's strays, come from `tvctx-manager`, so the caller
-  cannot tell them apart; the 2.6 s window stays. Deploy pair `update-v41g.sh` / `restore-v32a.sh`.
+  cannot tell them apart; the 2.6 s window stays.
 - **v41f**: the bounce, again; clearer current input.
   - v41e's event log showed the rest of the bounce: after the bar closes on a remote key (Back, Watch, Home), the TV
     sends the Home app one or two more launch requests 0.7-2.2 s later, with no key, and the second reopened the bar.

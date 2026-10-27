@@ -129,6 +129,25 @@ class SetupPageTests(unittest.TestCase):
         self.wait_for(lambda: (st := self.status()) and st["state"] == "closed")
         self.assertEqual(self.api("/api/state", code=code)[0], 410)
 
+    def test_home_screen_settings_go_to_silentglass_prefs(self):
+        # SilentGlass's own prefs file: the page changes its keys and keeps the rest
+        (self.data / "silentglass-prefs.txt").write_text("watch=0\nplay=0\nhideapps=0\ndim=1\nwall=auto\nlat=40.7\nlon=-74.0\n")
+        code = self.open_page()
+        state = json.loads(self.api("/api/state", code=code)[1])
+        self.assertEqual((state["watch"], state["play"], state["hideapps"], state["dim"], state["wall"]), ("0", "0", False, True, "auto"))
+        self.assertEqual([i["type"] for i in state["inputs"]], [13, 14, 15, 16])
+        for bad in ({"watch": "15", "play": "15"}, {"watch": "12", "play": "13"}, {"watch": "15", "play": "13", "wall": "dusk"}):
+            self.assertFalse(json.loads(self.api("/api/save", dict(bad, thread="keep"), code)[1])["ok"], bad)
+        r = json.loads(self.api("/api/save", {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "thread": "keep", "notifications": True}, code)[1])
+        self.assertTrue(r["ok"], r)
+        prefs = dict(l.split("=", 1) for l in (self.data / "silentglass-prefs.txt").read_text().split())
+        self.assertEqual(prefs, {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "lat": "40.7", "lon": "-74.0"})
+        state = json.loads(self.api("/api/state", code=code)[1])
+        self.assertEqual((state["watch"], state["hideapps"], state["dim"], state["wall"]), ("15", True, False, "night"))
+        # the page never carries the code in its address: the QR is the address only, the code is typed
+        st, page = self.api("/")
+        self.assertIn(b"Advanced settings", page); self.assertIn(b"z-index:10", page)
+
     def test_wrong_codes_close_the_page(self):
         code = self.open_page(); wrong = "%06d" % ((int(code) + 1) % 1000000)
         for _ in range(7): self.assertEqual(self.api("/api/state", code=wrong)[0], 403)

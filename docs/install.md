@@ -70,7 +70,7 @@ panel and replaces QuickLaunch with a tiny bridge that answers the vendor's prel
 /bin/sh < devices/s90d/device/ha-bridge/ha-bridge-install.sh
 ```
 
-It installs as an owner service and starts unconfigured. On the TV: **Home > Info > Home Assistant** shows a QR code;
+It installs as an owner service and starts unconfigured. On the TV: **Home > Info > Advanced settings** shows a QR code;
 scan it with a phone on the same network, enter the code, and fill in your MQTT broker (the Test button checks it),
 the TV's name, notifications and - if you use the border router - your Thread network. The settings are stored on the
 TV only (owner-readable). Details: [Home Assistant bridge](../devices/s90d/ha-bridge.md).

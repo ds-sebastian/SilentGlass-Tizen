@@ -15,7 +15,7 @@ using System.Net.NetworkInformation;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 
-// The phone setup page. SilentGlass asks for it (data/setup-request, from Info > Home Assistant) and shows the answer
+// The phone setup page. SilentGlass asks for it (data/setup-request, from Info > Advanced settings) and shows the answer
 // (data/setup.json: address + a fresh 6-digit code, then the progress) as a QR code. The page is served on port 7680
 // only while that sheet is open - Back on the TV (data/setup-close), 10 minutes, or 8 wrong codes close it - and
 // every API call must carry the code. Plain HTTP on the LAN, like the TV's own setup flows; the password is never
@@ -143,14 +143,21 @@ static partial class Bridge
 
     static object SetupState()
     {
-        var c = LoadConf(); var loc = LoadLocation();
+        var c = LoadConf(); var loc = LoadLocation(); var p = LoadPrefs();
         return new {
             name = c.GetValueOrDefault("name", TvName), host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
             has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""),
             notifications = !File.Exists(Data + "/notify-off"), lat = loc.lat, lon = loc.lon,
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
+            thread_on = ThreadWanted,
+            // SilentGlass's own settings (the launcher reloads its prefs file when it changes)
+            watch = p.GetValueOrDefault("watch", "0"), play = p.GetValueOrDefault("play", "0"), wall = p.GetValueOrDefault("wall", "auto"),
+            hideapps = p.GetValueOrDefault("hideapps", "0") == "1", dim = p.GetValueOrDefault("dim", "1") != "0",
+            inputs = Inputs().Where(i => i.Type != 0).Select(i => new { type = i.Type, name = i.Name == i.Port ? i.Port : i.Name + " · " + i.Port }).ToList(),
         };
     }
+    const string PrefsFile = "/silentglass-prefs.txt";
+    static Dictionary<string, string> LoadPrefs() { try { return ParseConf(File.ReadAllLines(Data + PrefsFile)); } catch { return new(); } }
     static (string lat, string lon) LoadLocation()
     {
         try { var l = ParseConf(File.ReadAllLines(Data + "/location.txt")); return (l.GetValueOrDefault("lat", ""), l.GetValueOrDefault("lon", "")); } catch { return ("", ""); }
@@ -222,6 +229,11 @@ static partial class Bridge
         string dataset = threadMode == "ha" ? haTlv : threadMode == "tlv" ? tlv : "";
         if (threadMode == "ha" && dataset.Length == 0) return (false, "Get Home Assistant's network first.");
         if (threadMode == "tlv" && !ValidDataset(dataset)) return (false, "That doesn't look like a Thread dataset (hex).");
+        string watch = S("watch"), play = S("play"), wall = S("wall"), threadOn = S("thread_on");
+        static bool Port(string v) => v is "0" or "13" or "14" or "15" or "16";
+        if (watch.Length > 0 && (!Port(watch) || !Port(play))) return (false, "Pick an input for Watch and Play.");
+        if (watch.Length > 0 && watch != "0" && watch == play) return (false, "Watch and Play need different inputs.");
+        if (wall.Length > 0 && wall is not ("auto" or "day" or "night")) return (false, "Pick a wallpaper.");
 
         var c = LoadConf(); bool hostChanged = c.GetValueOrDefault("host", "") != host;
         void Put(string k, string v) { if (v.Length > 0) c[k] = v; else c.Remove(k); }
@@ -231,7 +243,18 @@ static partial class Bridge
         try {
             if (S("notifications") == "true") File.Delete(Data + "/notify-off"); else File.WriteAllText(Data + "/notify-off", "");
             if (lat.Length > 0 && lon.Length > 0) File.WriteAllText(Data + "/location.txt", "lat=" + lat + "\nlon=" + lon + "\n"); else File.Delete(Data + "/location.txt");
+            if (watch.Length > 0) {
+                var p = LoadPrefs();
+                p["watch"] = watch; p["play"] = play; p["wall"] = wall.Length > 0 ? wall : "auto";
+                p["hideapps"] = S("hideapps") == "1" ? "1" : "0"; p["dim"] = S("dim") == "0" ? "0" : "1";
+                File.WriteAllText(Data + PrefsFile, string.Concat(p.Select(kv => kv.Key + "=" + kv.Value + "\n")));
+            }
         } catch { }
+        bool threadStarting = false;
+        if (ThreadInstalled && threadOn is "on" or "off" && (threadOn == "on") != ThreadWanted) {
+            SetThreadSwitch(threadOn == "on"); threadStarting = threadOn == "on";
+            if (threadStarting && dataset.Length > 0) Thread.Sleep(8000);  // let the border router start before joining
+        }
         Log("setup saved" + (dataset.Length > 0 ? " (thread)" : ""));
         string threadResult = dataset.Length > 0 ? ApplyThread(dataset) : "";
         lock (setupGate) haTlv = "";
@@ -255,7 +278,7 @@ static partial class Bridge
     {
         const string C = "/opt/usr/apps/com.samsung.tizen.smartthings-hub/bin/ot-ctl";
         if (!ThreadInstalled || noTv) return "Thread: the border router is not installed.";
-        if (!ThreadWanted) return "Thread: switch the border router on in Info first.";
+        if (!ThreadWanted) return "Thread: switch the border router on first.";
         string Ot(string args) => Run(C, args, 6000).Replace("\r", "").Trim();
         string current = Ot("dataset active -x").Split('\n')[0].Trim();
         if (string.Equals(current, dataset, StringComparison.OrdinalIgnoreCase)) return "Already on this Thread network.";

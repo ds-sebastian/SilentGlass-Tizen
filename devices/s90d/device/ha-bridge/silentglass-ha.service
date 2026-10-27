@@ -1,7 +1,7 @@
 [Unit]
 Description=SilentGlass: Home Assistant bridge (MQTT discovery, notifications, phone setup page)
 StartLimitIntervalSec=0
-# runs unconfigured too: set it up from a phone (TV: Home > Info > Home Assistant), which writes
+# runs unconfigured too: set it up from a phone (TV: Home > Info > Advanced settings), which writes
 # /opt/usr/home/owner/.config/silentglass-ha.conf (mode 600)
 
 [Service]

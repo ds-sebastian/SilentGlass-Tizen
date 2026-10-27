@@ -1,4 +1,4 @@
-# SilentGlass Home Assistant bridge. Normally written by the phone setup page (TV: Home > Info > Home Assistant).
+# SilentGlass Home Assistant bridge. Normally written by the phone setup page (TV: Home > Info > Advanced settings).
 # By hand: copy to silentglass-ha.conf, chmod 600, fill in your MQTT broker (user/password are optional).
 host=192.168.1.10
 port=1883

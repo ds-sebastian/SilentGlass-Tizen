@@ -26,7 +26,7 @@ static partial class Bridge
     static readonly string ConfPath = Environment.GetEnvironmentVariable("SG_CONF") ?? "/opt/usr/home/owner/.config/silentglass-ha.conf";
     static bool noTv;
     const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    const string Version = "2.3";
+    const string Version = "2.4";
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf = new();
     static Mqtt mqtt;
@@ -36,6 +36,13 @@ static partial class Bridge
     static volatile bool reload;
     static volatile string mqttState = "unconfigured", mqttError = "";
 
+    // the border router's switch (also on the phone page): thread-off survives reboots, and quiet-otbr-switch.path
+    // watches thread-switch and applies the change at once
+    static void SetThreadSwitch(bool on)
+    {
+        if (on) File.Delete(Data + "/thread-off"); else File.WriteAllText(Data + "/thread-off", "");
+        File.WriteAllText(Data + "/thread-switch", DateTime.UtcNow.ToString("o") + (on ? " on\n" : " off\n"));
+    }
     static void Log(string s) { if (noTv) Console.WriteLine(s); try { File.AppendAllText("/run/user/5001/silentglass-ha.log", DateTime.Now.ToString("MM-dd HH:mm:ss ") + s + "\n"); } catch { } }
     static string TvName => conf.GetValueOrDefault("name", "").Length > 0 ? conf["name"] : "Living Room TV";
     static bool Configured => conf.GetValueOrDefault("host", "").Length > 0;
@@ -48,7 +55,7 @@ static partial class Bridge
     {
         string tmp = ConfPath + ".new";
         File.WriteAllText(tmp, ""); Run("/bin/chmod", "600 " + tmp, 3000);  // private before anything is written
-        File.AppendAllText(tmp, "# SilentGlass bridge - written by the setup page (Info > Home Assistant on the TV)\n" +
+        File.AppendAllText(tmp, "# SilentGlass bridge - written by the setup page (Info > Advanced settings on the TV)\n" +
             string.Join("", new[] { "host", "port", "user", "password", "name", "notify_from" }.Where(c.ContainsKey).Select(k => k + "=" + c[k] + "\n")));
         File.Move(tmp, ConfPath, true);
     }
@@ -168,10 +175,7 @@ static partial class Bridge
             case "ambient/press": LaunchApp(ArtApp); slow = false; break;
             case "resync/press": ResyncNames(); break;
             case "thread_switch/set" when ThreadInstalled && (payload == "ON" || payload == "OFF"):
-                if (payload == "OFF") File.WriteAllText(Data + "/thread-off", ""); else File.Delete(Data + "/thread-off");
-                // same as the Info switch: quiet-otbr-switch.path watches this file and applies the change at once
-                File.WriteAllText(Data + "/thread-switch", DateTime.UtcNow.ToString("o") + (payload == "ON" ? " on\n" : " off\n"));
-                slow = false; break;
+                SetThreadSwitch(payload == "ON"); slow = false; break;
             case "volume/set" when double.TryParse(payload, NumberStyles.Float, CultureInfo.InvariantCulture, out var vol):
                 lock (tv) sound_manager_set_master_volume((int)Math.Clamp(Math.Round(vol), 0, 100)); slow = false; break;
             case "mute/set" when payload == "ON" || payload == "OFF":

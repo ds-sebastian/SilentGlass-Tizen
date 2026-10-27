@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>SilentGlass setup</title>
+<title>SilentGlass · Advanced settings</title>
 <style>
-:root{--bg:#f2f2f7;--card:#fff;--text:#000;--sub:#6e6e73;--line:#c6c6c8;--accent:#0a84ff;--green:#30c759;--red:#ff3b30;--field:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--sub:#8e8e93;--line:#38383a;--field:#1c1c1e}}
+:root{--bg:#f2f2f7;--card:#fff;--text:#000;--sub:#6e6e73;--line:#c6c6c8;--accent:#0a84ff;--green:#30c759;--red:#ff3b30;--field:#fff;--segon:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--sub:#8e8e93;--line:#38383a;--field:#1c1c1e;--segon:#636366}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
 header{padding:40px 4px 8px}
@@ -25,7 +25,7 @@ h2{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--sub);marg
 .btnrow.busy{opacity:.5;pointer-events:none}
 .seg{display:flex;background:rgba(118,118,128,.12);border-radius:9px;padding:2px;margin:10px 16px;gap:2px}
 .seg button{flex:1;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;white-space:nowrap;padding:7px 4px;border-radius:7px}
-.seg button.on{background:var(--card);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+.seg button.on{background:var(--segon);box-shadow:0 3px 8px rgba(0,0,0,.12)}
 .switch{position:relative;display:block;flex:0 0 51px;width:51px;height:31px;margin-left:auto}
 .switch input{opacity:0;width:0;height:0}
 .switch span{position:absolute;inset:0;background:rgba(120,120,128,.32);border-radius:16px;transition:.2s}
@@ -37,23 +37,62 @@ h2{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--sub);marg
 .dot.ok{background:var(--green)}.dot.bad{background:var(--red)}
 textarea{width:100%;border:0;background:transparent;color:var(--text);font:13px ui-monospace,Menlo,monospace;padding:12px 16px;min-height:84px;outline:0;resize:vertical}
 .hidden,#gate.hidden{display:none}
+body.locked main,body.locked #save{display:none}
+.row select{flex:1;min-width:0;border:0;background:transparent;color:var(--sub);font:inherit;text-align:right;text-align-last:right;padding:11px 0;outline:0;-webkit-appearance:none;appearance:none}
+.row>span{flex:1}
 #save{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));height:52px;border:0;border-radius:14px;background:var(--accent);color:#fff;font:600 17px -apple-system,BlinkMacSystemFont,sans-serif}
 #save:disabled{opacity:.5}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(80px + env(safe-area-inset-bottom));background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none}
-#gate{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#gate{position:fixed;inset:0;z-index:10;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
 #gate input{font:600 34px ui-monospace,Menlo,monospace;letter-spacing:10px;text-align:center;width:240px;border:0;border-bottom:2px solid var(--line);background:transparent;color:var(--text);padding:8px;outline:0;margin:22px 0}
 #gate button{border:0;border-radius:12px;background:var(--accent);color:#fff;font:600 17px -apple-system,sans-serif;padding:12px 28px}
 </style>
 </head>
-<body>
+<body class="locked">
 <div id="gate" class="hidden">
   <h1>SilentGlass</h1>
-  <p style="color:var(--sub)">Enter the code shown on the TV.</p>
+  <p style="color:var(--sub)">Advanced settings. Enter the code shown on the TV.</p>
   <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
   <button onclick="unlock()">Continue</button>
   <p id="gateerr" style="color:var(--red)"></p>
 </div>
-<header><h1>SilentGlass</h1><p id="tvname">Living Room TV</p></header>
+<main>
+<header><h1>Advanced settings</h1><p id="tvname">Living Room TV</p></header>
+
+<h2>Home screen</h2>
+<div class="group">
+  <div class="row"><label for="watch">Watch</label><select id="watch"></select></div>
+  <div class="row"><label for="play">Play</label><select id="play"></select></div>
+  <div class="row"><span>Apps in the bar</span><label class="switch"><input type="checkbox" id="apps"><span></span></label></div>
+  <div class="row"><span>Dim when idle</span><label class="switch"><input type="checkbox" id="dim"><span></span></label></div>
+  <div class="seg" id="wallseg"><button data-w="auto" class="on">Follows sunset</button><button data-w="day">Day</button><button data-w="night">Night</button></div>
+  <div class="row"><label for="lat">Latitude</label><input id="lat" inputmode="decimal" placeholder="40.7"></div>
+  <div class="row"><label for="lon">Longitude</label><input id="lon" inputmode="decimal" placeholder="-74.0"></div>
+</div>
+<p class="foot">Watch and Play are the two inputs on the bar. The wallpaper follows sunset at this location (city level is plenty).</p>
+
+<h2>Notifications</h2>
+<div class="group">
+  <div class="row"><span>Show on the TV</span><label class="switch"><input type="checkbox" id="notify"><span></span></label></div>
+  <div class="row"><label for="from">Also from</label><input id="from" placeholder="addresses, optional" autocapitalize="off"></div>
+</div>
+<p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV.</p>
+
+<div id="threadsec">
+<h2>Thread border router</h2>
+<div class="group">
+  <div class="row"><span>Border router</span><label class="switch"><input type="checkbox" id="thon"><span></span></label></div>
+  <div class="status"><span class="dot" id="thdot"></span><span id="thstate">Checking…</span></div>
+  <div class="seg" id="thseg"><button data-m="keep" class="on">Keep network</button><button data-m="ha">Home Assistant</button><button data-m="tlv">Paste dataset</button></div>
+  <div id="th-ha" class="hidden">
+    <div class="row"><label for="haurl">Address</label><input id="haurl" placeholder="http://homeassistant.local:8123" autocapitalize="off" autocorrect="off"></div>
+    <div class="row"><label for="hatoken">Token</label><input id="hatoken" type="password" placeholder="long-lived access token"></div>
+    <div class="row btnrow" id="hafetch" onclick="fetchHa()">Get Home Assistant's network</div>
+  </div>
+  <div id="th-tlv" class="hidden"><textarea id="tlv" placeholder="Active dataset (hex TLVs)" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>
+</div>
+<p class="foot" id="thfoot">The TV can be a Thread border router for your smart home. To join your network it needs the network's dataset: let it read Home Assistant's preferred network once (the token is used for that and then forgotten), or paste the dataset (Home Assistant: Settings › Thread › your network › ⓘ).</p>
+</div>
 
 <h2>Home Assistant</h2>
 <div class="group">
@@ -70,35 +109,7 @@ textarea{width:100%;border:0;background:transparent;color:var(--text);font:13px 
 <div class="group">
   <div class="row"><label for="name">Name</label><input id="name" placeholder="Living Room TV"></div>
 </div>
-
-<h2>Notifications</h2>
-<div class="group">
-  <div class="row"><span>Show on the TV</span><label class="switch"><input type="checkbox" id="notify"><span></span></label></div>
-  <div class="row"><label for="from">Also from</label><input id="from" placeholder="addresses, optional" autocapitalize="off"></div>
-</div>
-<p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV.</p>
-
-<div id="threadsec">
-<h2>Thread</h2>
-<div class="group">
-  <div class="status"><span class="dot" id="thdot"></span><span id="thstate">Checking…</span></div>
-  <div class="seg" id="thseg"><button data-m="keep" class="on">Keep</button><button data-m="ha">Home Assistant</button><button data-m="tlv">Paste dataset</button></div>
-  <div id="th-ha" class="hidden">
-    <div class="row"><label for="haurl">Address</label><input id="haurl" placeholder="http://homeassistant.local:8123" autocapitalize="off" autocorrect="off"></div>
-    <div class="row"><label for="hatoken">Token</label><input id="hatoken" type="password" placeholder="long-lived access token"></div>
-    <div class="row btnrow" id="hafetch" onclick="fetchHa()">Get Home Assistant's network</div>
-  </div>
-  <div id="th-tlv" class="hidden"><textarea id="tlv" placeholder="Active dataset (hex TLVs)" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>
-</div>
-<p class="foot" id="thfoot">The TV is a Thread border router. To join your network it needs the network's dataset: let it read Home Assistant's preferred network once (the token is used for that and then forgotten), or paste the dataset (Home Assistant: Settings › Thread › your network › ⓘ).</p>
-</div>
-
-<h2>Wallpaper</h2>
-<div class="group">
-  <div class="row"><label for="lat">Latitude</label><input id="lat" inputmode="decimal" placeholder="40.7"></div>
-  <div class="row"><label for="lon">Longitude</label><input id="lon" inputmode="decimal" placeholder="-74.0"></div>
-</div>
-<p class="foot">For switching the wallpaper at sunrise and sunset. City level is plenty.</p>
+</main>
 
 <div id="toast"></div>
 <button id="save" onclick="save()">Save</button>
@@ -106,16 +117,16 @@ textarea{width:100%;border:0;background:transparent;color:var(--text);font:13px 
 <script>
 const $ = id => document.getElementById(id);
 let code = new URLSearchParams(location.search).get('code') || '';
-let threadMode = 'keep', haReady = false;
+let threadMode = 'keep', haReady = false, wall = 'auto';
 
 async function api(path, body) {
   const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-Code': code, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   if (r.status === 403) { gate('That code did not match. Check the TV.'); throw new Error('code'); }
-  if (r.status === 410) { toast('Setup was closed on the TV. Open it again from Info › Home Assistant.'); throw new Error('closed'); }
+  if (r.status === 410) { toast('Closed on the TV. Open it again from Info › Advanced settings.'); throw new Error('closed'); }
   return r.json();
 }
-function gate(err) { $('gate').classList.remove('hidden'); $('gateerr').textContent = err || ''; $('code').focus(); }
-function unlock() { code = $('code').value.replace(/\D/g, ''); if (code.length === 6) { $('gate').classList.add('hidden'); load(); } }
+function gate(err) { document.body.classList.add('locked'); $('gate').classList.remove('hidden'); $('gateerr').textContent = err || ''; $('code').focus(); }
+function unlock() { code = $('code').value.replace(/\D/g, ''); if (code.length === 6) load(); }
 $('code').addEventListener('input', () => { if ($('code').value.replace(/\D/g, '').length === 6) unlock(); });
 function toast(text, ms) { const t = $('toast'); t.textContent = text; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms || 5000); }
 function dot(el, s) { el.className = 'dot' + (s === true ? ' ok' : s === false ? ' bad' : ''); }
@@ -126,14 +137,26 @@ function show(s) {
   $('password').placeholder = s.has_password ? 'unchanged' : 'optional';
   $('notify').checked = s.notifications; $('from').value = s.notify_from || '';
   $('lat').value = s.lat ?? ''; $('lon').value = s.lon ?? '';
+  fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
+  $('apps').checked = !s.hideapps; $('dim').checked = s.dim; setWall(s.wall || 'auto');
+  $('thon').checked = s.thread_on;
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
   dot($('mqttdot'), m[0]); $('mqttstate').textContent = m[1];
   $('threadsec').classList.toggle('hidden', !s.thread_installed);
   const role = s.thread_role || 'unavailable', joined = /^(router|leader|child)$/.test(role);
   dot($('thdot'), joined ? true : role === 'off' ? null : false);
-  $('thstate').textContent = joined ? 'Border router on your Thread network (' + role + ')' : role === 'off' ? 'Border router switched off' : role === 'detached' ? 'Not on a Thread network yet' : 'Border router ' + role;
+  $('thstate').textContent = !s.thread_on ? 'Switched off' : joined ? 'On your Thread network (' + role + ')' : role === 'detached' ? 'Not on a Thread network yet' : role === 'off' ? 'Starting…' : 'Border router ' + role;
 }
-async function load() { try { show(await api('/api/state')); } catch (e) {} }
+async function load() {
+  try { const s = await api('/api/state'); $('gate').classList.add('hidden'); document.body.classList.remove('locked'); show(s); } catch (e) {}
+}
+function setWall(w) { wall = w; document.querySelectorAll('#wallseg button').forEach(x => x.classList.toggle('on', x.dataset.w === w)); }
+document.querySelectorAll('#wallseg button').forEach(b => b.onclick = () => setWall(b.dataset.w));
+function fillInputs(sel, list, value) {
+  sel.innerHTML = '';
+  [{ type: 0, name: 'Automatic' }].concat(list).forEach(i => { const o = document.createElement('option'); o.value = i.type; o.textContent = i.name; sel.appendChild(o); });
+  sel.value = value;
+}
 
 document.querySelectorAll('#thseg button').forEach(b => b.onclick = () => {
   threadMode = b.dataset.m;
@@ -157,9 +180,12 @@ async function fetchHa() {
   b.classList.remove('busy'); b.textContent = 'Get Home Assistant\'s network';
 }
 async function save() {
-  if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep.'); return; }
+  if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep network.'); return; }
+  if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
   const body = Object.assign(mqttBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(),
-    lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, '') });
+    lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
+    watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').checked ? '1' : '0', wall,
+    thread_on: $('thon').checked ? 'on' : 'off' });
   $('save').disabled = true; $('save').textContent = 'Saving…';
   try { const r = await api('/api/save', body); toast(r.message, 8000); $('password').value = ''; await load(); } catch (e) {}
   $('save').disabled = false; $('save').textContent = 'Save';

@@ -52,9 +52,10 @@ is a full capture of the backdrop with the bar.*
 - **Notifications on any input**: add the TV with Home Assistant's *Notifications for Android TV* integration and
   notifications (Frigate snapshots, the doorbell) appear as a banner over whatever is on screen - SHIELD, a console,
   an app - without taking the remote. They never wake the TV.
-- **Set up from your phone**: Info > Home Assistant shows a QR code. Scan it, enter the code on screen, and fill in
-  your MQTT broker (with a Test button), the TV's name, notifications and your Thread network. Nothing to type with
-  the remote; the settings stay on the TV.
+- **Advanced settings on your phone**: Info > Advanced settings shows a QR code. Scan it, enter the code on screen, and fill in
+  the home screen (Watch/Play inputs, Apps, dimming, wallpaper), notifications, the Thread border router, your MQTT
+  broker (with a Test button) and the TV's name. Info shows Home Assistant's status. Nothing to type with the remote;
+  the settings stay on the TV.
 
 ![Notification over the picture](docs/screenshots/s90d-notice.jpg)
 

@@ -105,19 +105,20 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
 
 ![Setup sheet on the TV](../../docs/screenshots/s90d-setup.jpg)
 
-On the TV: **Home > Info > Home Assistant**. A sheet shows a QR code of the address and a 6-digit code; scan it with a phone
+On the TV: **Home > Info > Advanced settings**. A sheet shows a QR code of the address and a 6-digit code; scan it with a phone
 on the same network (or open the address shown), then type the code - the QR never carries it. The page, served by the bridge on port 7680, has:
 
-- **Home Assistant**: MQTT server, port, username, password, with a **Test connection** button. The password is never
-  sent back to the phone; leave it empty to keep the current one.
-- **This TV**: the name it has in Home Assistant.
+- **Home screen**: the Watch and Play inputs, Apps in the bar, Dim when idle, the wallpaper (follows sunset / day /
+  night) and its location. Written to SilentGlass's own prefs file, which it reloads at once.
 - **Notifications**: on/off, and extra addresses allowed to send them (`notify_from`) if Home Assistant doesn't run
   on the broker's host.
-- **Thread** (where the border router is installed): keep the current network, read Home Assistant's preferred
-  network once (address + a long-lived token; the token is used for that one request and not stored), or paste a
-  dataset. The dataset is applied as the owner user with `ot-ctl`, with Thread stopped first so nothing is pushed
-  to the rest of the mesh.
-- **Wallpaper**: latitude/longitude for the sunrise/sunset switch.
+- **Thread border router** (where installed): on/off (the same switch as in Home Assistant), and its network: keep
+  it, read Home Assistant's preferred network once (address + a long-lived token; the token is used for that one
+  request and not stored), or paste a dataset. The dataset is applied as the owner user with `ot-ctl`, with Thread
+  stopped first so nothing is pushed to the rest of the mesh.
+- **Home Assistant**: MQTT server, port, username, password, with a **Test connection** button. The password is never
+  sent back to the phone; leave it empty to keep the current one. Info on the TV shows its status.
+- **This TV**: the name it has in Home Assistant.
 
 Save writes the owner-only config, reconnects, and the sheet on the TV shows the result. The page only works while
 the sheet is open: Back on the TV, 10 minutes, or 8 wrong codes close it. It is plain HTTP on your LAN, like the TV's
