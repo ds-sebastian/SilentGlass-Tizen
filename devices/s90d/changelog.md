@@ -6,11 +6,29 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v41a**: the wallpaper no longer comes up over SHIELD. What is on screen is now decided in one NUI-free file,
+  `launcher/src/Screen.cs`, and `tests/screen-sim` runs that exact code against a simulated TV (SHIELD and Switch
+  sleeping, waking over CEC and resyncing, Ambient, standby, Home Assistant launches, idle close, OLED dim), under every
+  combination of the TV behaviours not yet measured. Against v40i it found about 1,200 runs with the wallpaper over a
+  live picture and about 160 with a bar the remote could not reach; v41a breaks no rule in 12,088 runs.
+  - Home during a picture blip (SHIELD waking, an input still syncing, a frame-rate switch) used to bring up the
+    wallpaper, which then never left - not when the picture came back, not on a second Home press, and after 5 min
+    it dimmed to black over SHIELD. Now the picture arriving under the wallpaper takes the screen, the viewer
+    coming to the front ends the wallpaper, and Home within 4 s of a dropout counts as over the picture.
+  - Home from Ambient (the remote, or Home Assistant's Home button) went to the wallpaper even with SHIELD on and
+    selected. It now goes to the picture first, waits for the signal flag (stale while Ambient runs) to settle, then
+    opens the bar.
+  - An input switch SilentGlass did not make (HDMI-CEC One Touch Play) and standby (`memory/pm/state`, which the
+    app can watch) now close the bar and the wallpaper; before, a CEC switch left a bar the keys no longer reached,
+    and a bar open at power-off came back dead at power-on.
+  - Checked on the TV: cold start (bar, keys), Home with the Switch asleep (wallpaper), switching to SHIELD with Home
+    pressed before its signal settled (the wallpaper stepped aside), Ambient -> Home (bar over SHIELD, keys work),
+    standby with the bar open (closed itself). Deploy pair `update-v41a.sh` (from v32a) / `restore-v32a.sh`.
 - **v40i** + **batch F**: the drift check found Prime Video's companion enabled again - and Prime Video, Apple TV and
   the web browser reinstalled ~3.5 h after batch D uninstalled them (Samsung's country preloads come back; Prime was
   running in the background). Batch F keeps them installed but disabled, which sticks, as it has for TV YouTube;
   stopping them freed ~90 MB. Info's privacy check and the drift check now cover them. The drift check reads clean
-  again. Deploy pair: `update-v40i.sh` (from v32a) / `restore-v32a.sh`. Installed; it takes over at the next Home
+  again. Installed; it takes over at the next Home
   press (the TV was put in standby before an on-screen check).
 - **v40h** (+ HA bridge 2.3, installed and checked on the TV): first on-screen run of v40a, and the fixes it needed.
   - **Keys at cold start**: the TV's launch placeholder (`[WIND]com.samsung.tv.bixby-promotion`) holds the remote's

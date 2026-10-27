@@ -23,7 +23,7 @@ Re-read current device state and exact hashes before acting; never run every sav
 installer merely because it exists.
 
 
-## SilentGlass (v40i)
+## SilentGlass (v41a)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -84,6 +84,10 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   the soundbar the SHIELD reports Off.
 - **Ambient**: the Art app always hands Home to Samsung Home (hard-coded); SilentGlass watches the foreground app and
   brings itself back on that one hand-off.
+- **What is on screen**: `Screen.cs` alone decides wallpaper vs bar vs nothing; `tests/screen-sim` runs it against a
+  simulated TV. Rules it enforces: the wallpaper never covers a live picture; a visible bar always gets the keys;
+  nothing of ours stays over another app; Home always leaves a working bar (or closes one); Home with no picture brings
+  the wallpaper. Change the model in `tests/screen-sim/ScreenSim.cs` when the TV shows new behaviour.
 - **Cold start**: the TV's launch placeholder holds the remote's keys until the app's main window has been shown once,
   so that window starts shown (black, empty) and Home hides it as the bar opens. The TV also pauses the app whenever
   only the overlay is up; a pause never closes the overlay - another app coming to the front does.

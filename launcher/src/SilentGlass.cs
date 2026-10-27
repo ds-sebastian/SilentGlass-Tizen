@@ -15,7 +15,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v40i";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41a";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -45,7 +45,7 @@ public sealed partial class SilentGlass : NUIApplication
     // The TV also pauses us whenever our main window is hidden - i.e. whenever only the overlay is up - so a pause
     // alone must not close it. Another app coming to the front does (OnForegroundChanged); the backdrop never stays
     // behind anything.
-    protected override void OnPause() { base.OnPause(); if (!overlayShown) HideBackdrop(); Note("paused"); WriteState("paused"); }
+    protected override void OnPause() { base.OnPause(); screen.Paused(); Note("paused"); WriteState("paused"); }
 
     protected override void OnAppControlReceived(AppControlReceivedEventArgs e)
     {
@@ -60,23 +60,8 @@ public sealed partial class SilentGlass : NUIApplication
         Home(open ?? "", "launch");
     }
 
-    // The Home button. Over a picture it toggles the bar; with nothing to draw over, the wallpaper comes up behind it.
-    void Home(string open, string why)
-    {
-        Wake();
-        bool picture = HasPicture && (lastOther == Viewer || lastOther == "");
-        if (open == "" && overlayShown && !backdropShown) { CloseOverlay(why + ":close"); return; }
-        if (picture && !backdropShown) HideBackdrop(); else ShowBackdrop();
-        OpenBar(open == "" && overlayShown);
-        switch (open) {
-            case "controls": OpenControls(); break;
-            case "info": OpenInfo(); break;
-            case "apps": OpenApps(); break;
-            case "inputs": OpenInputs(); break;
-            case "setup": OpenInfo(); OpenSetup(); break;
-        }
-        Note(why + (open == "" ? "" : ":" + open) + (backdropShown ? ":backdrop" : ":picture"));
-    }
+    // The Home button: Screen.cs decides (bar over the picture, the wallpaper behind it, or picture first from Ambient)
+    void Home(string open, string why) => screen.Home(open, why);
 
     // ---- keys: both windows route here ----
     string lastKey = ""; long lastKeyAt, keyCount, keyTicksMax;
@@ -128,10 +113,10 @@ public sealed partial class SilentGlass : NUIApplication
         void Put(string key, object value) => b.Append('\n').Append(key).Append('=').Append(value);
         Put("version", ModVersion); Put("activity", what);
         // read by the bridge: while SilentGlass shows nothing full-screen, the app on screen is `fg`
-        Put("ui", overlayShown ? mode.ToString().ToLowerInvariant() : "none"); Put("backdrop", backdropShown ? "shown" : "hidden"); Put("fg", lastOther);
+        Put("ui", overlayShown ? mode.ToString().ToLowerInvariant() : "none"); Put("backdrop", backdropShown ? "shown" : "hidden"); Put("fg", screen.LastOther);
         Put("focus", FocusName()); Put("key", lastKey); Put("key_count", keyCount);
         Put("key_ms_max", (keyTicksMax * 1000.0 / Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
-        Put("source", lastSource); Put("signal", signal); Put("ports", watchPort + "," + playPort + "(" + prefs.Watch + "," + prefs.Play + ")");
+        Put("source", lastSource); Put("signal", screen.Signal); Put("ports", watchPort + "," + playPort + "(" + prefs.Watch + "," + prefs.Play + ")");
         Put("inputs", string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + (i.Known ? i.Connected ? "1" : "0" : "?"))));
         Put("prefs", Logic.FormatPrefs(prefs).Trim().Replace('\n', ','));
         Put("brightness", Setting("brightness")); Put("contrast", Setting("contrast")); Put("picturemode", Setting("picturemode"));

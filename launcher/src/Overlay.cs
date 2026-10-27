@@ -66,7 +66,7 @@ public sealed partial class SilentGlass
     }
 
     // ---- the bar ----
-    string BarSignature() => InputName(watchPort) + "|" + InputName(playPort) + "|" + lastSource + "|" + signal + "|" + prefs.HideApps;
+    string BarSignature() => InputName(watchPort) + "|" + InputName(playPort) + "|" + lastSource + "|" + screen.Signal + "|" + prefs.HideApps;
     bool PortsChanged() { RefreshInputs(); ResolvePorts(); return BarSignature() != barSig; }
     bool LiveDot(string action) => action == "hdmi:" + lastSource && HasPicture;
     void OpenBar(bool keepFocus)
@@ -74,7 +74,7 @@ public sealed partial class SilentGlass
         EnsureOverlay();
         string keep = keepFocus && barSel >= 0 && barSel < bar.Count ? bar[barSel].Action : null;
         ClearOverlay(); mode = Mode.Bar; Place(0, BandTop, 1920, 1080 - BandTop);
-        RefreshInputs(); RefreshSource(); ReadSignal(); ResolvePorts(); barSig = BarSignature();
+        RefreshInputs(); ResolvePorts(); barSig = BarSignature();
         oDim = Dimming(false, 0, BandTop + 180, 1920, 1080 - BandTop - 180, .5f); oRoot.Add(oDim); oRoot.Add(oLayer);
         // Watch / Play keep their names; the device each opens (the TV's input name) is the line underneath
         var items = new List<(string glyph, string title, string sub, string action)> {
@@ -134,7 +134,7 @@ public sealed partial class SilentGlass
         string a = bar[barSel].Action;
         if (a.StartsWith("hdmi:")) {
             int t = int.Parse(a.Substring(5));
-            if (t == lastSource && HasPicture && !backdropShown) CloseOverlay("bar:watching"); else SelectSource(t);
+            if (screen.BarWatching(t)) CloseOverlay("bar:watching"); else SelectSource(t);
         }
         else if (a == "inputs") OpenInputs();
         else if (a == "apps") OpenApps();
@@ -151,7 +151,7 @@ public sealed partial class SilentGlass
         switch (mode) {
             case Mode.Bar:
                 // over the wallpaper Back goes to the picture (the last input); over the picture it closes the bar
-                if (back) { if (backdropShown) SelectSource(lastSource); else CloseOverlay("back"); return; }
+                if (back) { screen.BarBack(); return; }
                 if (k == "Left" || k == "Right") { int n = Math.Clamp(barSel + (k == "Left" ? -1 : 1), 0, bar.Count - 1); if (n != barSel) { barSel = n; FocusBar(true); } }
                 else if (sel || k == "Up" && !bar[barSel].Action.StartsWith("hdmi:")) ActivateBar();
                 return;

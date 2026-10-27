@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Off-TV simulation of launcher/src/Screen.cs (wallpaper vs bar vs nothing) against a model of the S90D.
+       Run by tests/test_s90d_screen.py. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="../../launcher/src/Screen.cs" /><Compile Include="../../launcher/src/Logic.cs" /></ItemGroup>
+</Project>

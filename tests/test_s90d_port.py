@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "launcher/src"
 BRIDGE = ROOT / "devices/s90d/device/ha-bridge/src"
 PARTS = ("SilentGlass.cs", "Ui.cs", "Backdrop.cs", "Overlay.cs", "Menus.cs", "Panels.cs", "Setup.cs", "Notice.cs", "Tv.cs",
-         "Logic.cs", "Qr.cs", "AppLibrary.cs", "InfoStats.cs")
+         "Screen.cs", "Logic.cs", "Qr.cs", "AppLibrary.cs", "InfoStats.cs")
 
 
 def launcher():
@@ -63,6 +63,9 @@ class LauncherTests(unittest.TestCase):
         for p in ("Logic.cs", "Qr.cs"):
             self.assertIn(f'<Compile Include="../launcher/src/{p}" />', tests)
             self.assertNotIn("Tizen.", (SRC / p).read_text())
+        # what is on screen is decided in Screen.cs, which tests/screen-sim runs against a simulated TV
+        self.assertIn('<Compile Include="../../launcher/src/Screen.cs" />', (ROOT / "tests/screen-sim/ScreenSim.csproj").read_text())
+        self.assertNotIn("Tizen.", (SRC / "Screen.cs").read_text())
 
     def test_body_helper_stops_at_the_member(self):
         src = "class C\n{\n void A(){x(\"}\"); // the TV's }\n }\n void B(){y();}\n}\n"
@@ -83,11 +86,13 @@ class LauncherTests(unittest.TestCase):
         self.assertNotIn("Hide()", build.replace("backdrop.Hide()", ""))
         self.assertIn("if (!backdropShown && !mainUp) return;", body(backdrop, "void HideBackdrop()"))
         # shown only when there is nothing to draw over
-        home = body(src, "void Home(")
-        self.assertIn("bool picture = HasPicture && (lastOther == Viewer || lastOther == \"\");", home)
-        self.assertIn("if (picture && !backdropShown) HideBackdrop(); else ShowBackdrop();", home)
+        screen = (SRC / "Screen.cs").read_text()
+        home = body(screen, "public void Home(")
+        self.assertIn("if (OverPicture()) ui.HideBackdrop(); else ui.ShowBackdrop();", home)
         # Home over the picture toggles the bar
-        self.assertIn('if (open == "" && overlayShown && !backdropShown) { CloseOverlay(why + ":close"); return; }', home)
+        self.assertIn('if (open == "" && ui.OverlayShown && !ui.BackdropShown) { ui.CloseOverlay(why + ":close"); return; }', home)
+        # and the wallpaper never stays over a picture that arrives under it
+        self.assertIn('if (!had && HasPicture && ui.BackdropShown && !ui.SetupOpen) { ToPicture("picture_arrived"); return; }', screen)
 
     def test_overlay_is_a_partial_notification_window_above_the_viewer(self):
         ov = (SRC / "Overlay.cs").read_text()
@@ -105,9 +110,11 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("EnsureOverlay();  // created while the app's main window is still up", (SRC / "SilentGlass.cs").read_text())
         # the TV pauses us whenever only the overlay is up: a pause must not close it; another app in front does
         pause = body(launcher(), "protected override void OnPause()")
-        self.assertIn("if (!overlayShown) HideBackdrop();", pause)
+        self.assertIn("screen.Paused();", pause)
         self.assertNotIn("CloseOverlay", pause)
-        self.assertIn('if (now != SelfId && now != Viewer && (overlayShown || backdropShown)) { CloseOverlay("foreground:" + now); HideBackdrop(); }', (SRC / "Tv.cs").read_text())
+        screen = (SRC / "Screen.cs").read_text()
+        self.assertIn("public void Paused() { if (!ui.OverlayShown) ui.HideBackdrop(); }", screen)
+        self.assertIn('if (now != Self && now != Viewer && (ui.OverlayShown || ui.BackdropShown)) { ui.CloseOverlay("foreground:" + now); ui.HideBackdrop(); }', screen)
 
     def test_panels_replace_the_bar_and_menus_sit_above_it(self):
         src = launcher()
@@ -166,14 +173,17 @@ class LauncherTests(unittest.TestCase):
 
     def test_native_callbacks_are_kept_alive_and_posted_to_the_ui_thread(self):
         tv = (SRC / "Tv.cs").read_text()
-        self.assertIn("SourceListChangedCallback sourceListCallback; VconfChangedCallback sourceTypeCallback, signalCallback, foregroundCallback;", tv)
-        for cb in ("sourceListCallback = (t, d) => OnUi(", "sourceTypeCallback = (n, d) => OnUi(", "signalCallback = (n, d) => OnUi(", "foregroundCallback = (n, d) => OnUi("):
+        self.assertIn("SourceListChangedCallback sourceListCallback; VconfChangedCallback sourceTypeCallback, signalCallback, foregroundCallback, pmCallback;", tv)
+        for cb in ("sourceListCallback = (t, d) => OnUi(", "sourceTypeCallback = (n, d) => OnUi(", "signalCallback = (n, d) => OnUi(", "foregroundCallback = (n, d) => OnUi(", "pmCallback = (n, d) => OnUi("):
             self.assertIn(cb, tv)
-        # the signal flag flaps while an input syncs
-        self.assertIn("signalSettle = new Tizen.NUI.Timer(800)", tv)
+        # the signal flag flaps while an input syncs: Screen.cs settles it
+        self.assertIn("public const int SettleMs = 800", (SRC / "Screen.cs").read_text())
+        # Screen.After keeps its timers referenced until they fire
+        self.assertIn("afterTimers.Add(t);", tv)
 
     def test_ambient_home_returns_to_silentglass(self):
-        self.assertIn('if (now == "com.samsung.tv.csfs" && IsAmbient(before)) { Launch(SelfId);', (SRC / "Tv.cs").read_text())
+        # to the picture first, then SilentGlass as for any Home press (it used to open the wallpaper over SHIELD)
+        self.assertIn('if (now == SamsungHome && IsAmbient(before)) PictureFirst("", "ambient_home");', (SRC / "Screen.cs").read_text())
 
     def test_oled_idle_dim_only_on_the_backdrop(self):
         b = (SRC / "Backdrop.cs").read_text()

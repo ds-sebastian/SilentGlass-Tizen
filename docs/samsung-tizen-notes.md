@@ -163,6 +163,13 @@ are ordinary optional features rather than trackers.
 - **Pause:** the TV pauses an app whenever its main window is hidden, even if one of its notification windows is up
   and focused. Use the foreground app (`memory/appfw/current_fullscreen_appid`), not `OnPause`, to decide that
   another app has taken over.
+- **The signal flag** (`memory/tv-viewer/mainscreen_signal_state`) is only updated while the viewer runs: it still
+  reads 1 in standby, and goes stale in Ambient. Treat it as "picture" only when the viewer is the app behind you, and
+  debounce it (it flaps for ~1 s while an input syncs). **Power-off** makes the Home app the foreground app.
+  **`memory/pm/state`** (1 on, 3 screen off, 4 standby) can be watched from an app to notice standby.
+- **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off. A device waking with One
+  Touch Play switches the TV's input underneath any open app window; a notification window that had the keys loses
+  them.
 - **Remote keys from Home Assistant** (Samsung TV integration, `remote.send_command`) can arrive seconds late or
   bunched together. Fine for occasional use; space test sequences out or check the app's own state between keys.
 - **Rendering:** DALi renders every second vsync by default; `SetRenderRefreshRate(1)` gives 60 fps.

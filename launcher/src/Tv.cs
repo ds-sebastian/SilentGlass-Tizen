@@ -101,33 +101,32 @@ public sealed partial class SilentGlass
     // powerState is never used: devices behind the soundbar report Off. The only trusted power signal is the picture
     // on the current input (memory/tv-viewer/mainscreen_signal_state). ----
     const string SignalKey = "memory/tv-viewer/mainscreen_signal_state", SourceKey = "memory/system/source_type", ForegroundKey = "memory/appfw/current_fullscreen_appid";
+    const string PmKey = "memory/pm/state";  // 1 on, 2 dim, 3 screen off, 4 standby
     List<InfoStats.InputSource> inputs = new();
-    int lastSource = 15, signal = -1, watchPort = 15, playPort = 13;
-    SourceListChangedCallback sourceListCallback; VconfChangedCallback sourceTypeCallback, signalCallback, foregroundCallback;  // kept alive: native code holds them
-    Tizen.NUI.Timer signalSettle;
-    bool HasPicture => signal == 1;
+    int watchPort = 15, playPort = 13;
+    // what is on screen (wallpaper / bar / nothing) is decided in Screen.cs; it keeps the current input and the
+    // settled signal flag
+    Screen screen;
+    int lastSource => screen.Source;
+    bool HasPicture => screen.HasPicture;
+    SourceListChangedCallback sourceListCallback; VconfChangedCallback sourceTypeCallback, signalCallback, foregroundCallback, pmCallback;  // kept alive: native code holds them
     void WatchTv()
     {
+        screen = new Screen(this, () => Environment.TickCount64);
         try { sourceListCallback = (t, d) => OnUi(() => OnInputsChanged(true)); register_sourcelist_changed_callback(sourceListCallback, IntPtr.Zero); } catch { }
-        try { sourceTypeCallback = (n, d) => OnUi(OnSourceChanged); vconf_notify_key_changed(SourceKey, sourceTypeCallback, IntPtr.Zero); } catch { }
-        // the signal flag flaps while an input syncs: act on it once it has settled
+        try { sourceTypeCallback = (n, d) => OnUi(screen.SourceChanged); vconf_notify_key_changed(SourceKey, sourceTypeCallback, IntPtr.Zero); } catch { }
+        try { signalCallback = (n, d) => OnUi(screen.SignalFlapped); vconf_notify_key_changed(SignalKey, signalCallback, IntPtr.Zero); } catch { }
+        try { foregroundCallback = (n, d) => OnUi(() => screen.Foreground(Foreground())); vconf_notify_key_changed(ForegroundKey, foregroundCallback, IntPtr.Zero); } catch { }
         try {
-            signalCallback = (n, d) => OnUi(() => {
-                if (signalSettle == null) { signalSettle = new Tizen.NUI.Timer(800); signalSettle.Tick += (s, e) => { ReadSignal(); OnTvChanged(); return false; }; }
-                signalSettle.Stop(); signalSettle.Start(); });
-            vconf_notify_key_changed(SignalKey, signalCallback, IntPtr.Zero);
+            pmCallback = (n, d) => OnUi(() => { if (vconf_get_int(PmKey, out int v) == 0 && v >= 3) screen.Standby(); });
+            vconf_notify_key_changed(PmKey, pmCallback, IntPtr.Zero);
         } catch { }
-        try { foregroundCallback = (n, d) => OnUi(OnForegroundChanged); vconf_notify_key_changed(ForegroundKey, foregroundCallback, IntPtr.Zero); } catch { }
-        RefreshInputs(); RefreshSource(); ReadSignal(); ResolvePorts(); NoteForeground(Foreground());
+        RefreshInputs(); screen.Start(); ResolvePorts();
     }
     void RefreshInputs() => inputs = InfoStats.Sources();
-    // TV and HDMI 1-4 only: USB, DLNA and apps leave lastSource on the last real input
-    void RefreshSource() { try { if (vconf_get_int(SourceKey, out int n) == 0 && (n == 0 || Logic.IsHdmi(n))) lastSource = n; } catch { } }
-    void ReadSignal() { try { signal = vconf_get_int(SignalKey, out int v) == 0 ? v : -1; } catch { signal = -1; } }
-    void OnSourceChanged() { int before = lastSource; RefreshSource(); if (before != lastSource) { ReadSignal(); OnTvChanged(); } }
     void OnInputsChanged(bool announce)
     {
-        var before = inputs; RefreshInputs(); RefreshSource(); ResolvePorts();
+        var before = inputs; RefreshInputs(); ResolvePorts();
         if (announce)
             foreach (var now in inputs) {
                 var was = before.Find(i => i.Type == now.Type);
@@ -149,29 +148,8 @@ public sealed partial class SilentGlass
         if (watch) prefs.Watch = Logic.NextPort(prefs.Watch, playPort, dir); else prefs.Play = Logic.NextPort(prefs.Play, watchPort, dir);
         SavePrefs(); ResolvePorts();
     }
-    void SelectSource(int type)
-    {
-        bool ok = false; try { ok = connect_source(type); } catch { }
-        lastSource = type; Note("source:" + type + ":" + ok);
-        CloseOverlay(null); HideBackdrop(); Launch(Viewer);
-    }
-
-    // ---- the app in front. While only SilentGlass's overlay is up the foreground id names us, so remember the last
-    // other app: Home draws over the picture only when that is the TV viewer. ----
-    string lastOther = "";
+    void SelectSource(int type) => screen.SelectSource(type);
     string Foreground() { try { return vconf_get_str(ForegroundKey) ?? ""; } catch { return ""; } }
-    void NoteForeground(string id) { if (!string.IsNullOrEmpty(id) && id != SelfId) lastOther = id; }
-    static bool IsAmbient(string id) => id == "org.tizen.art-app" || id == "com.samsung.tv.home.art" || id == "com.samsung.tv.ambientfte";
-    string previousForeground = "";
-    void OnForegroundChanged()
-    {
-        string now = Foreground(); if (now.Length == 0) return;
-        string before = previousForeground; previousForeground = now; NoteForeground(now); Note("fg:" + now);
-        // another app came to the front (not us, not the picture): nothing of ours may stay over it
-        if (now != SelfId && now != Viewer && (overlayShown || backdropShown)) { CloseOverlay("foreground:" + now); HideBackdrop(); }
-        // Ambient's Home key always opens Samsung Home (hard-coded): come back to SilentGlass instead
-        if (now == "com.samsung.tv.csfs" && IsAmbient(before)) { Launch(SelfId); Note("ambient_home_redirect"); }
-    }
 
     void Launch(string id, string menuItem = null)
     {
@@ -219,4 +197,41 @@ public sealed partial class SilentGlass
         try { var c = Logic.ParseConf(File.ReadAllText(DataFile("location.txt"))); prefs.Lat = Logic.Num(c, "lat", prefs.Lat); prefs.Lon = Logic.Num(c, "lon", prefs.Lon); } catch { }
     }
     void SavePrefs() { try { File.WriteAllText(DataFile("silentglass-prefs.txt"), Logic.FormatPrefs(prefs)); File.Delete(DataFile("quiet-home-prefs.txt")); } catch { } }
+}
+
+// Screen.cs talks to the windows through this
+public sealed partial class SilentGlass : IScreen
+{
+    bool IScreen.OverlayShown => overlayShown;
+    bool IScreen.BackdropShown => backdropShown;
+    bool IScreen.SetupOpen => overlayShown && mode == Mode.Setup;
+    int IScreen.ReadSignal() { try { return vconf_get_int(SignalKey, out int v) == 0 ? v : -1; } catch { return -1; } }
+    int IScreen.ReadSource() { try { return vconf_get_int(SourceKey, out int n) == 0 ? n : -1; } catch { return -1; } }
+    string IScreen.ReadForeground() => Foreground();
+    void IScreen.ShowBackdrop() => ShowBackdrop();
+    void IScreen.HideBackdrop() => HideBackdrop();
+    void IScreen.OpenBar(bool keepFocus) => OpenBar(keepFocus);
+    void IScreen.OpenPart(string part)
+    {
+        switch (part) {
+            case "controls": OpenControls(); break;
+            case "info": OpenInfo(); break;
+            case "apps": OpenApps(); break;
+            case "inputs": OpenInputs(); break;
+            case "setup": OpenInfo(); OpenSetup(); break;
+        }
+    }
+    void IScreen.CloseOverlay(string why) => CloseOverlay(why);
+    void IScreen.Launch(string appId) => Launch(appId);
+    bool IScreen.ConnectSource(int type) { try { return connect_source(type); } catch { return false; } }
+    void IScreen.Wake() => Wake();
+    void IScreen.TvChanged() => OnTvChanged();
+    readonly HashSet<Tizen.NUI.Timer> afterTimers = new();  // referenced until they fire
+    void IScreen.After(int ms, Action action)
+    {
+        var t = new Tizen.NUI.Timer((uint)Math.Max(1, ms)); afterTimers.Add(t);
+        t.Tick += (s, e) => { afterTimers.Remove(t); try { action(); } catch (Exception ex) { Note("after-error:" + ex.GetType().Name); } return false; };
+        t.Start();
+    }
+    void IScreen.Note(string what) => Note(what);
 }
