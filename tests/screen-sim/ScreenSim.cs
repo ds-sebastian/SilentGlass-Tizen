@@ -50,6 +50,7 @@ static class ScreenSim
 
     static IEnumerable<(string, string[])> Scenarios() => new[] {
         ("Home over SHIELD, Home again", new[] { "Home", "Wait 2s", "Home", "Wait 2s" }),
+        ("Home, Home, Home quickly (the bounce)", new[] { "Home", "Home", "Home", "Wait 3s" }),
         ("SHIELD asleep: Home, then SHIELD's remote", new[] { "SHIELD sleeps", "Wait 2s", "Home", "Wait 2s", "SHIELD wakes (its remote)", "Wait 10s" }),
         ("SHIELD asleep: Home, wallpaper dims, then SHIELD's remote", new[] { "SHIELD sleeps", "Wait 2s", "Home", "Wait 6min", "SHIELD wakes (its remote)", "Wait 10s" }),
         ("Home during a frame-rate switch", new[] { "SHIELD resyncs", "Wait 1s", "Home", "Wait 10s" }),
@@ -106,6 +107,8 @@ sealed class FakeTv : IScreen
     public bool OverlayShown => Overlay;
     public bool BackdropShown => Bd;
     public bool SetupOpen => Overlay && Mode == "setup";
+    public long OverlayClosedAt => closedAt; long closedAt = long.MinValue / 2, openedAt = long.MinValue / 2;
+    public readonly Random Rnd = new(7);
     public int ReadSignal() => SignalVconf;
     public int ReadSource() => Src;
     public string ReadForeground() => fgKey;
@@ -118,11 +121,11 @@ sealed class FakeTv : IScreen
     }
     public void OpenBar(bool keep)
     {
-        if (!Overlay) { Overlay = true; Focused = Front == Self && Power; }  // ShowOverlay: Show, Raise, Activate
+        if (!Overlay) { Overlay = true; openedAt = T; Focused = Front == Self && Power; }  // ShowOverlay: Show, Raise, Activate
         Mode = "bar"; lastActivity = T;
     }
     public void OpenPart(string part) { Mode = part; }
-    public void CloseOverlay(string why) { if (!Overlay) return; Overlay = false; Focused = false; Mode = ""; if (why != null) Note(why); }
+    public void CloseOverlay(string why) { if (!Overlay) return; Overlay = false; closedAt = T; Focused = false; Mode = ""; if (why != null) Note(why); }
     public void Launch(string id) => Later(150, () => Amd(id, null));
     public bool ConnectSource(int t)
     {
@@ -192,15 +195,22 @@ sealed class FakeTv : IScreen
     public void Do(string step)
     {
         Tv("> " + step);
-        homeCheck = false;  // a later press decides instead
+        if (!step.StartsWith("Wait ")) homeCheck = false;  // a later press decides instead
         switch (step) {
             case "Home":
                 if (!Power) break;
                 // a Home press closes a working bar over the picture; otherwise it must leave a working bar
                 homeCheck = true; homeAt = T; homeExpectClose = Overlay && Focused && !Bd && Front != Art && Front != Csfs;
                 homeNoPicture = !homeExpectClose && !InputHasPicture && T - pictureSeenAt > 6000;
+                // within 1.2 s of the bar opening or closing a press counts as the remote's echo (Screen.EchoMs): either
+                // outcome is fine
+                if (T - openedAt < Screen.EchoMs || T - closedAt < Screen.EchoMs) homeCheck = false;
                 if (Front == Art) { SetFront(Csfs); break; }  // Ambient's Home key opens Samsung Home
-                Later(150, () => Amd(Self, null)); break;
+                Later(150, () => Amd(Self, null));
+                // seen on the TV (event log, v41b): the remote's Home reaches the app twice, the second launch request
+                // 0.4-1 s after the first
+                Later(150 + 400 + Rnd.Next(600), () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
+                break;
             case "HA Home": Later(150, () => Amd(Self, null)); break;
             case "HA input SHIELD": Later(150, () => Amd(Self, "src:15")); break;
             case "HA input Switch": Later(150, () => Amd(Self, "src:13")); break;
@@ -244,6 +254,7 @@ sealed class FakeTv : IScreen
     {
         if (Power) return;
         Power = true; Tv("power on");
+        pictureSeenAt = T;  // just on: a picture is on its way (bar over black for a moment beats a wallpaper flash)
         if (Src != port) { Src = port; Later(5, () => App.SourceChanged()); }
         ShieldAwake = ShieldAwake || port == 15; ResyncUntil = T + 4000;  // the TV wakes SHIELD over CEC
         SignalVconf = 0; App.SignalFlapped();

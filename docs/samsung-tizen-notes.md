@@ -174,6 +174,8 @@ are ordinary optional features rather than trackers.
 - **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off. A device waking with One
   Touch Play switches the TV's input underneath any open app window; a notification window that had the keys loses
   them.
+- **The Home key reaches the Home app twice:** a key event plus a launch request, then a second launch request
+  0.4-1 s later. Treat a Home launch within ~1.2 s of the last one as the same press, or the second undoes the first.
 - **Remote keys from Home Assistant** (Samsung TV integration, `remote.send_command`) can arrive seconds late or
   bunched together. Fine for occasional use; space test sequences out or check the app's own state between keys.
 - **Rendering:** DALi renders every second vsync by default; `SetRenderRefreshRate(1)` gives 60 fps.

@@ -205,6 +205,7 @@ public sealed partial class SilentGlass : IScreen
     bool IScreen.OverlayShown => overlayShown;
     bool IScreen.BackdropShown => backdropShown;
     bool IScreen.SetupOpen => overlayShown && mode == Mode.Setup;
+    long IScreen.OverlayClosedAt => overlayClosedAt;
     int IScreen.ReadSignal() { try { return vconf_get_int(SignalKey, out int v) == 0 ? v : -1; } catch { return -1; } }
     int IScreen.ReadSource() { try { return vconf_get_int(SourceKey, out int n) == 0 ? n : -1; } catch { return -1; } }
     string IScreen.ReadForeground() => Foreground();

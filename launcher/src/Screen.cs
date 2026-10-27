@@ -18,6 +18,7 @@ public interface IScreen
     bool OverlayShown { get; }
     bool BackdropShown { get; }
     bool SetupOpen { get; }
+    long OverlayClosedAt { get; }   // clock ms when the overlay last closed
     int ReadSignal();
     int ReadSource();
     string ReadForeground();
@@ -45,7 +46,9 @@ public sealed class Screen
     public string LastOther = "";         // the last app in front other than us
     string previous = "";
     int settleGen, homeGen, pollGen; bool homeAfterViewer, directHome; string pendingOpen;
-    public const int BackdropPollMs = 1000;
+    public const int BackdropPollMs = 1000, EchoMs = 1200;
+    bool selfLaunch; long lastHome = long.MinValue / 2;  // the next launch request is our own relaunch, not a Home press
+    void LaunchSelf() { selfLaunch = true; ui.Launch(Self); }
     long pictureLostAt = long.MinValue / 2; int pictureLostOn = -1;
     public bool HasPicture => Signal == 1;
     // over the picture: the viewer is the app behind us and its input shows a picture, or did a moment ago
@@ -60,6 +63,15 @@ public sealed class Screen
     // The Home button. Over a picture it toggles the bar; with nothing to draw over, the wallpaper comes up behind it.
     public void Home(string open, string why)
     {
+        bool own = selfLaunch; selfLaunch = false;
+        // The remote's Home key reaches us twice: a second launch request 0.4-1 s after the first undid it - the bar
+        // closed and reopened (the "bounce", seen in the event log). A plain Home within 1.2 s of the last one, or of
+        // the bar closing (Watch, Back), is that echo.
+        long now = clock();
+        if (!own && open == "" && (now - lastHome < EchoMs || !ui.OverlayShown && now - ui.OverlayClosedAt < EchoMs)) { ui.Note(why + ":echo"); return; }
+        if (open == "") lastHome = now;
+        // a press while going to the picture first: this press decides, the pending relaunch is dropped
+        if (!own && homeAfterViewer) { homeAfterViewer = false; ++homeGen; }
         ui.Wake();
         if (open == "" && pendingOpen != null) open = pendingOpen;  // our own relaunch after going to the picture
         pendingOpen = null;
@@ -87,7 +99,7 @@ public sealed class Screen
         if (now == SamsungHome && IsAmbient(before)) PictureFirst("", "ambient_home");
         if (now == Viewer && homeAfterViewer) {
             homeAfterViewer = false; int g = ++homeGen;
-            ui.After(SettleMs + 300, () => { if (g == homeGen) ui.Launch(Self); });
+            ui.After(SettleMs + 300, () => { if (g == homeGen) LaunchSelf(); });
         }
     }
     // launch the viewer, wait for it to come to the front and its signal flag to settle, then open SilentGlass;
@@ -96,7 +108,7 @@ public sealed class Screen
     {
         homeAfterViewer = true; pendingOpen = open; int g = ++homeGen;
         ui.Launch(Viewer); ui.Note(why + ":picture_first");
-        ui.After(ViewerWaitMs, () => { if (homeAfterViewer && g == homeGen) { homeAfterViewer = false; directHome = true; ui.Launch(Self); } });
+        ui.After(ViewerWaitMs, () => { if (homeAfterViewer && g == homeGen) { homeAfterViewer = false; directHome = true; LaunchSelf(); } });
     }
     // the screen went off: nothing of ours is left up for when it comes back
     public void Standby() { homeAfterViewer = false; pendingOpen = null; ui.CloseOverlay("standby"); ui.HideBackdrop(); }
@@ -105,12 +117,14 @@ public sealed class Screen
     public void SignalFlapped() { int g = ++settleGen; ui.After(SettleMs, () => { if (g == settleGen) Settled(); }); }
     // While the wallpaper is in front the TV may not notify flag changes (a SHIELD switched on under it went unseen
     // on the TV): read the flag every second while the wallpaper is up, and treat a change like a notification.
+    bool polling;
     void PollUnderBackdrop()
     {
-        int g = ++pollGen;
+        if (polling) return;  // already reading (a second Home must not push the next read back)
+        polling = true; int g = ++pollGen;
         void Check()
         {
-            if (g != pollGen || !ui.BackdropShown) return;
+            if (g != pollGen || !ui.BackdropShown) { polling = false; return; }
             int v = ui.ReadSignal();
             if (v != Signal) { ui.Note("signal_polled:" + v); SignalFlapped(); }
             ui.After(BackdropPollMs, Check);
@@ -134,7 +148,12 @@ public sealed class Screen
         if (ui.OverlayShown || ui.BackdropShown) { ui.CloseOverlay("input_changed:" + n); ui.HideBackdrop(); }
         ui.TvChanged();
     }
-    void ToPicture(string why) { ui.CloseOverlay(why); ui.HideBackdrop(); ui.Launch(Viewer); }
+    // an open bar stays, now over the picture (and steps aside after 45 s like any bar over a picture)
+    void ToPicture(string why)
+    {
+        if (ui.OverlayShown) { ui.HideBackdrop(); ui.OpenBar(true); ui.Note(why + ":bar_over_picture"); return; }
+        ui.HideBackdrop(); ui.Launch(Viewer); ui.Note(why);
+    }
 
     public void SelectSource(int type)
     {

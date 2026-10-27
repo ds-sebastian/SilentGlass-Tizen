@@ -48,10 +48,11 @@ public sealed partial class SilentGlass
         ow.Show(); ow.Raise(); try { ow.Activate(); } catch { }
         overlayShown = true;
     }
+    long overlayClosedAt = long.MinValue / 2;
     void CloseOverlay(string why)
     {
         if (!overlayShown) return;
-        overlayShown = false; overlayIdle?.Stop(); infoTimer?.Stop(); CloseSetupServer();
+        overlayShown = false; overlayClosedAt = Environment.TickCount64; overlayIdle?.Stop(); infoTimer?.Stop(); CloseSetupServer();
         try { ow.Hide(); } catch { }
         ClearOverlay();
         if (why != null) Note(why);

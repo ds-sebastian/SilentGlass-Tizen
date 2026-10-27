@@ -6,11 +6,17 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v41e**: the bounce. The event log showed that the remote's Home reaches the app twice: a second launch request
+  0.4-1 s after the first undid it, so the bar closed and reopened on every press (and reopened about 1 s after
+  Watch). A plain Home within 1.2 s of the last one, or of the bar closing, is now ignored (`launch:echo` in the log).
+  When the picture arrives under the wallpaper while the bar is open, the bar now stays, over the picture, instead of
+  closing. `tests/screen-sim` models the double Home; its Home-press checks had never fired (a Wait step cancelled
+  them) and now do: without the fix, about 570 of 1,808 runs broke them; with it none of 11,408. Deploy pair `update-v41e.sh` / `restore-v32a.sh`.
 - **v41c/v41d** + **batch F2**: Info read "Check · 53 of 54" while the registry, the app framework and the drift check
   all said everything was blocked. Info now names what is on instead of a count (and the state file lists it as
   `privacy_gaps=`, checked 8 s after start). It named Apple TV: its package also holds `com.samsung.tv.aria-dummy`,
   which batch F missed (Prime Video's dummy was disabled with it). Batch F2 disables it; Info and the drift check
-  list it. Deploy pair `update-v41d.sh` / `restore-v32a.sh`.
+  list it.
 - **v41b**: from the first evening of use.
   - TV on with SHIELD off showed the wallpaper (right), but switching SHIELD on left it up: the TV did not report
     the signal flag change while the wallpaper was in front. While the wallpaper is up, the flag is now read every
