@@ -6,6 +6,10 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42f**: the settings-key bridge is gone (it replaced Samsung's QuickLaunch app; never installed on the tested
+  TV): `QuickLaunch.cs`, its recipes and tests removed, and the launcher no longer reads its old `quiet_page` extra.
+  `sg_open` stays for `app_launcher`. Deploy pair `update-v42f.sh` / `restore-v32a.sh`. Also removed from the TV: a
+  leftover diagnostic unit `sg-probe.service` (never enabled; backed up to `sgprobe-leftover-20261027`).
 - **v42e**: no wait before reopening the bar. The 2.6 s after-close window swallowed real presses: in one test
   session 6 Home presses in a row (0.3 s apart) were dropped after a close. Now closing starts no window. Only a
   launch request with no Home key, within 1.2 s of the press that opened the bar, is dropped (the TV's duplicate);
@@ -15,8 +19,7 @@ records. Conf keys mentioned in older entries may since have been removed - the 
   Home close); if they come back, the cost is a bounce, not a delay - the owner's preference. Also: Home pressed
   just after the picture dropped (counted as over it) now brings the wallpaper up behind the bar if the picture is
   still gone when the 4 s grace ends. Screen sim: "<step> quickly" steps, a 0.5 s "Home over the picture opens at
-  once" rule (proven to fail on v42d), `SG_SIM_TRACE=<scenario>` prints one scenario's log. Deploy pair
-  `update-v42e.sh` / `restore-v32a.sh`.
+  once" rule (proven to fail on v42d), `SG_SIM_TRACE=<scenario>` prints one scenario's log. 
 - **Release tooling**: `tools/build.py bridge` builds the bridge reproducibly (same flags as the launcher; the
   installer embeds that build), the SDK is pinned (`global.json`), `tools/release.py` builds the release files from
   a clean checkout and checks for local-only assets, and CI checks that the committed installer is its source. Lab

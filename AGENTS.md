@@ -47,7 +47,7 @@ gaming-hub helpers and TV Plus are optional features, not automatically malware.
    rows to the fresh snapshot and preserve fields outside the intended scope.
 6. For a new launcher trial, install SilentGlass without changing the default Home (docs/install.md).
    Verify visible UI, remote, HDMI, sound and settings first. Change Home/startup
-   or install a settings bridge only if that integration is owner-selected; do not
+   only if the owner selects it; do not
    assume launcher adoption requires disabling the sidebar/browser. On an existing
    S90D deployment, preserve the current routes unless this phase changes them.
 7. Test a full restart and standby/wake separately. Re-check app-preload values,

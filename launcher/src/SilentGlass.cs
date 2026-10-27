@@ -16,7 +16,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42e";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v42f";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -60,9 +60,8 @@ public sealed partial class SilentGlass : NUIApplication
         // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
         if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }
         if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
-        // from the bridge, QuickLaunch (Samsung's quick-settings key) or Home Assistant: open one part directly
-        // (QuickLaunch builds before v40 send quiet_page=settings: the installed copy is not replaced by launcher updates)
-        if (!x.TryGet("sg_open", out string open) && x.TryGet("quiet_page", out string page)) open = page == "settings" ? "controls" : page == "home" ? "" : page;
+        // from the bridge or Home Assistant: open one part directly
+        x.TryGet("sg_open", out string open);
         Home(open ?? "", "launch");
     }
 

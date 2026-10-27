@@ -12,7 +12,7 @@ helper (not bundled); its scope and limits are summarized in [upstream notes](up
 
 ## Launcher and bridge
 
-SilentGlass (the launcher), the QuickLaunch settings bridge, Probe and the Home Assistant bridge were written for the
+SilentGlass (the launcher), Probe and the Home Assistant bridge were written for the
 tested TV and compiled against assemblies from that TV. The UI was designed with Pi-rendered HTML mockups
 (`tools/overlay_mockup.py`) before each on-TV check.
 

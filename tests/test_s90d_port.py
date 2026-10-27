@@ -56,7 +56,7 @@ INVENTORY = ROOT / ".local/device-inventory/catalog-apps.csv"
 class LauncherTests(unittest.TestCase):
     def test_every_source_is_compiled_and_the_logic_is_testable_off_the_tv(self):
         proj = (SRC / "SilentGlass.csproj").read_text()
-        self.assertEqual(sorted(p.name for p in SRC.glob("*.cs") if p.name != "QuickLaunch.cs"), sorted(PARTS))
+        self.assertEqual(sorted(p.name for p in SRC.glob("*.cs")), sorted(PARTS))
         for p in PARTS:
             self.assertIn(f'<Compile Include="{p}" />', proj)
         tests = (ROOT / "tests/CatalogTests.csproj").read_text()
@@ -204,7 +204,7 @@ class LauncherTests(unittest.TestCase):
         # launch extras
         for key in ("sg_notice", "sg_source"):
             self.assertIn(f'"{key}"', src); self.assertIn(f'"{key}"', br)
-        self.assertIn('"sg_open", "controls"'.replace(", ", ","), (SRC / "QuickLaunch.cs").read_text().replace(", ", ","))
+        self.assertIn('x.TryGet("sg_open", out string open);', src)  # for app_launcher; nothing of ours sends it
         # files in the launcher's data directory
         for f in ("notice.json", "setup.json", "setup-request", "setup-close", "bridge-status.txt", "location.txt", "notify-off", "thread-off"):
             self.assertIn(f, src, f); self.assertIn(f, br, f)

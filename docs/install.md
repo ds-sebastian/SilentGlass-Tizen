@@ -2,7 +2,7 @@
 
 For an owner who already has root on a compatible Samsung Tizen TV (developed on a QN65S90D, Tizen, .NET 6). Every
 step is a separate phase with its own undo script; do them in order, check each one on the screen, and copy the
-backups off the TV. Read [Risks and recovery](../README.md#risks-and-recovery) first: most undo scripts have not
+backups off the TV. Read [Risks](../README.md#risks) first: most undo scripts have not
 been run on a TV yet.
 Root access itself is not part of this repository: this project uses the reviewed external
 [s90c-tools](https://github.com/invaliddayta/s90c-tools) `tv-access` helper - see the
@@ -33,7 +33,7 @@ Builds are reproducible with the pinned SDK (`global.json`, .NET SDK 6.0.428): t
 bytes, so you can compare your build with a release's `SHA256SUMS`. `tools/release.py VERSION` makes the release
 files from a clean checkout.
 
-`.local/package/` then holds `BixbyPromotion.dll` (SilentGlass), `QuickLaunch.dll` (settings-key bridge),
+`.local/package/` then holds `BixbyPromotion.dll` (SilentGlass),
 `Probe.dll` (Home-handler tool) and the assets. Your TV's apps for the Apps menu come from
 `launcher/assets/apps.local.json` if present (see [app library](app-library.md)).
 
@@ -65,17 +65,7 @@ vconftool set -f -t string db/appfw/startup_appid org.tizen.tv-viewer   # power 
 
 Read all three back, restart with the remote, and check full boot, Home, standby/wake and return from an app.
 
-## 4. Settings keys (optional)
-
-Routes the remote's settings keys (`XF86More` on QuickLaunch, `XF86SysMenu` on `org.tizen.menu`) to the Controls
-panel and replaces QuickLaunch with a tiny bridge that answers the vendor's preload requests and exits.
-
-```sh
-/bin/sh -s -- shell-01 < recipes/snapshot.sh
-/bin/sh -s -- shell-01 < recipes/install-settings-bridge.sh
-```
-
-## 5. Home Assistant bridge (optional)
+## 4. Home Assistant bridge (optional)
 
 ```sh
 /bin/sh < devices/s90d/device/ha-bridge/ha-bridge-install.sh
@@ -86,7 +76,7 @@ scan it with a phone on the same network, enter the code, and fill in your MQTT 
 the TV's name, notifications and - if you use the border router - your Thread network. The settings are stored on the
 TV only (owner-readable). Details: [Home Assistant bridge](../devices/s90d/ha-bridge.md).
 
-## 6. Thread border router and privacy batches (optional)
+## 5. Thread border router and privacy batches (optional)
 
 - **Stop the silent updates first** (`devices/s90d/device/cleanup/batchg-apply.sh`, inverse `batchg-restore.sh`).
   Turning off "Auto update" in the TV's menus is not enough: Samsung's built-in app upgrader has its own switch, and
@@ -103,7 +93,6 @@ TV only (owner-readable). Details: [Home Assistant bridge](../devices/s90d/ha-br
 Each phase has its inverse; run them in reverse order:
 
 - `devices/s90d/device/ha-bridge/ha-bridge-restore.sh`
-- `recipes/restore-settings-bridge.sh shell-01`
 - `recipes/restore-launcher.sh home-01 ORIGINAL_MAIN_OPERATION_ID ORIGINAL_HOME_ID ORIGINAL_STARTUP_ID` - the three
   values you saved (all `com.samsung.tv.csfs` on the TVs seen so far; use yours)
 

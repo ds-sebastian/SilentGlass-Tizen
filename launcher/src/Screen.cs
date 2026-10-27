@@ -77,7 +77,7 @@ public sealed class Screen
         if (open == "" && pendingOpen != null) open = pendingOpen;  // our own relaunch after going to the picture
         pendingOpen = null;
         bool direct = directHome; directHome = false;
-        // over Ambient (Home Assistant's Home button, QuickLaunch): to the picture first, as for Ambient's Home key
+        // over Ambient (Home Assistant's Home button): to the picture first, as for Ambient's Home key
         if (!direct && IsAmbient(LastOther)) { PictureFirst(open, why); return; }
         if (open == "" && ui.OverlayShown && !ui.BackdropShown) { ui.CloseOverlay(why + ":close"); return; }
         bool keep = open == "" && ui.OverlayShown;

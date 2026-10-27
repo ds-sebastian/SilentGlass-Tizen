@@ -20,9 +20,8 @@ def main():
         for name in ("Tizen.NUI", "Tizen.Applications.Common", "Tizen.System", "Tizen"):
             if not (args.framework / f"{name}.dll").is_file():
                 parser.error(f"Missing {name}.dll. Read docs/install.md (step 1); these are not bundled.")
-        for name in ("SilentGlass", "QuickLaunch"):
-            jobs.append((ROOT / f"launcher/src/{name}.csproj", name, name,
-                         [f"-p:TV_FRAMEWORK_DIR={args.framework.resolve()}"]))
+        jobs.append((ROOT / "launcher/src/SilentGlass.csproj", "SilentGlass", "SilentGlass",
+                     [f"-p:TV_FRAMEWORK_DIR={args.framework.resolve()}"]))
         jobs.append((ROOT / "launcher/probe/Probe.csproj", "Probe", "Probe", []))
     if args.target == "bridge":  # then: python3 tools/bridge_installer.py .local/build/ha-bridge
         jobs.append((ROOT / "devices/s90d/device/ha-bridge/src/HaBridge.csproj", "ha-bridge", "ha-bridge", []))
@@ -38,7 +37,6 @@ def main():
         destination = ROOT / ".local/package"
         destination.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / ".local/build/SilentGlass/BixbyPromotion.dll", destination / "BixbyPromotion.dll")
-        shutil.copyfile(ROOT / ".local/build/QuickLaunch/QuickLaunch.dll", destination / "QuickLaunch.dll")
         shutil.copyfile(ROOT / ".local/build/Probe/Probe.dll", destination / "Probe.dll")
         assets = destination / "quiet-home"
         if assets.exists():

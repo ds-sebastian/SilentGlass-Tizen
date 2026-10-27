@@ -1,34 +1,20 @@
 # Samsung QN65S90DAFXZA (S90D, 2024 OLED)
 
-SilentGlass-Tizen's tested TV. Owner setup: **SHIELD TV Pro** (via the Q990D soundbar, HDMI 3) is the main
-device, **Nintendo Switch** on HDMI 1; the TV's own apps are backups. The phases below carry backups,
-guarded inverses and hash checks. Recorded reboot checks apply to their tested phase/version;
-newer edits still need their own acceptance rather than inheriting a blanket reboot guarantee.
+SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soundbar) is the main device, a
+**Nintendo Switch** on HDMI 1; the TV's own apps are backups.
 
-- Firmware: `T-PTMDAKUC-0090-REL-202605141701` (system build string `TIZEN-TRUNK2025-PontusM-OSU-2024-HOTFIX-RELEASE_20260514.3`)
-- Admin access: per-command UID-0 (root) sessions through the separately reviewed external
-  `s90c-tools` `tv-access` helper (not bundled).
-  Scripts in this device workflow are fed to `/bin/sh` on **stdin**; direct unsigned-script
-  execution is restricted by UEP. The helper automates acquisition per command; it does not
-  install permanent root or remove SMACK restrictions.
+- Firmware `T-PTMDAKUC-0090-REL-202605141701`.
+- Root: per-command sessions through [s90c-tools](https://github.com/invaliddayta/s90c-tools)' `tv-access` (not
+  bundled). Scripts go to `/bin/sh` on **stdin**, because UEP refuses unsigned script files.
+- Agents: start with the [agent workflow](../../docs/agent-workflow.md). Scripts and records here are dated evidence,
+  not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
+  because it exists.
 
-## Agent reading order and evidence scope
-
-Start with the [agent walkthrough](../../docs/agent-workflow.md), then the relevant
-scripts and inverse below. Read [access/persistence](../../docs/access-and-persistence.md)
-and [upstream notes](../../docs/upstream-notes.md) before proposing another boot mechanism.
-Phase scripts and benchmark records are dated evidence,
-not proof that every historical phase remains active or passed every boot scenario.
-Re-read current device state and exact hashes before acting; never run every saved
-installer merely because it exists.
-
-
-## SilentGlass (v42e)
+## SilentGlass (v42f)
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
-Version history: [changelog.md](changelog.md). On the TV it keeps its original file names (`quiet-home-*` resources,
-`quiet-otbr-*` units), so earlier installs and restore scripts keep working.
+Version history: [changelog.md](changelog.md).
 
 ![The bar over the picture](../../docs/screenshots/s90d-overlay-bar.jpg)
 
@@ -92,8 +78,8 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
 - **Cold start**: the TV's launch placeholder holds the remote's keys until the app's main window has been shown once,
   so that window starts shown (black, empty) and Home hides it as the bar opens. The TV also pauses the app whenever
   only the overlay is up; a pause never closes the overlay - another app coming to the front does.
-- **Launch extras** (from the bridge, QuickLaunch or Home Assistant): `sg_open=controls|info|apps|inputs|setup`,
-  `sg_source=<type>` (switch input), `sg_notice=1` (start hidden for a notification).
+- **Launch extras**: `sg_source=<type>` (switch input) and `sg_notice=1` (start hidden for a notification) from the
+  bridge; `sg_open=controls|info|apps|inputs|setup` opens one part directly (for `app_launcher`).
 - **State file** `/tmp/silentglass-state.txt` (coalesced, never on the key path): version, what is showing
   (`ui=`, `backdrop=`, `fg=`), focus, key timing, inputs, settings values. The bridge reads it to report the app on
   screen.
@@ -118,10 +104,10 @@ verifies every file) and `restore-v(N-1).sh`. A first install: [docs/install.md]
 | cleanup/batchg | Turns off the automatic updates that ignore the menu settings: Samsung's built-in app upgrader and the OMA-DM firmware auto-update. Inverse `batchg-restore.sh` |
 | cleanup/batche | content-info feed for ACR (`cis`, `cis-api-service-app`), usage analytics (`samsung-analytics`), voice leftovers (`multi-assistant-service`, always-on `aov-service`, voice instant/onboarding, three Bixby apps), ad players (`adplatform.ADPlayer`, `adplayer`, `ad-web-framework`); chosen from Vetro's catalog and checked on this TV. Not included: `coba.adagent` (Samsung Home loads it), `content-grab-service` / `nvision-analysis-dbmgr` (may feed picture processing / Ambient) | batche-restore.sh |
 | cleanup/multiview | Multi View no longer preloads at boot (marker that Samsung's own unit checks: `ConditionPathExists=!.../disable_preloading`); opens on demand, cold | multiview-restore.sh |
-| boot-units/quiet-csfs-off | owner watcher: while SilentGlass Home is the Home app, closes Samsung Home (`csfs`, ~100 MB) after it has sat in the background for two one-minute checks; never while it is on screen. Identity by SMACK label | csfs-off-restore.sh |
+| boot-units/quiet-csfs-off | owner watcher: while SilentGlass is the Home app, closes Samsung Home (`csfs`, ~100 MB) after it has sat in the background for two one-minute checks; never while it is on screen. Identity by SMACK label | csfs-off-restore.sh |
 | ha-bridge | Home Assistant bridge over MQTT discovery: power, input (selectable, TV-named), per-port rename + CEC name resync, volume/mute, brightness/contrast, picture/sound mode, sound output, sleep timer, game mode, app, Thread role and switch, Home/Ambient buttons, temperature, memory. Owner service, fixed command list. See [ha-bridge.md](ha-bridge.md) | ha-bridge-restore.sh |
 | boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background | batchd-restore.sh |
-| thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; SilentGlass Home Info switch ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
+| thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; on/off switch on the phone page and in Home Assistant ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
 
 Install the units with `*-install.sh`, then the latest `*-update*.sh` (janitor: update5 then update5c). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
 `/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
@@ -141,7 +127,7 @@ SmartThings/OTBR components are kept (the TV is a Thread border router on the ho
 ## Pi side (pi/)
 
 `s90d_drift_check.py` + `s90d_expected.json` (set `tv`): weekly read-only check of firmware, Home/startup apps,
-vendor markers, disabled apps, SilentGlass Home DLL hash, boot units and recognition. Prints nothing when all is well
+vendor markers, disabled apps, update settings, the SilentGlass DLL hash, boot units and recognition. Prints nothing when all is well
 (cron watchdog pattern); reports only after 3 consecutive unreachable runs.
 
 `thread_dataset.py`: saves Home Assistant's preferred Thread dataset to a private file for `otbr-join.sh`.
