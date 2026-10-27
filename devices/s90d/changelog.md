@@ -6,6 +6,15 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v41b**: from the first evening of use.
+  - TV on with SHIELD off showed the wallpaper (right), but switching SHIELD on left it up: the TV did not report
+    the signal flag change while the wallpaper was in front. While the wallpaper is up, the flag is now read every
+    second as well (nothing runs otherwise). `tests/screen-sim` gained that TV behaviour as a variant and the case as a
+    scenario (1 s passes the 2 s rule; 2 s did not).
+  - "The launcher bounces when it appears": the TV's compositor effect was still on for the app's main window (the
+    one that hides and shows on Home presses); now off, as for the overlay.
+  - `/tmp/silentglass-events.log`: every event (keys, launches, signal, bar and wallpaper show/hide), for diagnosing
+    what someone saw; the state file's trail holds only the last 16. Deploy pair `update-v41b.sh` / `restore-v32a.sh`.
 - **v41a**: the wallpaper no longer comes up over SHIELD. What is on screen is now decided in one NUI-free file,
   `launcher/src/Screen.cs`, and `tests/screen-sim` runs that exact code against a simulated TV (SHIELD and Switch
   sleeping, waking over CEC and resyncing, Ambient, standby, Home Assistant launches, idle close, OLED dim), under every
@@ -23,7 +32,7 @@ records. Conf keys mentioned in older entries may since have been removed - the 
     and a bar open at power-off came back dead at power-on.
   - Checked on the TV: cold start (bar, keys), Home with the Switch asleep (wallpaper), switching to SHIELD with Home
     pressed before its signal settled (the wallpaper stepped aside), Ambient -> Home (bar over SHIELD, keys work),
-    standby with the bar open (closed itself). Deploy pair `update-v41a.sh` (from v32a) / `restore-v32a.sh`.
+    standby with the bar open (closed itself).
 - **v40i** + **batch F**: the drift check found Prime Video's companion enabled again - and Prime Video, Apple TV and
   the web browser reinstalled ~3.5 h after batch D uninstalled them (Samsung's country preloads come back; Prime was
   running in the background). Batch F keeps them installed but disabled, which sticks, as it has for TV YouTube;

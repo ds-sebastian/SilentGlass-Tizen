@@ -23,6 +23,8 @@ public sealed partial class SilentGlass
     {
         var w = Window.Default;
         w.Title = "SilentGlass"; w.KeyEvent += OnKey;
+        // no compositor show/hide effect (the TV zooms app windows in): the window hides and shows on Home presses
+        try { w.AddAuxiliaryHint("wm.comp.win.effect.enable", "0"); } catch { }
         backdrop = new View { Size2D = new Size2D(1920, 1080) };
         if (PhotoWall) { wallNight = WantNight(); wallpaper = new ImageView { ResourceUrl = WallUrl(wallNight), Size2D = new Size2D(1920, 1080) }; backdrop.Add(wallpaper); }
         else backdrop.Add(new ImageView { ResourceUrl = Res + "free-background.svg", Size2D = new Size2D(1920, 1080), DesiredWidth = 960, DesiredHeight = 540 });
@@ -38,14 +40,14 @@ public sealed partial class SilentGlass
     {
         if (backdropShown) return;
         backdropShown = true; mainUp = true; UpdateClock(); CheckWallpaper(); lastActivity = Environment.TickCount64;
-        backdrop.Show();
+        backdrop.Show(); Note("backdrop:show");
         try { Window.Default.Show(); Window.Default.Raise(); } catch { }
         if (overlayShown) { ow.Raise(); try { ow.Activate(); } catch { } }
     }
     void HideBackdrop()
     {
         if (!backdropShown && !mainUp) return;
-        backdropShown = false; mainUp = false; Wake();
+        backdropShown = false; mainUp = false; Wake(); Note("backdrop:hide");
         try { Window.Default.Hide(); } catch { }
         backdrop.Hide();
     }

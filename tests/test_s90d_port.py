@@ -88,7 +88,7 @@ class LauncherTests(unittest.TestCase):
         # shown only when there is nothing to draw over
         screen = (SRC / "Screen.cs").read_text()
         home = body(screen, "public void Home(")
-        self.assertIn("if (OverPicture()) ui.HideBackdrop(); else ui.ShowBackdrop();", home)
+        self.assertIn("if (OverPicture()) ui.HideBackdrop(); else { ui.ShowBackdrop(); PollUnderBackdrop(); }", home)
         # Home over the picture toggles the bar
         self.assertIn('if (open == "" && ui.OverlayShown && !ui.BackdropShown) { ui.CloseOverlay(why + ":close"); return; }', home)
         # and the wallpaper never stays over a picture that arrives under it

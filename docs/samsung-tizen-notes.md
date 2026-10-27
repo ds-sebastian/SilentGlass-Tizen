@@ -166,7 +166,11 @@ are ordinary optional features rather than trackers.
 - **The signal flag** (`memory/tv-viewer/mainscreen_signal_state`) is only updated while the viewer runs: it still
   reads 1 in standby, and goes stale in Ambient. Treat it as "picture" only when the viewer is the app behind you, and
   debounce it (it flaps for ~1 s while an input syncs). **Power-off** makes the Home app the foreground app.
+  While an app's own full-screen window is in front, the flag's change notification did not arrive (a SHIELD
+  switched on under SilentGlass's wallpaper went unseen); poll it while you cover the viewer.
   **`memory/pm/state`** (1 on, 3 screen off, 4 standby) can be watched from an app to notice standby.
+- **Window effects:** the compositor animates app windows in and out unless the window sets the aux hint
+  `wm.comp.win.effect.enable=0`; set it on every window you show and hide yourself, the main window included.
 - **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off. A device waking with One
   Touch Play switches the TV's input underneath any open app window; a notification window that had the keys loses
   them.

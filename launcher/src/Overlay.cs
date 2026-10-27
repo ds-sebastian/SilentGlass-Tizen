@@ -111,7 +111,7 @@ public sealed partial class SilentGlass
         barSel = keep != null ? bar.FindIndex(b => b.Action == keep) : -1;
         if (barSel < 0) barSel = Math.Max(0, bar.FindIndex(b => b.Action == "hdmi:" + lastSource));
         FocusBar(false);
-        bool fresh = !overlayShown;
+        bool fresh = !overlayShown; Note(fresh ? "bar:open" : "bar:rebuild");
         ShowOverlay(); OverlayActivity();
         if (fresh) FadeIn(capsule, 24);
     }

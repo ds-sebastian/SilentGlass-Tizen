@@ -15,7 +15,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41a";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41b";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -102,13 +102,28 @@ public sealed partial class SilentGlass : NUIApplication
     void Note(string what)
     {
         activity = what;
-        trail.Enqueue(DateTime.Now.ToString("HH:mm:ss.f") + " " + what); while (trail.Count > 16) trail.Dequeue();
+        string line = DateTime.Now.ToString("HH:mm:ss.f") + " " + what;
+        trail.Enqueue(line); while (trail.Count > 16) trail.Dequeue();
+        unlogged.Add(line);
         if (stateTimer == null) { stateTimer = new Tizen.NUI.Timer(600); stateTimer.Tick += (s, e) => { WriteState(activity); return false; }; }
         if (!stateTimer.IsRunning()) stateTimer.Start();
     }
+    // every event, appended with the state write (never on the key path); /tmp, so it ends at reboot; kept under 256 KB
+    const string EventLog = "/tmp/silentglass-events.log";
+    readonly List<string> unlogged = new();
+    void FlushEvents()
+    {
+        if (unlogged.Count == 0) return;
+        try {
+            var f = new FileInfo(EventLog);
+            if (f.Exists && f.Length > 256 * 1024) { var keep = File.ReadAllLines(EventLog); File.WriteAllLines(EventLog, keep[(keep.Length / 2)..]); }
+            File.AppendAllLines(EventLog, unlogged);
+        } catch { }
+        unlogged.Clear();
+    }
     void WriteState(string what)
     {
-        stateTimer?.Stop();
+        stateTimer?.Stop(); FlushEvents();
         var b = new System.Text.StringBuilder(DateTime.UtcNow.ToString("o"));
         void Put(string key, object value) => b.Append('\n').Append(key).Append('=').Append(value);
         Put("version", ModVersion); Put("activity", what);

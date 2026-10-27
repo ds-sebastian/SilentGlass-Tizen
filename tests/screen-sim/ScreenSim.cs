@@ -24,13 +24,14 @@ static class ScreenSim
         foreach (bool ambientStale in new[] { true, false })
         foreach (bool cecLaunches in new[] { true, false })
         foreach (bool wakeHome in new[] { false, true })
+        foreach (bool quietUnderUs in new[] { false, true })
         {
-            string variant = $"ambient-flag-{(ambientStale ? "stale" : "live")}, cec-{(cecLaunches ? "relaunches-viewer" : "switches-only")}, power-on-{(wakeHome ? "launches-home" : "viewer-only")}";
-            foreach (var (name, steps) in Scenarios()) { Run(variant, name, steps, ambientStale, cecLaunches, wakeHome, found); runs++; }
+            string variant = $"ambient-flag-{(ambientStale ? "stale" : "live")}, cec-{(cecLaunches ? "relaunches-viewer" : "switches-only")}, power-on-{(wakeHome ? "launches-home" : "viewer-only")}, flag-notices-{(quietUnderUs ? "none-under-the-wallpaper" : "always")}";
+            foreach (var (name, steps) in Scenarios()) { Run(variant, name, steps, ambientStale, cecLaunches, wakeHome, quietUnderUs, found); runs++; }
             var rnd = new Random(1234);
             for (int i = 0; i < fuzzRuns; i++) {
                 var steps = Enumerable.Range(0, 24).Select(_ => Pool[rnd.Next(Pool.Length)]).ToArray();
-                Run(variant, "random #" + i, steps, ambientStale, cecLaunches, wakeHome, found); runs++;
+                Run(variant, "random #" + i, steps, ambientStale, cecLaunches, wakeHome, quietUnderUs, found); runs++;
             }
         }
         Console.WriteLine($"{runs} runs.");
@@ -58,13 +59,14 @@ static class ScreenSim
         ("TV on from standby, Home at once", new[] { "Power off", "Wait 50s", "Power on", "Wait 1s", "Home", "Wait 10s" }),
         ("Bar open at power-off, power on", new[] { "Home", "Power off", "Wait 50s", "Power on", "Wait 10s", "Home", "Wait 2s" }),
         ("Play, then Watch", new[] { "Home", "Select Play", "Wait 2s", "Home", "Select Watch", "Wait 2s" }),
+        ("TV on with SHIELD off, wallpaper, SHIELD switched on", new[] { "SHIELD sleeps", "Power off", "Wait 10s", "Power on", "Wait 10s", "SHIELD sleeps", "Wait 10s", "Home", "Wait 10s", "SHIELD wakes (its remote)", "Wait 10s" }),
         ("HA switches input under the wallpaper", new[] { "SHIELD sleeps", "Home", "Wait 2s", "SHIELD wakes (its remote)", "HA input SHIELD", "Wait 5s" }),
     };
 
-    static void Run(string variant, string name, string[] steps, bool ambientStale, bool cecLaunches, bool wakeHome,
+    static void Run(string variant, string name, string[] steps, bool ambientStale, bool cecLaunches, bool wakeHome, bool quietUnderUs,
                     Dictionary<string, (int, List<string>)> found)
     {
-        var tv = new FakeTv { AmbientStale = ambientStale, CecLaunchesViewer = cecLaunches, WakeLaunchesHome = wakeHome };
+        var tv = new FakeTv { AmbientStale = ambientStale, CecLaunchesViewer = cecLaunches, WakeLaunchesHome = wakeHome, NoNoticeUnderWallpaper = quietUnderUs };
         tv.Boot();
         var done = new List<string>();
         foreach (var s in steps) {
@@ -85,7 +87,7 @@ static class ScreenSim
 sealed class FakeTv : IScreen
 {
     public const string Viewer = Screen.Viewer, Self = Screen.Self, Csfs = Screen.SamsungHome, Art = "org.tizen.art-app";
-    public bool AmbientStale, CecLaunchesViewer, WakeLaunchesHome;
+    public bool AmbientStale, CecLaunchesViewer, WakeLaunchesHome, NoNoticeUnderWallpaper;
     public Screen App;
     public long T;
     public readonly List<string> Log = new();
@@ -148,7 +150,12 @@ sealed class FakeTv : IScreen
         bool tracks = Power && (Front != Art || !AmbientStale);
         if (!tracks) return;
         int v = InputHasPicture ? 1 : 0;
-        if (v != SignalVconf) { SignalVconf = v; App.SignalFlapped(); }
+        if (v != SignalVconf) {
+            SignalVconf = v;
+            // seen on the TV (v41a): a SHIELD switched on under the wallpaper went unseen - the flag changed, or its
+            // notification never came
+            if (!(NoNoticeUnderWallpaper && Front == Self && MainUp)) App.SignalFlapped();
+        }
     }
     void Fg()
     {

@@ -44,7 +44,8 @@ public sealed class Screen
     public int Signal = -1, Source = 15;  // Source: TV and HDMI 1-4 only; USB, DLNA and apps leave the last real input
     public string LastOther = "";         // the last app in front other than us
     string previous = "";
-    int settleGen, homeGen; bool homeAfterViewer, directHome; string pendingOpen;
+    int settleGen, homeGen, pollGen; bool homeAfterViewer, directHome; string pendingOpen;
+    public const int BackdropPollMs = 1000;
     long pictureLostAt = long.MinValue / 2; int pictureLostOn = -1;
     public bool HasPicture => Signal == 1;
     // over the picture: the viewer is the app behind us and its input shows a picture, or did a moment ago
@@ -67,7 +68,7 @@ public sealed class Screen
         if (!direct && IsAmbient(LastOther)) { PictureFirst(open, why); return; }
         if (open == "" && ui.OverlayShown && !ui.BackdropShown) { ui.CloseOverlay(why + ":close"); return; }
         bool keep = open == "" && ui.OverlayShown;
-        if (OverPicture()) ui.HideBackdrop(); else ui.ShowBackdrop();
+        if (OverPicture()) ui.HideBackdrop(); else { ui.ShowBackdrop(); PollUnderBackdrop(); }
         ui.OpenBar(keep);
         if (open != "") ui.OpenPart(open);
         ui.Note(why + (open == "" ? "" : ":" + open) + (ui.BackdropShown ? ":backdrop" : ":picture"));
@@ -102,9 +103,23 @@ public sealed class Screen
 
     // the signal flag changed; act once it has held for SettleMs
     public void SignalFlapped() { int g = ++settleGen; ui.After(SettleMs, () => { if (g == settleGen) Settled(); }); }
+    // While the wallpaper is in front the TV may not notify flag changes (a SHIELD switched on under it went unseen
+    // on the TV): read the flag every second while the wallpaper is up, and treat a change like a notification.
+    void PollUnderBackdrop()
+    {
+        int g = ++pollGen;
+        void Check()
+        {
+            if (g != pollGen || !ui.BackdropShown) return;
+            int v = ui.ReadSignal();
+            if (v != Signal) { ui.Note("signal_polled:" + v); SignalFlapped(); }
+            ui.After(BackdropPollMs, Check);
+        }
+        ui.After(BackdropPollMs, Check);
+    }
     void Settled()
     {
-        bool had = HasPicture; Signal = ui.ReadSignal();
+        bool had = HasPicture; Signal = ui.ReadSignal(); ui.Note("signal:" + Signal);
         if (had && !HasPicture) { pictureLostAt = clock(); pictureLostOn = Source; }
         // the picture arrived under the wallpaper: step aside to it (not while the phone setup sheet is open)
         if (!had && HasPicture && ui.BackdropShown && !ui.SetupOpen) { ToPicture("picture_arrived"); return; }
