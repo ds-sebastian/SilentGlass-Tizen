@@ -169,6 +169,8 @@ are ordinary optional features rather than trackers.
   While an app's own full-screen window is in front, the flag's change notification did not arrive (a SHIELD
   switched on under SilentGlass's wallpaper went unseen); poll it while you cover the viewer.
   **`memory/pm/state`** (1 on, 3 screen off, 4 standby) can be watched from an app to notice standby.
+- **Hidden windows keep their last frame**, and the compositor can show it again on the next Show before the app's
+  first new frame. Clear (or reset) a window's content and let a few frames render before hiding it.
 - **Window effects:** the compositor animates app windows in and out unless the window sets the aux hint
   `wm.comp.win.effect.enable=0`; set it on every window you show and hide yourself, the main window included.
 - **HDMI-CEC:** SHIELD's sleep (Home Assistant `remote.turn_off`) also turns the TV off. A device waking with One

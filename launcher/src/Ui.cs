@@ -16,6 +16,13 @@ public sealed partial class SilentGlass
     static AlphaFunction Ease() => new(AlphaFunction.BuiltinFunctions.EaseOutSine);
     // StopFinal: an interrupted animation lands on its end values (a half-faded focus never sticks)
     static void StopAnimation(ref Animation a) { if (a == null) return; a.EndAction = Animation.EndActions.StopFinal; a.Stop(); a.Dispose(); a = null; }
+    // a one-shot timer, ~5 frames: long enough for an emptied scene to reach the screen before the window hides
+    static Tizen.NUI.Timer ClearThenHide(Action hide)
+    {
+        var t = new Tizen.NUI.Timer(80);
+        t.Tick += (s, e) => { hide(); return false; };
+        return t;
+    }
     static void Play(Animation a) { a.Finished += (s, e) => a.Dispose(); a.Play(); }
 
     static TextLabel Label(string text, int x, int y, int w, int h, float px, Color color, string face = "Medium") =>

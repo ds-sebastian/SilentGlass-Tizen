@@ -35,11 +35,13 @@ public sealed partial class SilentGlass
         // (or keeps it as the backdrop). It starts black and empty.
         w.BackgroundColor = new Color(0, 0, 0, 1); backdrop.Hide();
     }
+    Tizen.NUI.Timer mainHide;
     bool mainUp = true;  // the window is on screen (the TV shows it at start)
     void ShowBackdrop()
     {
         if (backdropShown) return;
         backdropShown = true; mainUp = true; UpdateClock(); CheckWallpaper(); lastActivity = Environment.TickCount64;
+        mainHide?.Stop();
         backdrop.Show(); Note("backdrop:show");
         try { Window.Default.Show(); Window.Default.Raise(); } catch { }
         if (overlayShown) { ow.Raise(); try { ow.Activate(); } catch { } }
@@ -48,8 +50,10 @@ public sealed partial class SilentGlass
     {
         if (!backdropShown && !mainUp) return;
         backdropShown = false; mainUp = false; Wake(); Note("backdrop:hide");
-        try { Window.Default.Hide(); } catch { }
-        backdrop.Hide();
+        // end the dim first and hide the window a few frames later, so its last frame is the plain wallpaper - what
+        // the next Show draws anyway (the window is black underneath: emptying it first would flash black)
+        mainHide ??= ClearThenHide(() => { if (backdropShown) return; try { Window.Default.Hide(); } catch { } backdrop.Hide(); });
+        mainHide.Stop(); mainHide.Start();
     }
     void UpdateClock() { clock.Text = DateTime.Now.ToString("h:mm tt"); }
     void CheckWallpaper()

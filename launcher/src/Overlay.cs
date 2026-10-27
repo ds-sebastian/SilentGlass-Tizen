@@ -42,9 +42,14 @@ public sealed partial class SilentGlass
         while (oRoot != null && oRoot.ChildCount > 0) { var v = oRoot.GetChildAt(0); oRoot.Remove(v); v.Dispose(); }
         oLayer = new View { Size2D = new Size2D(1920, 1080) }; oDim = null;
     }
+    // Hidden windows keep their last frame, and the compositor shows it again on the next Show, before our first new
+    // frame: the old bar flashed at full opacity, then the new one faded in from nothing. So a window is cleared,
+    // given a few frames to present the empty scene, and only then hidden (ClearThenHide).
+    Tizen.NUI.Timer overlayHide;
     void ShowOverlay()
     {
         if (overlayShown) return;
+        overlayHide?.Stop();
         ow.Show(); ow.Raise(); try { ow.Activate(); } catch { }
         overlayShown = true;
     }
@@ -53,8 +58,9 @@ public sealed partial class SilentGlass
     {
         if (!overlayShown) return;
         overlayShown = false; overlayClosedAt = Environment.TickCount64; overlayIdle?.Stop(); infoTimer?.Stop(); CloseSetupServer();
-        try { ow.Hide(); } catch { }
         ClearOverlay();
+        overlayHide ??= ClearThenHide(() => { if (!overlayShown) try { ow.Hide(); } catch { } });
+        overlayHide.Stop(); overlayHide.Start();
         if (why != null) Note(why);
     }
     // over a picture the bar steps aside by itself; over the wallpaper it stays (the backdrop dims instead)

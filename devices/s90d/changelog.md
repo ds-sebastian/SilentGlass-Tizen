@@ -6,13 +6,21 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v42c**: a double/triple flash when the bar appears. A window trace (`enlightenment_info -topvwins` every ~40 ms)
+  shows a warm open is one clean step - overlay hidden -> shown, nothing else moves - so the flash is the overlay's
+  own content. Likely cause: the window was hidden before it was cleared, so it kept the old bar as its last frame,
+  and the compositor showed that frame again on the next Show before SilentGlass's first new frame (old bar at full
+  opacity, then the new one fading in from nothing). Now the overlay is cleared, given 80 ms (~5 frames) to present
+  the empty scene, then hidden; a reopen inside that time just cancels the hide. The main window ends the dim first
+  and hides after 80 ms (it is black underneath, so it keeps the wallpaper rather than emptying). Deploy pair
+  `update-v42c.sh` / `restore-v32a.sh`.
 - **v42b**: Home ignored for a few seconds after closing the bar. That was the 2.6 s guard against the TV's stray
   launch requests. Likely cause of the strays: the remote sends press and release separately; SilentGlass hid its
   windows on the press, so the release reached the TV with nothing of ours up, and the TV relaunched the Home app
   (Home Assistant's keys, pressed and released together, never caused them). Whatever a key hides now waits for that
   key's release (at most 1.5 s), and a launch request right after the Home key itself reached the bar is always a
   real press. The guard stays until the event log shows no strays (`released <key>` marks a deferred hide; launch
-  requests log their extra keys). Deploy pair `update-v42b.sh` / `restore-v32a.sh`.
+  requests log their extra keys).
 - **v42a** + **bridge 2.4** + **re-apply**: Advanced settings.
   - Info: Home Assistant is a status line (Connected / Not set up / Can't connect / Not running); the last row,
     **Advanced settings**, opens the phone sheet (QR + code). The Thread border router switch moved to the phone.
