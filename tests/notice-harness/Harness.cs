@@ -22,7 +22,17 @@ static class NoticeHarness
             app_hidden = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=none\nbackdrop=hidden\nfg=org.tizen.tv-viewer\n"),
             app_shown = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=none\nbackdrop=shown\nfg=org.tizen.tv-viewer\n"),
             app_bar = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=bar\nbackdrop=hidden\nfg=org.tizen.tv-viewer\n"),
-            game = new[] { "Auto", "On", "Off" }.Select(Bridge.GameName).ToArray() }));
+            game = new[] { "Auto", "On", "Off" }.Select(Bridge.GameName).ToArray(),
+            prefs = Prefs(),
+            picture_only_dropped = Bridge.ApplyPrefs(new Bridge.NoticeData { Image = new byte[600], Ext = "jpg" }, new() { ["notify_images"] = "0" }) == null,
+            quiet = new[] { ("22:00-07:00", 23), ("22:00-07:00", 12), ("22:00-07:00", 6), ("09:00-17:00", 18), ("", 3) }
+                .Select(q => Bridge.InQuietHours(q.Item1, TimeSpan.FromHours(q.Item2))).ToArray() }));
         return 0;
+    }
+    static object[] Prefs()
+    {
+        var n = Bridge.ApplyPrefs(new Bridge.NoticeData { Title = "t", Image = new byte[600], Ext = "jpg", W = 4, H = 3 },
+            new() { ["notify_position"] = "top-left", ["notify_size"] = "small", ["notify_duration"] = "30", ["notify_images"] = "0" });
+        return new object[] { n.Position, n.Size, n.Duration, n.Image?.Length ?? 0 };
     }
 }

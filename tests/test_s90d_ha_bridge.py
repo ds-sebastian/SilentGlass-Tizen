@@ -1,5 +1,5 @@
 import base64
-import gzip
+import lzma
 import hashlib
 import re
 import unittest
@@ -69,16 +69,16 @@ class HaBridgeTests(unittest.TestCase):
         inst = (DIR / "ha-bridge-install.sh").read_text()
         for dest in ("$Q/silentglass-ha.runtimeconfig.json", "$UD/$N"):
             self.assertIn(dest + '.new" <<', inst)
-        # the DLL travels gzipped: the TV runner takes at most 64 KiB per command
-        self.assertIn('base64 -d <<\'B64_EOF\' | gzip -dc > "$Q/silentglass-ha.dll.new"', inst)
+        # the DLL travels xz-packed: the TV runner takes at most 64 KiB per command
+        self.assertIn('base64 -d <<\'B64_EOF\' | xz -dc > "$Q/silentglass-ha.dll.new"', inst)
         self.assertLess(len(inst.encode()), 64 * 1024)
         self.assertIn("N=silentglass-ha.service", inst)
         blocks = re.findall(r"<<'B64_EOF'[^\n]*\n(.*?)\nB64_EOF\n\[ \"\$\(sha256sum [^)]*\)\" = ([0-9a-f]{64}) \]", inst, re.S)
         self.assertEqual(len(blocks), 4)
         for b64, sha in blocks:
             data = base64.b64decode(b64)
-            if data[:2] == b"\x1f\x8b":
-                data = gzip.decompress(data)
+            if data[:6] == b"\xfd7zXZ\x00":
+                data = lzma.decompress(data)
             self.assertEqual(hashlib.sha256(data).hexdigest(), sha)
         unit = (DIR / "silentglass-ha.service").read_text()
         self.assertNotIn("ConditionPathExists", unit)  # starts unconfigured: the phone setup page writes the config

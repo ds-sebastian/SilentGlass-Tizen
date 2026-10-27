@@ -148,6 +148,15 @@ static partial class Bridge
                 return (200, J, Json(new { ok, message, network = ok ? haNetwork : "" }));
             }
             case "/api/save": { var (ok, message) = SaveSetup(S); return (200, J, Json(new { ok, message })); }
+            case "/api/notify-test": {
+                // with the settings as they are on the page (not saved yet)
+                var (prefs, err) = NoticePrefs(S);
+                if (err != null) return (200, J, Json(new { ok = false, message = err }));
+                if (noTv) return (200, J, Json(new { ok = false, message = "Not available here." }));
+                string why;
+                lock (noticeGate) why = HandleNotice(ApplyPrefs(new NoticeData { Title = "SilentGlass", Message = "A test notification from Advanced settings." }, prefs), test: true);
+                return (200, J, Json(new { ok = why == null, message = why == null ? "Sent. Look at the TV." : "Not shown: " + why + "." }));
+            }
         }
         return (404, "text/plain", null);
     }
@@ -158,6 +167,9 @@ static partial class Bridge
         return new {
             name = c.GetValueOrDefault("name", TvName), host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
             has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""), update = UpdateSeconds(c),
+            notify_position = c.GetValueOrDefault("notify_position", ""), notify_size = c.GetValueOrDefault("notify_size", ""),
+            notify_duration = c.GetValueOrDefault("notify_duration", ""), notify_images = c.GetValueOrDefault("notify_images", "1") != "0",
+            notify_quiet = c.GetValueOrDefault("notify_quiet", ""),
             notifications = !File.Exists(Data + "/notify-off"), lat = loc.lat, lon = loc.lon,
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
             thread_on = ThreadWanted,
@@ -227,6 +239,18 @@ static partial class Bridge
         } catch (Exception e) { return (false, "Can't reach Home Assistant (" + (e.InnerException ?? e).Message + ")."); }
     }
 
+    // the notification settings from the page, checked; empty values mean "as sent"
+    static (Dictionary<string, string>, string) NoticePrefs(Func<string, string> S)
+    {
+        string pos = S("notify_position"), size = S("notify_size"), dur = S("notify_duration"), from = S("notify_quiet_from"), to = S("notify_quiet_to");
+        if (pos.Length > 0 && !NoticePositions.Contains(pos)) return (null, "Pick where notifications appear.");
+        if (size.Length > 0 && !NoticeSizes.Contains(size)) return (null, "Pick a notification size.");
+        if (dur.Length > 0 && !(int.TryParse(dur, out int d) && NoticeDurations.Contains(d))) return (null, "Pick how long notifications stay.");
+        string quiet = from.Length > 0 || to.Length > 0 ? from + "-" + to : "";
+        if (!ValidQuiet(quiet)) return (null, "Quiet hours are two times, like 22:00 and 07:00.");
+        return (new Dictionary<string, string> { ["notify_position"] = pos, ["notify_size"] = size, ["notify_duration"] = dur,
+            ["notify_images"] = S("notify_images") == "0" ? "0" : "", ["notify_quiet"] = quiet }, null);
+    }
     static (bool, string) SaveSetup(Func<string, string> S)
     {
         string host = S("host").Trim(), portText = S("port").Trim(), user = S("user").Trim(), password = S("password"), name = S("name").Trim(),
@@ -238,6 +262,8 @@ static partial class Bridge
         if (senders.Length > 8 || senders.Any(h => !ValidHost(h))) return (false, "\"Also from\" takes up to 8 addresses, separated by commas.");
         if (!ValidCoordinate(lat, 90) || !ValidCoordinate(lon, 180)) return (false, "Latitude and longitude are numbers, like 40.7 and -74.0.");
         if (update.Length > 0 && !(int.TryParse(update, out int every) && UpdateChoices.Contains(every))) return (false, "Pick how often to update Home Assistant.");
+        var (noticePrefs, noticeErr) = NoticePrefs(S);
+        if (noticeErr != null) return (false, noticeErr);
         string dataset = threadMode == "ha" ? haTlv : threadMode == "tlv" ? tlv : "";
         if (threadMode == "ha" && dataset.Length == 0) return (false, "Get Home Assistant's network first.");
         if (threadMode == "tlv" && !ValidDataset(dataset)) return (false, "That doesn't look like a Thread dataset (hex).");
@@ -251,6 +277,7 @@ static partial class Bridge
         void Put(string k, string v) { if (v.Length > 0) c[k] = v; else c.Remove(k); }
         Put("host", host); Put("port", portText == "1883" ? "" : portText); Put("user", user); Put("name", name); Put("notify_from", string.Join(",", senders));
         Put("update", update == DefaultUpdate.ToString() ? "" : update);
+        foreach (var kv in noticePrefs) Put(kv.Key, kv.Value);
         if (password.Length > 0) c["password"] = password; else if (hostChanged || user.Length == 0) c.Remove("password");
         try { SaveConf(c); } catch (Exception e) { return (false, "Could not save (" + e.Message + ")."); }
         try {

@@ -16,7 +16,7 @@ header p{color:var(--sub);margin:6px 0 0}
 h2{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--sub);margin:28px 16px 7px;letter-spacing:.2px}
 .group{background:var(--card);border-radius:12px;overflow:hidden}
 .row{display:flex;align-items:center;min-height:46px;padding:0 16px;position:relative}
-.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+.row+.row::before,#nquietrows>.row:first-child::before,#nquietrows+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
 .row>label:not(.switch){flex:0 0 112px;color:var(--text)}
 .row input[type=password],.row input:not([type]){flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;text-align:right;padding:11px 0;outline:0}
 .row input::placeholder{color:var(--sub)}
@@ -40,6 +40,7 @@ textarea{width:100%;border:0;background:transparent;color:var(--text);font:13px 
 body.locked main,body.locked #save{display:none}
 .row select{flex:1;min-width:0;border:0;background:transparent;color:var(--sub);font:inherit;text-align:right;text-align-last:right;padding:11px 0;outline:0;-webkit-appearance:none;appearance:none}
 .row>span{flex:1}
+.row input[type=time]{flex:1;min-width:0;border:0;background:transparent;color:var(--sub);font:inherit;text-align:right;padding:11px 0;outline:0;-webkit-appearance:none;appearance:none}
 #save{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));height:52px;border:0;border-radius:14px;background:var(--accent);color:#fff;font:600 17px -apple-system,BlinkMacSystemFont,sans-serif}
 #save:disabled{opacity:.5}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(80px + env(safe-area-inset-bottom));background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none}
@@ -74,9 +75,19 @@ body.locked main,body.locked #save{display:none}
 <h2>Notifications</h2>
 <div class="group">
   <div class="row"><span>Show on the TV</span><label class="switch"><input type="checkbox" id="notify"><span></span></label></div>
+  <div class="row"><label for="npos">Position</label><select id="npos"><option value="">As sent</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="center">Center</option></select></div>
+  <div class="row"><label for="nsize">Size</label><select id="nsize"><option value="">As sent</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
+  <div class="row"><label for="ndur">On screen</label><select id="ndur"><option value="">As sent</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
+  <div class="row"><span>Pictures</span><label class="switch"><input type="checkbox" id="nimg"><span></span></label></div>
+  <div class="row"><span>Quiet hours</span><label class="switch"><input type="checkbox" id="nquiet"><span></span></label></div>
+  <div id="nquietrows" class="hidden">
+    <div class="row"><label for="nqfrom">From</label><input type="time" id="nqfrom" value="22:00"></div>
+    <div class="row"><label for="nqto">Until</label><input type="time" id="nqto" value="07:00"></div>
+  </div>
   <div class="row"><label for="from">Also from</label><input id="from" placeholder="addresses, optional" autocapitalize="off"></div>
+  <div class="row btnrow" id="ntest" onclick="testNotice()">Send a test notification</div>
 </div>
-<p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV.</p>
+<p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. "As sent" keeps what each automation asks for. Pictures are camera snapshots and other images. In quiet hours notifications are dropped, not saved for later. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV. The test uses the settings on this page, before you save.</p>
 
 <div id="threadsec">
 <h2>Thread border router</h2>
@@ -141,6 +152,11 @@ function show(s) {
   $('name').value = s.name || ''; $('host').value = s.host || ''; $('port').value = s.port || ''; $('user').value = s.user || '';
   $('password').placeholder = s.has_password ? 'unchanged' : 'optional';
   $('notify').checked = s.notifications; $('from').value = s.notify_from || '';
+  $('npos').value = s.notify_position || ''; $('nsize').value = s.notify_size || ''; $('ndur').value = s.notify_duration || '';
+  $('nimg').checked = s.notify_images !== false;
+  const q = (s.notify_quiet || '').split('-'); $('nquiet').checked = q.length === 2;
+  if (q.length === 2) { $('nqfrom').value = q[0]; $('nqto').value = q[1]; }
+  $('nquietrows').classList.toggle('hidden', !$('nquiet').checked);
   $('lat').value = s.lat ?? ''; $('lon').value = s.lon ?? '';
   fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
   $('apps').checked = !s.hideapps; $('dim').checked = s.dim; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
@@ -171,6 +187,17 @@ document.querySelectorAll('#thseg button').forEach(b => b.onclick = () => {
   $('th-ha').classList.toggle('hidden', threadMode !== 'ha'); $('th-tlv').classList.toggle('hidden', threadMode !== 'tlv');
 });
 
+$('nquiet').addEventListener('change', () => $('nquietrows').classList.toggle('hidden', !$('nquiet').checked));
+function noticeBody() {
+  const quiet = $('nquiet').checked;
+  return { notify_position: $('npos').value, notify_size: $('nsize').value, notify_duration: $('ndur').value, notify_images: $('nimg').checked ? '1' : '0',
+    notify_quiet_from: quiet ? $('nqfrom').value : '', notify_quiet_to: quiet ? $('nqto').value : '' };
+}
+async function testNotice() {
+  const b = $('ntest'); b.classList.add('busy'); b.textContent = 'Sending…';
+  try { const r = await api('/api/notify-test', noticeBody()); toast(r.message, 6000); } catch (e) {}
+  b.classList.remove('busy'); b.textContent = 'Send a test notification';
+}
 function mqttBody() { return { host: $('host').value.trim(), port: parseInt($('port').value) || 1883, user: $('user').value.trim(), password: $('password').value }; }
 async function testMqtt() {
   const b = $('test'); b.classList.add('busy'); b.textContent = 'Testing…';
@@ -189,7 +216,7 @@ async function fetchHa() {
 async function save() {
   if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep network.'); return; }
   if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
-  const body = Object.assign(mqttBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
+  const body = Object.assign(mqttBody(), noticeBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
     lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
     watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').checked ? '1' : '0', wall,
     thread_on: $('thon').checked ? 'on' : 'off' });

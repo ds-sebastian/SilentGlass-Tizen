@@ -64,6 +64,10 @@ class NoticeProtocolTests(unittest.TestCase):
         self.assertEqual(misc["app_shown"], "com.samsung.tv.bixby-promotion")
         self.assertEqual(misc["app_bar"], "com.samsung.tv.bixby-promotion")
         self.assertEqual(misc["game"], ["Automatic", "Always", "Never"])
+        # owner settings override what was sent; pictures off drops a picture-only notice
+        self.assertEqual(misc["prefs"], ["top-left", "small", 30, 0])
+        self.assertEqual(misc["picture_only_dropped"], True)
+        self.assertEqual(misc["quiet"], [True, False, True, False, False])
 
 
 class NoticeSourceTests(unittest.TestCase):
@@ -83,9 +87,12 @@ class NoticeSourceTests(unittest.TestCase):
 
     def test_bridge_never_wakes_and_only_listens_to_home_assistant(self):
         src = BRIDGE.read_text()
-        handle = src[src.index("static void HandleNotice("):src.index("public static Dictionary<string, byte[]> ParseMultipart(")]
-        self.assertIn('!ScreenOn ? "screen off"', handle)
-        self.assertIn('IsAmbient(fg) ? "Ambient"', handle)
+        handle = src[src.index("static string HandleNotice("):src.index("public static Dictionary<string, byte[]> ParseMultipart(")]
+        self.assertIn('!ScreenOn ? "the TV is off"', handle)
+        self.assertIn('IsAmbient(fg) ? "Ambient is on"', handle)
+        # a test from the phone page skips only the owner's own switch and quiet hours
+        self.assertIn('!test && !NoticesOn', handle)
+        self.assertIn('!test && InQuietHours(', handle)
         self.assertNotIn("PressPower", handle)
         # starting SilentGlass only over the TV viewer (it would push another app to the background)
         self.assertIn('if (onScreen != "org.tizen.tv-viewer" && fg != Launcher)', handle)

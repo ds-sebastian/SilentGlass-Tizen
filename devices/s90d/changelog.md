@@ -6,6 +6,14 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **bridge 2.6.0**: notification settings on the phone page (Advanced settings › Notifications), applied by the
+  bridge to every notification: position, size and time on screen (each "As sent" by default), pictures on/off,
+  quiet hours (dropped, not queued; TV time), and "Send a test notification" with the page's unsaved values (ignores
+  the on/off switch and quiet hours, reports why it was not shown). Config keys `notify_position`, `notify_size`,
+  `notify_duration`, `notify_images`, `notify_quiet`. Measured on the TV: test in standby -> "the TV is off"; with
+  the picture on, a small banner at x=56, y=56 (top-left).
+  - The installer's DLL now travels xz-packed (the TV has `/usr/bin/xz`): 58.9 KB, was 66.8 KB with gzip, over the
+    TV runner's 64 KiB.
 - **v42k** + **bridge 2.5.1**: no built-in location. Until one is set on the phone page, sunrise and sunset come from
   the TV's time zone (standard offset x 15 degrees of longitude, latitude 40). Examples and tests use New York.
 - **bridge 2.5.0**: about a seventh of the CPU (per-thread `/proc/<pid>/task/*/stat` over 2 min with the picture on:

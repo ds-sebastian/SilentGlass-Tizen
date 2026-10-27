@@ -6,8 +6,8 @@ from a bridge build and the unit/example next to the installer.
     python3 tools/bridge_installer.py .local/build/ha-bridge
 """
 import base64
-import gzip
 import hashlib
+import lzma
 import re
 import sys
 from pathlib import Path
@@ -17,12 +17,10 @@ DIR = ROOT / "devices/s90d/device/ha-bridge"
 INSTALLER = DIR / "ha-bridge-install.sh"
 
 
-def fixed_gzip(data: bytes) -> bytes:
-    """gzip with a fixed header: Python 3.13 started writing the OS byte (3 = Unix) where older versions wrote 255,
-    so pin it - the same DLL must give the same installer on any machine (CI checks this)."""
-    z = bytearray(gzip.compress(data, 9, mtime=0))
-    z[9] = 255
-    return bytes(z)
+def packed(data: bytes) -> bytes:
+    """xz (the TV has /usr/bin/xz): ~13% smaller than gzip, which keeps the installer under the TV runner's 64 KiB.
+    No timestamps or OS byte in the format, so the same DLL gives the same installer anywhere (CI checks this)."""
+    return lzma.compress(data, format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC32, preset=9 | lzma.PRESET_EXTREME)
 
 
 def main():
@@ -37,11 +35,11 @@ def main():
     text = INSTALLER.read_text()
     for name, src in sources.items():
         data = src.read_bytes()
-        # the DLL travels gzipped (the TV runner takes at most 64 KiB per command); the hash is of the real file
-        payload = fixed_gzip(data) if name.endswith(".dll") else data
+        # the DLL travels xz-packed (the TV runner takes at most 64 KiB per command); the hash is of the real file
+        payload = packed(data) if name.endswith(".dll") else data
         b64 = base64.b64encode(payload).decode() + "\n"  # one line per file
         digest = hashlib.sha256(data).hexdigest()
-        pat = re.compile(r'(base64 -d (?:<<\'B64_EOF\' \| gzip -dc )?> "[^"]*' + re.escape(name) + r'\.new"(?: <<\'B64_EOF\')?\n)(.*?)(B64_EOF\n\[ "\$\(sha256sum "[^"]*'
+        pat = re.compile(r'(base64 -d (?:<<\'B64_EOF\' \| xz -dc )?> "[^"]*' + re.escape(name) + r'\.new"(?: <<\'B64_EOF\')?\n)(.*?)(B64_EOF\n\[ "\$\(sha256sum "[^"]*'
                          + re.escape(name) + r'\.new" \| cut -d" " -f1\)" = )([0-9a-f]{64})( \])', re.S)
         text, n = pat.subn(lambda m: m.group(1) + b64 + m.group(3) + digest + m.group(5), text)
         if n != 1:

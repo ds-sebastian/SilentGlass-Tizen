@@ -99,6 +99,9 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
   (`ot-ctl state`) and the picture settings every minute; the picture/sound mode lists take dozens of settings calls,
   so they are never part of the frequent check. Only changes are published (retained), plus a full refresh every
   5 minutes and whenever Home Assistant restarts (`homeassistant/status`).
+- Notifications: the owner's settings (`notify_position`, `notify_size`, `notify_duration`, `notify_images`,
+  `notify_quiet`; Advanced settings › Notifications) override what each Home Assistant notification asks for, and
+  quiet hours drop notifications in that window. The page's test button sends one with the page's values.
 - Commands are a fixed list; there is no shell. Input: `launch_app com.samsung.tv.bixby-promotion sg_source <id>`
   (the launcher only accepts an input it lists). Home / Ambient: `launch_app`. Thread: writes or removes the
   `thread-off` marker and touches `thread-switch`, exactly like the phone page's switch.

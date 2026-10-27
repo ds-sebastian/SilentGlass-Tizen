@@ -26,7 +26,7 @@ static partial class Bridge
     static readonly string ConfPath = Environment.GetEnvironmentVariable("SG_CONF") ?? "/opt/usr/home/owner/.config/silentglass-ha.conf";
     static bool noTv;
     const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";
-    const string Version = "2.5.1";
+    const string Version = "2.6.0";
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf = new();
     static Mqtt mqtt;
@@ -61,7 +61,7 @@ static partial class Bridge
         string tmp = ConfPath + ".new";
         File.WriteAllText(tmp, ""); Run("/bin/chmod", "600 " + tmp, 3000);  // private before anything is written
         File.AppendAllText(tmp, "# SilentGlass bridge - written by the setup page (Info > Advanced settings on the TV)\n" +
-            string.Join("", new[] { "host", "port", "user", "password", "name", "notify_from", "update" }.Where(c.ContainsKey).Select(k => k + "=" + c[k] + "\n")));
+            string.Join("", new[] { "host", "port", "user", "password", "name", "notify_from", "notify_position", "notify_size", "notify_duration", "notify_images", "notify_quiet", "update" }.Where(c.ContainsKey).Select(k => k + "=" + c[k] + "\n")));
         File.Move(tmp, ConfPath, true);
     }
     // what the Info panel shows (rewritten on every change and once a minute, so a stale file means "not running")

@@ -49,7 +49,7 @@ static partial class Bridge
             var req = HttpRequest.Read(s, NoticeMaxBody);
             if (req == null) return;
             HttpRequest.Respond(s, req.Method == "GET" || req.Method == "POST" ? 200 : 405);
-            if (req.Method == "POST") lock (noticeGate) HandleNotice(BuildNotice(ParseMultipart(req.Body, req.Boundary)));
+            if (req.Method == "POST") lock (noticeGate) HandleNotice(ApplyPrefs(BuildNotice(ParseMultipart(req.Body, req.Boundary)), conf));
         } catch (Exception e) { Log("notifications: " + e.GetType().Name + ": " + e.Message); }
     }
     public sealed class NoticeData { public string Title = "", Message = "", Size = "large", Position = "bottom-right", Ext = ""; public int Duration = 5, W, H; public byte[] Image; }
@@ -66,6 +66,29 @@ static partial class Bridge
                 n.Image = img; n.Ext = ext; (n.W, n.H) = ImageSize(img); break;
             }
         return n.Title.Length > 0 || n.Message.Length > 0 || n.Image != null ? n : null;
+    }
+    // ---- the owner's notification settings (Advanced settings › Notifications; silentglass-ha.conf). Each one empty
+    // means "as Home Assistant sent it". ----
+    public static readonly string[] NoticePositions = { "bottom-right", "bottom-left", "top-right", "top-left", "center" };
+    public static readonly string[] NoticeSizes = { "small", "medium", "large" };
+    public static readonly int[] NoticeDurations = { 5, 10, 20, 30 };
+    public static bool ValidQuiet(string spec) => spec.Length == 0 || Regex.IsMatch(spec, @"^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$");
+    public static NoticeData ApplyPrefs(NoticeData n, Dictionary<string, string> c)
+    {
+        if (n == null) return null;
+        string pos = c.GetValueOrDefault("notify_position", ""), size = c.GetValueOrDefault("notify_size", "");
+        if (NoticePositions.Contains(pos)) n.Position = pos;
+        if (NoticeSizes.Contains(size)) n.Size = size;
+        if (int.TryParse(c.GetValueOrDefault("notify_duration", ""), out int d) && NoticeDurations.Contains(d)) n.Duration = d;
+        if (c.GetValueOrDefault("notify_images", "1") == "0") { n.Image = null; n.Ext = ""; n.W = n.H = 0; }
+        return n.Title.Length > 0 || n.Message.Length > 0 || n.Image != null ? n : null;  // a picture-only notice with pictures off
+    }
+    // "22:00-07:00" (may wrap past midnight); empty = never quiet
+    public static bool InQuietHours(string spec, TimeSpan now)
+    {
+        if (string.IsNullOrEmpty(spec) || !ValidQuiet(spec)) return false;
+        var p = spec.Split('-'); var from = TimeSpan.Parse(p[0], CultureInfo.InvariantCulture); var to = TimeSpan.Parse(p[1], CultureInfo.InvariantCulture);
+        return from == to ? false : from < to ? now >= from && now < to : now >= from || now < to;
     }
     public static string ImageType(byte[] b) =>
         b.Length > 12 && b[0] == 0xFF && b[1] == 0xD8 ? "jpg" : b.Length > 24 && b[0] == 0x89 && b[1] == (byte)'P' && b[2] == (byte)'N' && b[3] == (byte)'G' ? "png" :
@@ -95,12 +118,14 @@ static partial class Bridge
     }
     static bool IsAmbient(string app) => app is ArtApp or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
     // hand the notice to SilentGlass: data/notice.json (+ image). Taking the file is its acknowledgement.
-    static void HandleNotice(NoticeData n)
+    // Returns why it was not shown, or null. A test (from the phone page) ignores the on/off switch and quiet hours.
+    static string HandleNotice(NoticeData n, bool test = false)
     {
-        if (n == null) { Log("notifications: empty request"); return; }
+        if (n == null) { Log("notifications: empty request (or a picture with pictures off)"); return "nothing to show"; }
         string fg = VStr("memory/appfw/current_fullscreen_appid"), what = "'" + (n.Title.Length > 0 ? n.Title : n.Message.Length > 40 ? n.Message.Substring(0, 40) : n.Message) + "'";
-        string why = !NoticesOn ? "notifications are off" : !ScreenOn ? "screen off" : IsAmbient(fg) ? "Ambient" : null;
-        if (why != null) { Log("notifications: " + what + " not shown (" + why + ")"); return; }
+        string why = !test && !NoticesOn ? "notifications are off" : !ScreenOn ? "the TV is off" : IsAmbient(fg) ? "Ambient is on" :
+            !test && InQuietHours(conf.GetValueOrDefault("notify_quiet", ""), DateTime.Now.TimeOfDay) ? "quiet hours" : null;
+        if (why != null) { Log("notifications: " + what + " not shown (" + why + ")"); return why; }
         foreach (var f in Directory.GetFiles(Data, "notice-*")) try { File.Delete(f); } catch { }
         long id = ++noticeSeq; string image = n.Image != null ? "notice-" + id + "." + n.Ext : "";
         if (image.Length > 0) File.WriteAllBytes(Data + "/" + image, n.Image);
@@ -110,14 +135,16 @@ static partial class Bridge
         string file = Data + "/notice.json";
         File.WriteAllText(file + ".tmp", json); File.Move(file + ".tmp", file, true);
         bool Taken(int ms) { for (int i = 0; i < ms / 100 && File.Exists(file); i++) Thread.Sleep(100); return !File.Exists(file); }
-        if (Taken(1500)) { Log("notifications: " + what + " shown"); return; }
+        if (Taken(1500)) { Log("notifications: " + what + " shown"); return null; }
         // SilentGlass is not running (it is closed in standby): start it for the notice - only over the TV viewer,
         // where starting it hidden is invisible; over another app it would send that app to the background
         string onScreen = OnScreenApp(fg);
-        if (onScreen != "org.tizen.tv-viewer" && fg != Launcher) { File.Delete(file); Log("notifications: " + what + " not shown (SilentGlass not running over " + onScreen + ")"); return; }
+        if (onScreen != "org.tizen.tv-viewer" && fg != Launcher) { File.Delete(file); Log("notifications: " + what + " not shown (SilentGlass not running over " + onScreen + ")"); return "an app is on screen and SilentGlass is not running"; }
         LaunchApp(Launcher, "sg_notice", "1");
-        Log("notifications: " + what + (Taken(8000) ? " shown (started SilentGlass)" : " NOT taken"));
+        bool taken = Taken(8000);
+        Log("notifications: " + what + (taken ? " shown (started SilentGlass)" : " NOT taken"));
         if (File.Exists(file)) File.Delete(file);
+        return taken ? null : "SilentGlass did not answer";
     }
     // multipart/form-data body -> field name -> bytes
     public static Dictionary<string, byte[]> ParseMultipart(byte[] body, string boundary)
