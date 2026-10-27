@@ -1,7 +1,9 @@
 # Install SilentGlass
 
 For an owner who already has root on a compatible Samsung Tizen TV (developed on a QN65S90D, Tizen, .NET 6). Every
-step is a separate, reversible phase; do them in order, check each one on the screen, and keep the backups.
+step is a separate phase with its own undo script; do them in order, check each one on the screen, and copy the
+backups off the TV. Read [Risks and recovery](../README.md#risks-and-recovery) first: most undo scripts have not
+been run on a TV yet.
 Root access itself is not part of this repository: this project uses the reviewed external
 [s90c-tools](https://github.com/invaliddayta/s90c-tools) `tv-access` helper - see the
 [agent walkthrough](agent-workflow.md#2-confirm-the-existing-access-path).

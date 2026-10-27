@@ -8,6 +8,10 @@ Press Home and a glass bar fades in over whatever is playing - the picture keeps
 that, the TV's recognition, voice and advertising services are switched off (each change reversible), the TV shows
 up in Home Assistant with notifications on any input, and its built-in Thread radio joins **your** smart-home network.
 
+> **Unofficial and at your own risk.** This modifies a Samsung TV in ways Samsung doesn't support, through root
+> access from a separate tool. The risk of bricking it is low but not zero, and most undo scripts haven't been run on
+> a TV yet. Read [Risks and recovery](#risks-and-recovery) before installing anything.
+
 ![Home over the picture](docs/screenshots/s90d-overlay-bar.jpg)
 
 *The bar over the picture, captured from the TV's overlay window and composited over a stand-in photo (the TV's video
@@ -98,15 +102,51 @@ brand, year or Tizen version is not enough to establish compatibility.
 
 ## How it changes the TV
 
-- **Owner-authorized, local and reversible.** Administrative commands run as root through a separately reviewed
+- **Owner-authorized, local, and designed to be reversible** (see [Risks and recovery](#risks-and-recovery) for what
+  has actually been undone on a TV). Administrative commands run as root through a separately reviewed
   per-command helper ([s90c-tools](https://github.com/invaliddayta/s90c-tools), not bundled); that does not remove
   Samsung's SMACK sandbox or firmware protections, and nothing here tries to.
 - **No TV firmware is flashed** and no bootloader, partition or SDB key is touched. The one exception is the Thread
   radio's application image, switched between images Samsung ships on the TV, with Samsung's own flasher and only
   with the owner's approval.
 - **The launcher replaces a stock app in place** (Samsung's Bixby promotion app) and is set as the Home handler;
-  power-on still goes to the last input. Restore scripts put the original back.
+  power-on still goes to the last input. `recipes/restore-launcher.sh` is meant to put the original back (not yet
+  run on a TV).
 - **Persistence uses the owner's own systemd user units** - no system services are modified.
+
+## Risks and recovery
+
+No warranty (MIT). Samsung may refuse support or warranty service for a modified TV.
+
+**What is never touched:** the TV's firmware, bootloader, partitions and read-only system files. Changes go to the
+writable data area: the app registry, settings keys, files in an app container, stop markers and the owner's own
+systemd units. A hard brick (a TV that won't start) would need one of the untouched parts to break, so it is
+unlikely. A **soft brick** (the TV starts, but something important doesn't work) is possible:
+
+| What could go wrong | What you'd see | How it's recovered |
+|---|---|---|
+| The app registry (`/opt/dbspace/.pkgmgr_parser.db`) is damaged by a privacy batch or the launcher install | apps don't launch | each script copies the registry first, edits it in one transaction and checks it; copy the backup back (root) |
+| SilentGlass fails to start | the TV powers on to the last input as usual, but Home does nothing | `recipes/restore-launcher.sh` (root) |
+| The Thread radio flash fails | Thread, Zigbee and Samsung's SmartThings hub don't work; the rest of the TV does | flash again with the same Samsung tool (its bootloader isn't touched) |
+| A disabled Samsung service turns out to be needed | one TV feature misbehaves | that batch's restore script |
+
+**Recovery needs root.** Every undo runs as root through [s90c-tools](https://github.com/invaliddayta/s90c-tools)'
+`tv-access`, which needs Developer Mode and a firmware build that tool supports. Keep both working:
+
+- **Batch G turns automatic firmware updates off,** because an update can close that access. You then get no
+  security updates unless you install them yourself, and a manual update can still close it. Check s90c-tools before
+  updating.
+- **Backups are kept on the TV** (`/opt/usr/share/quiet-tizen-backups/`). Copy them to another machine: a backup on the
+  TV doesn't help if its storage is wiped.
+- **Don't count on a factory reset as an undo.** Whether it restores the replaced app and the Home setting hasn't been
+  tested.
+
+**Which undo scripts have actually been run on a TV** (all on the one tested TV):
+
+- Run and verified: batch G (apply, restore, apply) and the Thread border router (full uninstall and reinstall).
+- Written but not yet run: `restore-launcher.sh` (back to Samsung Home), `restore-settings-bridge.sh`,
+  `ha-bridge-restore.sh`, the privacy batch restores (C to F2, multiview, Prime), the boot-unit restores and the
+  launcher rollback (`restore-v32a.sh`). Treat these as untested. Test one on your own TV before relying on it.
 
 ## Getting started
 
