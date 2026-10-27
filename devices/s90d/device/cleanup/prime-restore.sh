@@ -9,8 +9,10 @@ COMP=org.tizen.primevideo_companionapp
 KEYS="'http://samsung.com/tv/metadata/appbootingsupport','http://samsung.com/tv/metadata/prelaunch.support'"
 [ "$(id -u)" = 0 ]
 [ "$(grep -c '^INSERT INTO' "$BK/prime-restore.sql")" = 2 ]
-[ "$(sqlite3 -readonly "$DB" "select count(*) from package_app_app_metadata where app_id='$APP' and md_key in ($KEYS);")" = 0 ] || { echo 'metadata already present - refusing'; exit 4; }
-{ echo 'BEGIN IMMEDIATE;'; cat "$BK/prime-restore.sql"; echo "UPDATE package_app_info SET app_disable='false' WHERE app_id='$COMP' AND app_disable='true';"; echo 'COMMIT;'; } | sqlite3 -bail "$DB"
+# Samsung reinstalls Prime Video now and then, which brings its boot metadata back: then only the companion is left
+have=$(sqlite3 -readonly "$DB" "select count(*) from package_app_app_metadata where app_id='$APP' and md_key in ($KEYS);")
+case "$have" in 0) ins="$BK/prime-restore.sql";; 2) ins=/dev/null; echo 'boot metadata already back (Samsung reinstalled Prime) - skipped';; *) echo "partial metadata ($have) - refusing"; exit 4;; esac
+{ echo 'BEGIN IMMEDIATE;'; cat "$ins"; echo "UPDATE package_app_info SET app_disable='false' WHERE app_id='$COMP' AND app_disable='true';"; echo 'COMMIT;'; } | sqlite3 -bail "$DB"
 [ "$(sqlite3 -readonly "$DB" 'PRAGMA quick_check;')" = ok ]
 $HELPER reload-owner
 $HELPER read-owner $APP $COMP

@@ -6,6 +6,14 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **Undo scripts tested offline**: every restore script was run in a sandbox on the Pi against copies of the tested
+  TV's files (registry, settings, owner units, markers, launcher, all 6,328 backup files), one at a time and as one
+  chain back to stock (45 disabled apps -> 1, the one the Thread undo re-enables; Home and startup back to Samsung's).
+  Fixed what would have refused on the TV: `privacy/restore.sh` (Samsung had uninstalled one of its 19 apps; absent
+  apps are now skipped, present ones must still match their recorded rows), `prime-restore.sh` (Samsung's Prime
+  reinstall had put the boot metadata back; now skipped, the companion is still re-enabled). New
+  `launcher-deploy/restore-stock-home.sh`: the TV's own trial rollback only accepted the first trial build.
+  `tests/test_s90d_undo.py`.
 - **v42f**: the settings-key bridge is gone (it replaced Samsung's QuickLaunch app; never installed on the tested
   TV): `QuickLaunch.cs`, its recipes and tests removed, and the launcher no longer reads its old `quiet_page` extra.
   `sg_open` stays for `app_launcher`. Deploy pair `update-v42f.sh` / `restore-v32a.sh`. Also removed from the TV: a

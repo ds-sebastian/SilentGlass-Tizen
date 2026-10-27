@@ -90,11 +90,14 @@ TV only (owner-readable). Details: [Home Assistant bridge](../devices/s90d/ha-br
 
 ## Undo
 
-Each phase has its inverse; run them in reverse order:
+Each phase has its inverse; run them in reverse order (newest change first), and the launcher last:
 
+- the privacy batches and boot services: their `*-restore.sh` scripts (listed in the [S90D record](../devices/s90d/README.md))
 - `devices/s90d/device/ha-bridge/ha-bridge-restore.sh`
-- `recipes/restore-launcher.sh home-01 ORIGINAL_MAIN_OPERATION_ID ORIGINAL_HOME_ID ORIGINAL_STARTUP_ID` - the three
-  values you saved (all `com.samsung.tv.csfs` on the TVs seen so far; use yours)
+- back to Samsung Home: `recipes/restore-launcher.sh home-01 ORIGINAL_MAIN_OPERATION_ID ORIGINAL_HOME_ID
+  ORIGINAL_STARTUP_ID` - the three values you saved (all `com.samsung.tv.csfs` on the TVs seen so far; use yours).
+  The tested TV was installed by an earlier trial script; its undo is
+  `devices/s90d/device/launcher-deploy/restore-stock-home.sh`, which works from any SilentGlass version.
 
 If the screen is blank after an update, read `/tmp/silentglass-state.txt`, the installed DLL hash, its labels and
 any `.native_image` cache before changing anything else. See [recovery principles](samsung-tizen-notes.md#recovery-principles).

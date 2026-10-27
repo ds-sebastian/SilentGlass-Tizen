@@ -232,7 +232,9 @@ class LauncherTests(unittest.TestCase):
         self.assertTrue(update.exists(), update)
         prev = re.search(r"Inverse: restore-(v\d+\w)\.sh", update.read_text()).group(1)
         self.assertTrue((deploy / f"restore-{prev}.sh").exists())
-        self.assertEqual(len(list(deploy.glob("*.sh"))), 2)  # only the current pair
+        # only the current pair, plus the way back to Samsung Home
+        self.assertEqual(sorted(p.name for p in deploy.glob("*.sh")),
+                         sorted([update.name, f"restore-{prev}.sh", "restore-stock-home.sh"]))
 
     def test_backdrop_art_is_local_svg(self):
         for name in ("tile-samsung-home.svg", "free-background.svg"):

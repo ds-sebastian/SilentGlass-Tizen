@@ -87,7 +87,10 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   path, native callbacks posted to the UI thread, interrupted animations land on their end state.
 
 Deploy: `launcher-deploy/update-vN.sh` (refuses unless the installed DLL is the previous version; keeps SMACK labels;
-verifies every file) and `restore-v(N-1).sh`. A first install: [docs/install.md](../../docs/install.md).
+verifies every file) and its inverse. The published pair upgrades from v32a (`update-v42f.sh` / `restore-v32a.sh`).
+Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
+then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).
+A first install: [docs/install.md](../../docs/install.md).
 
 ## Device changes (device/)
 

@@ -69,14 +69,18 @@ No warranty (MIT). Samsung may refuse warranty service on a modified TV.
   unlikely.
 - **What can break, and the fix:**
   - The app registry (apps won't launch): every script backs it up first and changes it in one checked step.
-  - SilentGlass (Home does nothing; the TV still powers on to the last input): `recipes/restore-launcher.sh`.
+  - SilentGlass (Home does nothing; the TV still powers on to the last input): back to Samsung Home with
+    `restore-stock-home.sh` (tested TV) or `recipes/restore-launcher.sh` (installs made with the recipes).
   - The Thread radio flash (Thread and SmartThings stop; the rest works): flash again with Samsung's own tool.
 - **Every undo needs root** through [s90c-tools](https://github.com/invaliddayta/s90c-tools)' `tv-access`, which
   needs Developer Mode and a supported firmware. A firmware update can close that access, so batch G turns automatic
   updates off. That also means no security updates until you install them yourself.
 - **Copy the backups off the TV.** Don't count on a factory reset as an undo; that hasn't been tested.
-- **Tested undo scripts:** batch G and the Thread border router. The others (back to Samsung Home, the Home
-  Assistant bridge, the privacy batches, the boot services) are checked offline but haven't been run on a TV.
+- **How the undo scripts were tested:** batch G and the Thread border router were run on the TV. All the others
+  were run on a computer against copies of the tested TV's own files (app registry, settings, services, backups),
+  one at a time and as one full chain back to stock: 45 disabled apps down to the one the Thread undo re-enables,
+  and Samsung Home back. That found and fixed three that would have refused on the TV. It can't show how the TV
+  behaves when apps and services restart, so those undos still haven't been run on a real TV.
 
 ## Install
 
