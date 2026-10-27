@@ -6,6 +6,11 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v41c/v41d** + **batch F2**: Info read "Check · 53 of 54" while the registry, the app framework and the drift check
+  all said everything was blocked. Info now names what is on instead of a count (and the state file lists it as
+  `privacy_gaps=`, checked 8 s after start). It named Apple TV: its package also holds `com.samsung.tv.aria-dummy`,
+  which batch F missed (Prime Video's dummy was disabled with it). Batch F2 disables it; Info and the drift check
+  list it. Deploy pair `update-v41d.sh` / `restore-v32a.sh`.
 - **v41b**: from the first evening of use.
   - TV on with SHIELD off showed the wallpaper (right), but switching SHIELD on left it up: the TV did not report
     the signal flag change while the wallpaper was in front. While the wallpaper is up, the flag is now read every
@@ -14,7 +19,7 @@ records. Conf keys mentioned in older entries may since have been removed - the 
   - "The launcher bounces when it appears": the TV's compositor effect was still on for the app's main window (the
     one that hides and shows on Home presses); now off, as for the overlay.
   - `/tmp/silentglass-events.log`: every event (keys, launches, signal, bar and wallpaper show/hide), for diagnosing
-    what someone saw; the state file's trail holds only the last 16. Deploy pair `update-v41b.sh` / `restore-v32a.sh`.
+    what someone saw; the state file's trail holds only the last 16.
 - **v41a**: the wallpaper no longer comes up over SHIELD. What is on screen is now decided in one NUI-free file,
   `launcher/src/Screen.cs`, and `tests/screen-sim` runs that exact code against a simulated TV (SHIELD and Switch
   sleeping, waking over CEC and resyncing, Ambient, standby, Home Assistant launches, idle close, OLED dim), under every

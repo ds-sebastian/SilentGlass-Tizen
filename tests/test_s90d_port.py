@@ -265,13 +265,16 @@ class LauncherTests(unittest.TestCase):
         self.assertNotIn("File.Delete", info)
         self.assertNotIn("File.Write", info)
         self.assertNotIn("attr/current", info)
-        self.assertIn("if (AppEnabled(selfId) != true) return -1;", info)
-        self.assertIn('if (marks < 0 || apps < 0) return ("Unknown", Grey);', launcher())
+        # could not check (the self-check fails, a lookup errors): "Unknown", never a false "Check"
+        self.assertIn("if (AppEnabled(selfId) != true) return null;", info)
+        self.assertIn('if (gaps == null) return ("Unknown", Grey);', launcher())
+        # names what is on, so it can be found
+        self.assertIn('"Check · " + What(gaps[0]) + " is on"', launcher())
 
     def test_info_privacy_list_covers_every_registry_batch(self):
         info = (SRC / "InfoStats.cs").read_text()
         listed = set(re.findall(r'"([A-Za-z0-9._-]+)"', info.split("DisabledApps = {")[1].split("};")[0]))
-        for batch in ("batchc-apply.sh", "batche-apply.sh", "batchf-apply.sh"):
+        for batch in ("batchc-apply.sh", "batche-apply.sh", "batchf-apply.sh", "batchf2-apply.sh"):
             text = (ROOT / "devices/s90d/device/cleanup" / batch).read_text()
             ids = re.search(r'^IDS="([^"]+)"', text, re.M)  # batch F names its targets once
             scope = ids.group(1) if ids else text.split("app_id IN (")[1].split(")")[0]

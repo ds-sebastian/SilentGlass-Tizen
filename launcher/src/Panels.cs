@@ -85,10 +85,14 @@ public sealed partial class SilentGlass
 
     (string, Color) PrivacyStatus()
     {
-        int marks = InfoStats.MarkersInPlace(), apps = InfoStats.DisabledAppCount(SelfId);
-        if (marks < 0 || apps < 0) return ("Unknown", Grey);
-        return marks == InfoStats.VendorMarkers.Length && apps == InfoStats.DisabledApps.Length ? ("Protected", Live) : ("Check · " + (marks + apps) + " of " + (InfoStats.VendorMarkers.Length + InfoStats.DisabledApps.Length), Amber);
+        var gaps = InfoStats.PrivacyGaps(SelfId); privacyGaps = gaps == null ? "unknown" : string.Join(",", gaps);
+        if (gaps == null) return ("Unknown", Grey);
+        if (gaps.Count == 0) return ("Protected", Live);
+        // name what is on (the app id's last part) so it can be found; several: how many
+        string What(string g) { var n = g.StartsWith("marker:") ? g.Substring(7) : g; int d = n.LastIndexOf('.'); return d >= 0 ? n.Substring(d + 1) : n; }
+        return (gaps.Count == 1 ? "Check · " + What(gaps[0]) + " is on" : "Check · " + gaps.Count + " not blocked", Amber);
     }
+    string privacyGaps = "";
     (string, Color) NetworkStatus()
     {
         string i = InfoStats.DefaultInterface();

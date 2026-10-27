@@ -15,7 +15,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41b";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41d";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -39,7 +39,9 @@ public sealed partial class SilentGlass : NUIApplication
         // started by the bridge only to show a notification: stay hidden, the picture stays in front
         if (NoticePending()) { HideBackdrop(); TakeNotice("start"); }
         Note("created");
+        var privacy = new Tizen.NUI.Timer(8000); privacy.Tick += (s, e) => { PrivacyStatus(); Note("privacy:" + privacyGaps); return false; }; privacy.Start(); privacyTimer = privacy;
     }
+    Tizen.NUI.Timer privacyTimer;
     // AMD resumes us for every launch request; what to show is decided in OnAppControlReceived
     protected override void OnResume() { base.OnResume(); Note("resumed fg=" + Foreground()); }
     // The TV also pauses us whenever our main window is hidden - i.e. whenever only the overlay is up - so a pause
@@ -137,6 +139,7 @@ public sealed partial class SilentGlass : NUIApplication
         Put("brightness", Setting("brightness")); Put("contrast", Setting("contrast")); Put("picturemode", Setting("picturemode"));
         Put("game", Setting("game-mode-auto")); Put("volume", volume);
         Put("trail", string.Join(" | ", trail));
+        Put("privacy_gaps", privacyGaps);
         Put("notice", noticeState); Put("setup", setupState); Put("dimmed", dimmed); Put("library", library.Count);
         b.Append('\n');
         try { File.WriteAllText(StateFile, b.ToString()); } catch { }

@@ -46,10 +46,11 @@
     "org.tizen.primevideo",
     "org.tizen.primevideo-dummy",
     "com.samsung.tv.aria-video",
-    "org.tizen.browser"
+    "org.tizen.browser",
+    "com.samsung.tv.aria-dummy"
   ],
   "quiet_home_dlls": [
-    "b33eef6afaf752d8ad3d9d5fb16ff4ff2e16e300921f270d82dd498261d65d27"
+    "3a46e626fdc1038f6111ad46f0748a377ba67e4b4b542c3e68a337173e7d1621"
   ],
   "user_units": [
     "quiet-recog-off.service",

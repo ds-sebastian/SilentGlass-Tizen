@@ -23,7 +23,7 @@ public static class InfoStats
         "com.samsung.tv.targeted-ad-service", "com.samsung.tv.utterance-recommender-core", "com.samsung.tv.AICompanionAgent", "com.samsung.tv.aov-dashboard",
         "com.samsung.tv.home.media", "com.samsung.tv.cobalt-yt",
         // batch F: Samsung's country preloads come back after an uninstall, so they stay installed but disabled
-        "org.tizen.primevideo", "org.tizen.primevideo-dummy", "org.tizen.primevideo_companionapp", "com.samsung.tv.aria-video", "org.tizen.browser",
+        "org.tizen.primevideo", "org.tizen.primevideo-dummy", "org.tizen.primevideo_companionapp", "com.samsung.tv.aria-video", "com.samsung.tv.aria-dummy", "org.tizen.browser",
         // batch E (2026-10-26)
         "com.samsung.tv.cis-api-service-app", "com.samsung.tv.cis", "com.samsung.tizen.samsung-analytics", "org.tizen.multi-assistant-service",
         "com.samsung.tv.aov-service", "com.samsung.tv.voice-instant-app", "org.tizen.voice-onboarding", "com.samsung.tv.mybixby",
@@ -144,11 +144,6 @@ public static class InfoStats
         var set = new HashSet<string>(names, StringComparer.Ordinal);
         return VendorMarkers.Count(set.Contains);
     }
-    public static int MarkersInPlace()
-    {
-        try { return CountMarkers(Directory.EnumerateFileSystemEntries("/opt/usr/share/systemd/system").Select(Path.GetFileName)); }
-        catch { return -1; }
-    }
     // Other apps' /proc entries are invisible to this sandbox, so ask the app framework instead:
     // disabled apps are not returned by app_manager_get_app_info. -1 = API unusable (self-check failed).
     [DllImport("libcapi-appfw-app-manager.so.0")] static extern int app_manager_get_app_info(string appId, out IntPtr info);
@@ -163,17 +158,20 @@ public static class InfoStats
         }
         catch { return null; }
     }
-    public static int DisabledAppCount(string selfId)
+    // what is not blocked: missing vendor markers and enabled apps, by name; null = could not check
+    public static List<string> PrivacyGaps(string selfId)
     {
-        if (AppEnabled(selfId) != true) return -1;
-        int disabled = 0;
-        foreach (var id in DisabledApps)
-        {
+        List<string> names;
+        try { names = Directory.EnumerateFileSystemEntries("/opt/usr/share/systemd/system").Select(Path.GetFileName).ToList(); }
+        catch { return null; }
+        if (AppEnabled(selfId) != true) return null;
+        var gaps = VendorMarkers.Where(m => !names.Contains(m)).Select(m => "marker:" + m).ToList();
+        foreach (var id in DisabledApps) {
             var e = AppEnabled(id);
-            if (e == null) return -1;
-            if (e == false) disabled++;
+            if (e == null) return null;
+            if (e == true) gaps.Add(id);
         }
-        return disabled;
+        return gaps;
     }
     [DllImport("libcapi-system-info.so.0")] static extern int system_info_get_platform_string(string key, out IntPtr value);
     [DllImport("libc.so.6")] static extern void free(IntPtr p);
