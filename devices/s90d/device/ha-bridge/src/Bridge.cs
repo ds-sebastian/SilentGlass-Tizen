@@ -226,13 +226,15 @@ static partial class Bridge
         StartSetupWatch();
         int backoff = 5;
         while (true) {
-            conf = LoadConf();
+            // in this order: the setup page waits until reload is clear and the state is no longer "connecting", and a
+            // save that lands while the file is read is not lost (it sets reload again)
+            if (LoadConf().GetValueOrDefault("host", "").Length > 0) SetState("connecting", mqttError);
+            reload = false; conf = LoadConf();
             if (!Configured) {
-                reload = false; Log("not configured: waiting for the setup page");
+                Log("not configured: waiting for the setup page");
                 for (int i = 0; !reload; i++) { if (i % 60 == 0) SetState("unconfigured", ""); Thread.Sleep(1000); }
                 continue;
             }
-            SetState("connecting", ""); reload = false;  // in this order: the setup page waits for the outcome of these settings
             try {
                 mqtt = new Mqtt(conf["host"], int.Parse(conf.GetValueOrDefault("port", "1883")), "silentglass-s90d", conf.GetValueOrDefault("user"), conf.GetValueOrDefault("password"),
                     Base + "/availability", "offline", OnMessage);

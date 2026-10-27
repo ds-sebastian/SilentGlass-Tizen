@@ -19,7 +19,7 @@ public sealed partial class SilentGlass
     }
     readonly List<Row> rows = new();
     int rowSel;
-    Tizen.NUI.Timer infoTimer;
+    Tizen.NUI.Timer panelTimer;
     const int CcX = 1236, CcW = 624, CcR = 44, SliderH = 88, ValueH = 64, StatusH = 56, RuleH = 25, HeadH = 70;
 
     static Row Level(string glyph, string name, Func<string> value, Func<float> amount, Action<int> adjust, Action select = null) =>
@@ -75,10 +75,7 @@ public sealed partial class SilentGlass
         // everything else (Home Assistant, the Thread border router, the wallpaper's location) is set from a phone
         list.Add(Open("gear", "Advanced settings", OpenSetup));
         BuildPanel(Mode.Info, "SilentGlass " + ModVersion, true, list);
-        infoTimer ??= new Tizen.NUI.Timer(3000);
-        infoTimer.Tick -= InfoTick; infoTimer.Tick += InfoTick; infoTimer.Start();
     }
-    bool InfoTick(object s, Tizen.NUI.Timer.TickEventArgs e) { if (!overlayShown || mode != Mode.Info) return false; UpdatePanel(true); return true; }
 
     // ~45 app-framework calls: read at most every 30 s
     (string, Color) privacy; long privacyAt = long.MinValue / 2; string privacyGaps = "";
@@ -167,9 +164,13 @@ public sealed partial class SilentGlass
         }
         rowSel = rows.FindIndex(r => r.Kind != RowKind.Status);
         UpdatePanel(true); FadeIn(panel); Note(m.ToString().ToLowerInvariant());
+        // volume, mute and the sleep timer change without telling us; Info's status rows too
+        panelTimer ??= new Tizen.NUI.Timer(3000);
+        panelTimer.Tick -= PanelTick; panelTimer.Tick += PanelTick; panelTimer.Start();
     }
-    // refresh: read the TV again (settings for Controls, the status rows for Info) - on open, every 3 s in Info and when
-    // the TV changes, never for a focus move (each read is IPC or file I/O); a changed setting reads itself back
+    bool PanelTick(object s, Tizen.NUI.Timer.TickEventArgs e) { if (!overlayShown || mode != Mode.Info && mode != Mode.Controls) return false; UpdatePanel(true); return true; }
+    // refresh: read the TV again (settings for Controls, the status rows for Info) - on open, every 3 s and when the TV
+    // changes, never for a focus move (each read is IPC or file I/O); a changed setting reads itself back
     void UpdatePanel(bool refresh = false)
     {
         if (refresh && mode == Mode.Controls) RefreshSettings();

@@ -165,7 +165,8 @@ function show(s) {
   fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
   $('apps').checked = !s.hideapps; $('dim').checked = s.dim; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
   $('thon').checked = s.thread_on;
-  const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
+  const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'],
+    connecting: [null, 'Connecting…' + (s.mqtt_error ? ' (last time: ' + s.mqtt_error + ')' : '')] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
   dot($('mqttdot'), m[0]); $('mqttstate').textContent = m[1];
   $('threadsec').classList.toggle('hidden', !s.thread_installed);
   const role = s.thread_role || 'unavailable', joined = /^(router|leader|child)$/.test(role);

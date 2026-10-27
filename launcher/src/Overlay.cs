@@ -64,7 +64,7 @@ public sealed partial class SilentGlass
     void CloseOverlay(string why)
     {
         if (!overlayShown) return;
-        overlayShown = false; overlayIdle?.Stop(); infoTimer?.Stop(); CloseSetupServer();
+        overlayShown = false; overlayIdle?.Stop(); panelTimer?.Stop(); CloseSetupServer();
         ClearOverlay();
         string fg = Foreground();
         if (fg == Viewer || fg == SelfId) { try { ow.SetAcceptFocus(false); } catch { } overlayParked = true; }

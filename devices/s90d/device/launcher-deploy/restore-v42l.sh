@@ -5,7 +5,7 @@ A=/opt/usr/apps/com.samsung.tv.bixby-promotion
 BK=/opt/usr/share/quiet-tizen-backups/s90d-home-v43a-20261027
 LBL=User::Pkg::com.samsung.tv.bixby-promotion::RO
 PREV=c208d23dcf858593900678316e9987f17d971e7afa2f9cf44f17e375d6d7d6a9  # v42l
-DLL=6589763b58fead61807aac72c718ef8bd88a41e55d83a662bc787a1b95d17a1a  # v43a: python3 tools/build.py launcher (reproducible)
+DLL=d91f08ebc172058825a6a632c78698d442abed85a0536c9b744a58515190364c  # v43a: python3 tools/build.py launcher (reproducible)
 [ "$(id -u)" = 0 ]
 [ "$(sha256sum $BK/v42l-BixbyPromotion.dll | cut -d' ' -f1)" = "$PREV" ]
 [ -d "$BK/v42l-quiet-home" ]

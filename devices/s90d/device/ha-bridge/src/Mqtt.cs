@@ -13,7 +13,7 @@ sealed class Mqtt
     volatile bool alive = true; ushort pid = 1;
     public bool Alive => alive;
     public Action Closed;  // called once when the connection is lost or closed
-    void Die() { if (!alive) return; alive = false; try { Closed?.Invoke(); } catch { } }
+    void Die() { if (!alive) return; alive = false; try { tcp.Close(); } catch { } try { Closed?.Invoke(); } catch { } }  // closing unblocks a stuck write
     public Mqtt(string host, int port, string clientId, string user, string pass, string willTopic, string willMsg, Action<string, string> onMsg)
     {
         onMessage = onMsg;
