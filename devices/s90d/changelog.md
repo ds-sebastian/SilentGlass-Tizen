@@ -16,8 +16,9 @@ records. Conf keys mentioned in older entries may since have been removed - the 
     TV runner's 64 KiB.
 - **v42k** + **bridge 2.5.1**: no built-in location. Until one is set on the phone page, sunrise and sunset come from
   the TV's time zone (standard offset x 15 degrees of longitude, latitude 40). Examples and tests use New York.
-- **bridge 2.5.0**: about a seventh of the CPU (per-thread `/proc/<pid>/task/*/stat` over 2 min with the picture on:
-  ~0.4% of one core, was ~2.4-3%).
+- **bridge 2.5.0**: about a third of the CPU: ~1% of one core (137 ticks in 120 s, per-thread `/proc/<pid>/task/*/stat`,
+  bridge 2.6.0 in standby), was ~3% (452 ticks in 150 s, picture on). An earlier "~0.4%, a seventh" figure came from
+  a 60 s window read as 120 s (the TV runner does not pass environment variables such as `SECS=`).
   - Power, input and the app in front are published when they change (vconf change notifications on the bridge's
     GLib loop, plus the source list callback); measured: power on reached Home Assistant in 1.5 s.
   - Volume, mute and input names are checked every 10 s instead of 2 s, settable on the phone page (Advanced
