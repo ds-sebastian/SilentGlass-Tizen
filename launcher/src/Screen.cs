@@ -46,7 +46,7 @@ public sealed class Screen
     public string LastOther = "";         // the last app in front other than us
     string previous = "";
     int settleGen, homeGen, pollGen; bool homeAfterViewer, directHome; string pendingOpen;
-    public const int BackdropPollMs = 1000, EchoMs = 1200;
+    public const int BackdropPollMs = 1000, EchoMs = 1200, AfterCloseMs = 2600;
     bool selfLaunch; long lastHome = long.MinValue / 2;  // the next launch request is our own relaunch, not a Home press
     void LaunchSelf() { selfLaunch = true; ui.Launch(Self); }
     long pictureLostAt = long.MinValue / 2; int pictureLostOn = -1;
@@ -64,11 +64,11 @@ public sealed class Screen
     public void Home(string open, string why)
     {
         bool own = selfLaunch; selfLaunch = false;
-        // The remote's Home key reaches us twice: a second launch request 0.4-1 s after the first undid it - the bar
-        // closed and reopened (the "bounce", seen in the event log). A plain Home within 1.2 s of the last one, or of
-        // the bar closing (Watch, Back), is that echo.
+        // The TV sends the Home app stray launch requests: a second one 0.4-1 s after a Home press, and one or two
+        // 0.7-2.2 s after the bar closes on a remote key (Back, Watch, Home) - each reopened the bar (the "bounce",
+        // seen in the event log). A plain Home within 1.2 s of the last one, or 2.6 s of the bar closing, is ignored.
         long now = clock();
-        if (!own && open == "" && (now - lastHome < EchoMs || !ui.OverlayShown && now - ui.OverlayClosedAt < EchoMs)) { ui.Note(why + ":echo"); return; }
+        if (!own && open == "" && (now - lastHome < EchoMs || !ui.OverlayShown && now - ui.OverlayClosedAt < AfterCloseMs)) { ui.Note(why + ":echo"); return; }
         if (open == "") lastHome = now;
         // a press while going to the picture first: this press decides, the pending relaunch is dropped
         if (!own && homeAfterViewer) { homeAfterViewer = false; ++homeGen; }
@@ -133,7 +133,9 @@ public sealed class Screen
     }
     void Settled()
     {
-        bool had = HasPicture; Signal = ui.ReadSignal(); ui.Note("signal:" + Signal);
+        bool had = HasPicture; int before = Signal; Signal = ui.ReadSignal();
+        if (Signal == before) return;  // the TV re-sends the same value whenever we step aside: nothing changed
+        ui.Note("signal:" + Signal);
         if (had && !HasPicture) { pictureLostAt = clock(); pictureLostOn = Source; }
         // the picture arrived under the wallpaper: step aside to it (not while the phone setup sheet is open)
         if (!had && HasPicture && ui.BackdropShown && !ui.SetupOpen) { ToPicture("picture_arrived"); return; }

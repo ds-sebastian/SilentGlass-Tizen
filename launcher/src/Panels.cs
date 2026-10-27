@@ -167,7 +167,7 @@ public sealed partial class SilentGlass
             panel.Add(r.Box); rows.Add(r); y += rh;
         }
         rowSel = rows.FindIndex(r => r.Kind != RowKind.Status);
-        UpdatePanel(); FadeIn(panel, 0); Note(m.ToString().ToLowerInvariant());
+        UpdatePanel(); FadeIn(panel); Note(m.ToString().ToLowerInvariant());
     }
     void UpdatePanel()
     {

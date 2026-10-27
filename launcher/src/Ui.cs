@@ -10,7 +10,7 @@ public sealed partial class SilentGlass
 {
     static readonly Color White = new(1, 1, 1, 1), Clear = new(0, 0, 0, 0), Ink = new(.11f, .11f, .12f, 1), Live = new(.19f, .82f, .35f, 1),
         Amber = new(1f, .62f, .04f, 1), Grey = new(.56f, .56f, .58f, 1), Faint = new(1, 1, 1, .62f), FaintInk = new(.11f, .11f, .12f, .6f),
-        FocusFill = new(1, 1, 1, .95f), Edge = new(1, 1, 1, .16f), Hairline = new(1, 1, 1, .14f),
+        FocusFill = new(1, 1, 1, .95f), CurrentFill = new(1, 1, 1, .16f), Edge = new(1, 1, 1, .16f), Hairline = new(1, 1, 1, .14f),
         GlassTop = new(.15f, .15f, .17f, .70f), GlassBottom = new(.115f, .115f, .13f, .66f), Solid = new(.086f, .086f, .10f, .95f);
 
     static AlphaFunction Ease() => new(AlphaFunction.BuiltinFunctions.EaseOutSine);
@@ -63,11 +63,12 @@ public sealed partial class SilentGlass
         s.Track.Add(s.Knob); return s;
     }
     static void SetSwitch(Switch s, bool on) { s.Track.BackgroundColor = on ? Live : new Color(.47f, .47f, .5f, .5f); s.Knob.Position2D = new Position2D(on ? 31 : 3, 3); }
-    static void FadeIn(View v, int dy, int ms = 170)
+    // things appear by fading in where they stay (no slide: on the TV a slide read as a bounce)
+    static void FadeIn(View v, int ms = 180)
     {
-        int y = v.Position2D.Y; v.Opacity = 0; v.Position2D = new Position2D(v.Position2D.X, y + dy);
+        v.Opacity = 0;
         var a = new Animation(ms) { DefaultAlphaFunction = Ease() };
-        a.AnimateTo(v, "Opacity", 1f); a.AnimateTo(v, "PositionY", (float)y); Play(a);
+        a.AnimateTo(v, "Opacity", 1f); Play(a);
     }
     static Color HexColor(string hex)
     {

@@ -8,7 +8,7 @@ using Tizen.NUI.BaseComponents;
 public sealed partial class SilentGlass
 {
     const int MenuRowH = 88, PopW = 560, PopR = 36, AppW = 256, AppH = 144, AppGap = 24, AppCols = 4, MaxApps = 12;
-    sealed class MenuRow { public View Box; public ImageView Glyph, Check; public TextLabel Name, Port; public int Type; }
+    sealed class MenuRow { public View Box; public ImageView Glyph, Check; public TextLabel Name, Port; public int Type; public bool Current; }
     readonly List<MenuRow> menu = new();
     readonly List<(View card, TextLabel name, LibraryApp app)> tiles = new();
     int menuSel;
@@ -16,17 +16,21 @@ public sealed partial class SilentGlass
     static string PortGlyph(int type, int watch, int play) => type == watch ? "tv" : type == play ? "gamecontroller" : type == 0 ? "antenna" : "hdmi";
     void CloseMenu() { if (popover == null) return; oLayer.Remove(popover); popover.Dispose(); popover = null; menu.Clear(); tiles.Clear(); }
 
-    // ---- Inputs: every input by the TV's name for it; a checkmark on the current one, a green dot when it has a picture ----
+    // ---- Inputs: every input by the TV's name for it. The one on screen: a soft pill and a checkmark; a green dot when
+    // it has a picture (its device is on). The focus is the white pill. ----
+    string inputsSig = "";
+    string InputsSignature() => lastSource + "|" + HasPicture + "|" + string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + i.Connected));
     void OpenInputs()
     {
-        int keep = mode == Mode.Inputs && menuSel < menu.Count ? menu[menuSel].Type : lastSource;
+        bool refresh = mode == Mode.Inputs;  // already open: redraw in place, no fade
+        int keep = refresh && menuSel < menu.Count ? menu[menuSel].Type : lastSource;
         if (mode != Mode.Bar) OpenBar(true);
         mode = Mode.Inputs; FocusBar(false); CloseMenu(); RefreshInputs();
         int h = 24 + inputs.Count * MenuRowH, x = Math.Clamp(BarItemCentre("inputs") - PopW / 2, 40, 1880 - PopW), y = BarTop - PopGap - h;
         popover = Glass(x, y, PopW, h, PopR); oLayer.Add(popover);
         foreach (var s in inputs) {
             bool cur = s.Type == lastSource, off = s.Known && !s.Connected && !cur, sub = s.Name != s.Port;
-            var r = new MenuRow { Type = s.Type, Box = new View { Position2D = new Position2D(12, 12 + menu.Count * MenuRowH), Size2D = new Size2D(PopW - 24, MenuRowH), CornerRadius = Round(26), Opacity = off ? .45f : 1 } };
+            var r = new MenuRow { Type = s.Type, Current = cur, Box = new View { Position2D = new Position2D(12, 12 + menu.Count * MenuRowH), Size2D = new Size2D(PopW - 24, MenuRowH), CornerRadius = Round(26), Opacity = off ? .45f : 1 } };
             r.Glyph = Sym(PortGlyph(s.Type, watchPort, playPort), 22, (MenuRowH - GlyphS) / 2, GlyphS); r.Box.Add(r.Glyph);
             r.Name = Label(s.Name, 80, sub ? 10 : 0, PopW - 24 - 80 - 110, sub ? 44 : MenuRowH, 30, White, "Semibold"); r.Box.Add(r.Name);
             if (sub) { r.Port = Label(s.Port, 80, 50, 300, 30, 22, Faint); r.Box.Add(r.Port); }
@@ -35,13 +39,14 @@ public sealed partial class SilentGlass
             popover.Add(r.Box); menu.Add(r);
         }
         menuSel = Math.Max(0, menu.FindIndex(r => r.Type == keep));
-        FocusMenu(); FadeIn(popover, 16); Note("inputs");
+        inputsSig = InputsSignature();
+        FocusMenu(); if (!refresh) FadeIn(popover); Note(refresh ? "inputs:refresh" : "inputs");
     }
     void FocusMenu()
     {
         for (int i = 0; i < menu.Count; i++) {
             var r = menu[i]; bool f = i == menuSel; var ink = f ? Ink : White;
-            r.Box.BackgroundColor = f ? FocusFill : Clear; r.Name.TextColor = ink; r.Glyph.Color = ink;
+            r.Box.BackgroundColor = f ? FocusFill : r.Current ? CurrentFill : Clear; r.Name.TextColor = ink; r.Glyph.Color = ink;
             if (r.Port != null) r.Port.TextColor = f ? FaintInk : Faint;
             if (r.Check != null) r.Check.Color = ink;
         }
@@ -70,7 +75,7 @@ public sealed partial class SilentGlass
             var name = Label(app.Name, x - 20, y + AppH + 10, AppW + 40, 34, 22, new Color(1, 1, 1, .86f), "Semibold"); name.HorizontalAlignment = HorizontalAlignment.Center;
             popover.Add(card); popover.Add(name); tiles.Add((card, name, app));
         }
-        menuSel = 0; FocusApps(false); FadeIn(popover, 16); Note("apps");
+        menuSel = 0; FocusApps(false); FadeIn(popover); Note("apps");
     }
     void FocusApps(bool animate)
     {

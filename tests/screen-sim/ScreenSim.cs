@@ -125,7 +125,17 @@ sealed class FakeTv : IScreen
         Mode = "bar"; lastActivity = T;
     }
     public void OpenPart(string part) { Mode = part; }
-    public void CloseOverlay(string why) { if (!Overlay) return; Overlay = false; closedAt = T; Focused = false; Mode = ""; if (why != null) Note(why); }
+    public void CloseOverlay(string why)
+    {
+        if (!Overlay) return;
+        // seen on the TV (event log, v41e): after the bar closes on a remote key, the Home app gets one or two stray
+        // launch requests 0.7-2.2 s later
+        if (why == "back" || why == "bar:watching" || why == "launch:close")
+            foreach (var at in new[] { 700 + Rnd.Next(300), 1400 + Rnd.Next(800) })
+                Later(at, () => { if (Power && Front != Art && Front != Csfs) Amd(Self, null); });
+        CloseOverlayNow(why);
+    }
+    void CloseOverlayNow(string why) { if (!Overlay) return; Overlay = false; closedAt = T; Focused = false; Mode = ""; if (why != null) Note(why); }
     public void Launch(string id) => Later(150, () => Amd(id, null));
     public bool ConnectSource(int t)
     {
@@ -202,9 +212,9 @@ sealed class FakeTv : IScreen
                 // a Home press closes a working bar over the picture; otherwise it must leave a working bar
                 homeCheck = true; homeAt = T; homeExpectClose = Overlay && Focused && !Bd && Front != Art && Front != Csfs;
                 homeNoPicture = !homeExpectClose && !InputHasPicture && T - pictureSeenAt > 6000;
-                // within 1.2 s of the bar opening or closing a press counts as the remote's echo (Screen.EchoMs): either
-                // outcome is fine
-                if (T - openedAt < Screen.EchoMs || T - closedAt < Screen.EchoMs) homeCheck = false;
+                // within 1.2 s of the bar opening, or 2.6 s of it closing, a press is taken for one of the TV's stray
+                // launch requests (Screen.EchoMs / AfterCloseMs): either outcome is fine
+                if (T - openedAt < Screen.EchoMs || T - closedAt < Screen.AfterCloseMs) homeCheck = false;
                 if (Front == Art) { SetFront(Csfs); break; }  // Ambient's Home key opens Samsung Home
                 Later(150, () => Amd(Self, null));
                 // seen on the TV (event log, v41b): the remote's Home reaches the app twice, the second launch request

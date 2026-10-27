@@ -11,7 +11,7 @@ using Tizen.NUI.BaseComponents;
 public sealed partial class SilentGlass
 {
     enum Mode { Bar, Inputs, Apps, Controls, Info, Setup }
-    Window ow; View oRoot, oDim, oLayer, capsule, highlight;
+    Window ow; View oRoot, oDim, oLayer, capsule, highlight, currentMark;
     Mode mode; bool overlayShown; Tizen.NUI.Timer overlayIdle;
     const int BandTop = 240, BarH = 104, BarBottom = 52, ItemH = 80, ItemPad = 30, GlyphS = 40, GlyphGap = 14, PopGap = 18, OverlayIdleMs = 45000;
     int BarTop => 1080 - BarBottom - BarH;
@@ -93,6 +93,8 @@ public sealed partial class SilentGlass
             labels.Add((t, s, w)); total += 2 * ItemPad + GlyphS + GlyphGap + w;
         }
         capsule = Glass(960 - total / 2, BarTop, total, BarH, BarH / 2); oLayer.Add(capsule);
+        // the input on screen keeps a soft pill (where the focus goes is the white one; the green dot = it has a picture)
+        currentMark = new View { Size2D = new Size2D(10, ItemH), BackgroundColor = CurrentFill, CornerRadius = Round(ItemH / 2f), Opacity = 0 }; capsule.Add(currentMark);
         highlight = new View { Size2D = new Size2D(10, ItemH), BackgroundColor = FocusFill, CornerRadius = Round(ItemH / 2f) }; capsule.Add(highlight);
         int ix = 12;
         for (int i = 0; i < items.Count; i++) {
@@ -109,12 +111,14 @@ public sealed partial class SilentGlass
             bar.Add(new BarItem { Action = it.action, Glyph = g, Title = t, Sub = s, X = ix, W = iw });
             ix += iw;
         }
+        var cur = bar.Find(b => b.Action == "hdmi:" + lastSource);
+        if (cur != null) { currentMark.Position2D = new Position2D(cur.X, (BarH - ItemH) / 2); currentMark.Size2D = new Size2D(cur.W, ItemH); currentMark.Opacity = 1; }
         barSel = keep != null ? bar.FindIndex(b => b.Action == keep) : -1;
         if (barSel < 0) barSel = Math.Max(0, bar.FindIndex(b => b.Action == "hdmi:" + lastSource));
         FocusBar(false);
         bool fresh = !overlayShown; Note(fresh ? "bar:open" : "bar:rebuild");
         ShowOverlay(); OverlayActivity();
-        if (fresh) FadeIn(capsule, 24);
+        if (fresh) { FadeIn(capsule); FadeIn(oDim); }
     }
     // the focused item is a white capsule; while one of its menus is open it stays marked in faint white
     void FocusBar(bool animate)
@@ -168,7 +172,7 @@ public sealed partial class SilentGlass
         Note("tv_changed");
         if (!overlayShown) return;
         if (mode == Mode.Bar && BarSignature() != barSig) OpenBar(true);
-        else if (mode == Mode.Inputs) OpenInputs();
+        else if (mode == Mode.Inputs && InputsSignature() != inputsSig) OpenInputs();
         else if (mode == Mode.Controls || mode == Mode.Info) UpdatePanel();
     }
     string FocusName() => !overlayShown ? "" : mode == Mode.Bar && barSel >= 0 && barSel < bar.Count ? bar[barSel].Action :

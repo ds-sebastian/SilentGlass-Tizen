@@ -6,12 +6,23 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v41f**: the bounce, again; clearer current input.
+  - v41e's event log showed the rest of the bounce: after the bar closes on a remote key (Back, Watch, Home), the TV
+    sends the Home app one or two more launch requests 0.7-2.2 s later, with no key, and the second reopened the bar.
+    A plain Home within 2.6 s of the bar closing is now ignored (and within 1.2 s of the last Home, as before). Cost: a
+    real Home pressed within 2.6 s of closing the bar is ignored too. Every launch request now logs its caller
+    (`request from ...`), to tell the TV's strays from real presses.
+  - The TV re-sends the same signal value whenever SilentGlass steps aside; each one rebuilt and re-faded an open
+    Inputs menu. Unchanged values are now dropped, and Inputs redraws only when its contents change (no fade).
+  - Things appear by fading in place (180 ms), with the dimming behind the bar fading too; the 16-24 px rise is gone.
+  - The input on screen keeps a soft pill, on the bar (Watch/Play) and in Inputs (with its checkmark); the focus is
+    the white pill; the green dot means that input has a picture. Deploy pair `update-v41f.sh` / `restore-v32a.sh`.
 - **v41e**: the bounce. The event log showed that the remote's Home reaches the app twice: a second launch request
   0.4-1 s after the first undid it, so the bar closed and reopened on every press (and reopened about 1 s after
   Watch). A plain Home within 1.2 s of the last one, or of the bar closing, is now ignored (`launch:echo` in the log).
   When the picture arrives under the wallpaper while the bar is open, the bar now stays, over the picture, instead of
   closing. `tests/screen-sim` models the double Home; its Home-press checks had never fired (a Wait step cancelled
-  them) and now do: without the fix, about 570 of 1,808 runs broke them; with it none of 11,408. Deploy pair `update-v41e.sh` / `restore-v32a.sh`.
+  them) and now do: without the fix, about 570 of 1,808 runs broke them; with it none of 11,408.
 - **v41c/v41d** + **batch F2**: Info read "Check · 53 of 54" while the registry, the app framework and the drift check
   all said everything was blocked. Info now names what is on instead of a count (and the state file lists it as
   `privacy_gaps=`, checked 8 s after start). It named Apple TV: its package also holds `com.samsung.tv.aria-dummy`,

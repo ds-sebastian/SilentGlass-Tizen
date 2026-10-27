@@ -42,7 +42,7 @@ public sealed partial class SilentGlass
         setupLight = Dot(48, h - 40 - 34 + 10, 14, Amber); setupSheet.Add(setupLight);
         setupLine = Label("Starting…", 76, h - 40 - 34, w - 76 - 48 - 200, 34, 26, White); setupSheet.Add(setupLine);
         var close = Label("Back to close", w - 48 - 200, h - 40 - 34, 200, 34, 24, Faint); close.HorizontalAlignment = HorizontalAlignment.End; setupSheet.Add(close);
-        FadeIn(setupSheet, 16); setupState = "starting"; Note("setup");
+        FadeIn(setupSheet); setupState = "starting"; Note("setup");
         // the bridge answers within a second; if it does not, it is not installed or not running
         setupWait?.Stop(); setupWait = new Tizen.NUI.Timer(6000);
         setupWait.Tick += (s, e) => { if (mode == Mode.Setup && setupState == "starting") SetupLine("The Home Assistant bridge is not running on this TV.", Amber); return false; };

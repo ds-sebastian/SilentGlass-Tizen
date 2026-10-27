@@ -15,7 +15,7 @@ using Tizen.NUI;
 // The package stays com.samsung.tv.bixby-promotion: that is the app the TV's Home button opens.
 public sealed partial class SilentGlass : NUIApplication
 {
-    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41e";
+    public const string SelfId = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", ModVersion = "v41f";
     const string Res = "/opt/usr/apps/com.samsung.tv.bixby-promotion/res/quiet-home/";
     List<LibraryApp> library = new();
     Tizen.NUI.Timer minuteTimer;
@@ -53,6 +53,8 @@ public sealed partial class SilentGlass : NUIApplication
     {
         base.OnAppControlReceived(e);
         var x = e.ReceivedAppControl.ExtraData;
+        string caller = null; try { caller = e.ReceivedAppControl.CallerApplicationId; } catch { }
+        Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller));
         // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
         if (x.TryGet("sg_notice", out string _)) { TakeNotice("launch"); return; }
         if (x.TryGet("sg_source", out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
