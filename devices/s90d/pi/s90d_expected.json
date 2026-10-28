@@ -50,8 +50,7 @@
     "com.samsung.tv.aria-dummy"
   ],
   "quiet_home_dlls": [
-    "c208d23dcf858593900678316e9987f17d971e7afa2f9cf44f17e375d6d7d6a9",
-    "d91f08ebc172058825a6a632c78698d442abed85a0536c9b744a58515190364c"
+    "a4fdb9d652bc8244e3663592eff3f1252680a800e9ef85f2b3237564a88f1ccc"
   ],
   "user_units": [
     "quiet-recog-off.service",

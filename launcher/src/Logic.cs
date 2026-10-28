@@ -48,22 +48,24 @@ public static class Logic
         public bool HideApps, Dim = true;
         public string Wall = "auto";       // auto (sunrise / sunset) | day | night
         public double Lat = DefaultLat, Lon = DefaultLon;
+        public int Close = 20;             // seconds of no key before the bar over a picture closes; 0 = never
     }
     // Until a location is set (phone page), sunrise and sunset come from the TV's time zone: its standard offset puts
     // the longitude within a few degrees (15 per hour), and a mid-northern latitude is close enough for a wallpaper.
     public const double DefaultLat = 40;
     public static readonly double DefaultLon = Math.Clamp(TimeZoneInfo.Local.BaseUtcOffset.TotalHours * 15, -180, 180);
-    public static readonly string[] WallModes = { "auto", "day", "night" };
+    public static readonly string[] WallModes = { "auto", "day", "night" }, CloseTimes = { "10", "20", "30", "60", "0" };
     public static Prefs ParsePrefs(string text)
     {
         var c = Shared.ParseConf(text);
         int Port(string k) => c.TryGetValue(k, out var v) && int.TryParse(v, out int n) && (n == 0 || Shared.IsHdmi(n)) ? n : 0;
         return new Prefs { Watch = Port("watch"), Play = Port("play"), HideApps = Flag(c, "hideapps", false), Dim = Flag(c, "dim", true),
-            Wall = Pick(c, "wall", "auto", WallModes), Lat = Math.Clamp(Num(c, "lat", DefaultLat), -90, 90), Lon = Math.Clamp(Num(c, "lon", DefaultLon), -180, 180) };
+            Wall = Pick(c, "wall", "auto", WallModes), Lat = Math.Clamp(Num(c, "lat", DefaultLat), -90, 90), Lon = Math.Clamp(Num(c, "lon", DefaultLon), -180, 180),
+            Close = int.Parse(Pick(c, "close", "20", CloseTimes)) };
     }
     public static string FormatPrefs(Prefs p) =>
         "watch=" + p.Watch + "\nplay=" + p.Play + "\nhideapps=" + (p.HideApps ? 1 : 0) + "\ndim=" + (p.Dim ? 1 : 0) + "\nwall=" + p.Wall +
-        "\nlat=" + p.Lat.ToString(CultureInfo.InvariantCulture) + "\nlon=" + p.Lon.ToString(CultureInfo.InvariantCulture) + "\n";
+        "\nlat=" + p.Lat.ToString(CultureInfo.InvariantCulture) + "\nlon=" + p.Lon.ToString(CultureInfo.InvariantCulture) + "\nclose=" + p.Close + "\n";
     public static string NextWall(string mode, int dir = 1) => WallModes[((Array.IndexOf(WallModes, mode) + dir) % 3 + 3) % 3];
     public static string WallName(string mode) => mode == "day" ? "Day" : mode == "night" ? "Night" : "Follows sunset";
 

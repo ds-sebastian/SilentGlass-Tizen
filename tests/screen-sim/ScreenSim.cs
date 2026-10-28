@@ -293,9 +293,9 @@ sealed class FakeTv : IScreen
             foreach (var e in queue.Where(q => q.at <= T).OrderBy(q => q.at).ThenBy(q => q.seq).ToList()) { queue.Remove(e); e.a(); }
             UpdateSignal();
             if (InputHasPicture) pictureSeenAt = T;
-            // SilentGlass.cs / Overlay.cs / Backdrop.cs timers: the bar steps aside after 45 s over a picture; the
+            // SilentGlass.cs / Overlay.cs / Backdrop.cs timers: the bar steps aside after 20 s (the default prefs.Close) over a picture; the
             // wallpaper dims after 5 min
-            if (Overlay && !Bd && Mode != "setup" && T - lastActivity >= 45000) CloseOverlay("idle");
+            if (Overlay && !Bd && Mode != "setup" && T - lastActivity >= 20000) CloseOverlay("idle");
             if (Bd && !Dimmed && T - lastActivity >= 300000) { Dimmed = true; CloseOverlay("dimmed"); }
             Check();
         }

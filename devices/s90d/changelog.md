@@ -6,6 +6,9 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v43b** + **bridge 2.8.1** (installed and checked on the TV 2026-10-27): the bar over a picture closes after a
+  time set on the phone page (Home screen › Menu closes after: 10 s, 20 s, 30 s, 1 min or never; default 20 s, was a
+  fixed 45 s), checked every second instead of every 5 s. Saved in SilentGlass's prefs, so it applies without a restart.
 - **v43a** + **bridge 2.8.0** (installed and checked on the TV 2026-10-27): one contract file
   (`launcher/src/Shared.cs`) compiled into both, for app ids, launch extras, the data-directory files and the input
   list; dead code removed. Fixes: the phone page could report "Connected" after saving settings that then failed (it

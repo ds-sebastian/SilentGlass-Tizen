@@ -174,7 +174,7 @@ static partial class Bridge
             thread_on = ThreadWanted,
             // SilentGlass's own settings (the launcher reloads its prefs file when it changes)
             watch = p.GetValueOrDefault("watch", "0"), play = p.GetValueOrDefault("play", "0"), wall = p.GetValueOrDefault("wall", "auto"),
-            hideapps = p.GetValueOrDefault("hideapps", "0") == "1", dim = p.GetValueOrDefault("dim", "1") != "0",
+            hideapps = p.GetValueOrDefault("hideapps", "0") == "1", dim = p.GetValueOrDefault("dim", "1") != "0", close = p.GetValueOrDefault("close", "20"),
             inputs = Inputs().Where(i => i.Type != 0).Select(i => new { type = i.Type, name = i.Name == i.Port ? i.Port : i.Name + " · " + i.Port }).ToList(),
         };
     }
@@ -265,6 +265,8 @@ static partial class Bridge
         if (watch.Length > 0 && (!Port(watch) || !Port(play))) return (false, "Pick an input for Watch and Play.");
         if (watch.Length > 0 && watch != "0" && watch == play) return (false, "Watch and Play need different inputs.");
         if (wall.Length > 0 && wall is not ("auto" or "day" or "night")) return (false, "Pick a wallpaper.");
+        string close = S("close");
+        if (close.Length > 0 && close is not ("10" or "20" or "30" or "60" or "0")) return (false, "Pick when the menu closes.");
 
         var c = LoadConf(); bool hostChanged = c.GetValueOrDefault("host", "") != host;
         void Put(string k, string v) { if (v.Length > 0) c[k] = v; else c.Remove(k); }
@@ -285,6 +287,7 @@ static partial class Bridge
                 var p = ReadConf(DataFile(Shared.PrefsFile));
                 p["watch"] = watch; p["play"] = play; p["wall"] = wall.Length > 0 ? wall : "auto";
                 p["hideapps"] = S("hideapps") == "1" ? "1" : "0"; p["dim"] = S("dim") == "0" ? "0" : "1";
+                if (close.Length > 0) p["close"] = close;
                 File.WriteAllText(DataFile(Shared.PrefsFile), string.Concat(p.Select(kv => kv.Key + "=" + kv.Value + "\n")));
             }
         } catch { }

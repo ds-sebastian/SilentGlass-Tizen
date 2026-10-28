@@ -147,12 +147,14 @@ class SetupPageTests(unittest.TestCase):
         state = json.loads(self.api("/api/state", code=code)[1])
         self.assertEqual((state["watch"], state["play"], state["hideapps"], state["dim"], state["wall"]), ("0", "0", False, True, "auto"))
         self.assertEqual([i["type"] for i in state["inputs"]], [13, 14, 15, 16])
-        for bad in ({"watch": "15", "play": "15"}, {"watch": "12", "play": "13"}, {"watch": "15", "play": "13", "wall": "dusk"}):
+        self.assertEqual(state["close"], "20")
+        for bad in ({"watch": "15", "play": "15"}, {"watch": "12", "play": "13"}, {"watch": "15", "play": "13", "wall": "dusk"},
+                    {"watch": "15", "play": "13", "close": "7"}):
             self.assertFalse(json.loads(self.api("/api/save", dict(bad, thread="keep"), code)[1])["ok"], bad)
-        r = json.loads(self.api("/api/save", {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "thread": "keep", "notifications": True}, code)[1])
+        r = json.loads(self.api("/api/save", {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "close": "0", "thread": "keep", "notifications": True}, code)[1])
         self.assertTrue(r["ok"], r)
         prefs = dict(l.split("=", 1) for l in (self.data / "silentglass-prefs.txt").read_text().split())
-        self.assertEqual(prefs, {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "lat": "40.7", "lon": "-74.0"})
+        self.assertEqual(prefs, {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "lat": "40.7", "lon": "-74.0", "close": "0"})
         state = json.loads(self.api("/api/state", code=code)[1])
         self.assertEqual((state["watch"], state["hideapps"], state["dim"], state["wall"]), ("15", True, False, "night"))
         # the page never carries the code in its address: the QR is the address only, the code is typed

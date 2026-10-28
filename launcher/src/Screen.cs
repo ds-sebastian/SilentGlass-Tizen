@@ -170,7 +170,7 @@ public sealed class Screen
         if (ui.OverlayShown || ui.BackdropShown) { ui.CloseOverlay("input_changed:" + n); ui.HideBackdrop(); }
         ui.TvChanged();
     }
-    // an open bar stays, now over the picture (and steps aside after 45 s like any bar over a picture)
+    // an open bar stays, now over the picture (and steps aside after the idle time like any bar over a picture)
     void ToPicture(string why)
     {
         if (ui.OverlayShown) { ui.HideBackdrop(); ui.OpenBar(true); ui.Note(why + ":bar_over_picture"); return; }

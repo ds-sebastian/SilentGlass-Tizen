@@ -86,13 +86,13 @@ static class CatalogTests
     static void HomeLogicTests()
     {
         // preferences: round trip, junk rejected, older files load
-        var saved = new Logic.Prefs { Watch = 15, HideApps = true, Dim = false, Wall = "night", Lat = 51.5, Lon = -0.1 };
+        var saved = new Logic.Prefs { Watch = 15, HideApps = true, Dim = false, Wall = "night", Lat = 51.5, Lon = -0.1, Close = 0 };
         var back = Logic.ParsePrefs(Logic.FormatPrefs(saved));
-        True(back.Watch == 15 && back.Play == 0 && back.HideApps && !back.Dim && back.Wall == "night" && back.Lat == 51.5 && back.Lon == -0.1, "prefs round trip");
-        var junk = Logic.ParsePrefs("watch=99\nplay=14\nwall=sepia\nlat=400\nlon=abc\n");
-        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == Logic.DefaultLon, "prefs reject junk");
+        True(back.Watch == 15 && back.Play == 0 && back.HideApps && !back.Dim && back.Wall == "night" && back.Lat == 51.5 && back.Lon == -0.1 && back.Close == 0, "prefs round trip");
+        var junk = Logic.ParsePrefs("watch=99\nplay=14\nwall=sepia\nlat=400\nlon=abc\nclose=7\n");
+        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == Logic.DefaultLon && junk.Close == 20, "prefs reject junk");
         var old = Logic.ParsePrefs("watch=0\nplay=0\nhideapps=1\nlive=0\noverlay=1\n");
-        True(old.HideApps && old.Dim, "pre-v40 prefs load");
+        True(old.HideApps && old.Dim && old.Close == 20, "pre-v40 prefs load");
         True(!Logic.ParsePrefs(null).HideApps && Logic.ParsePrefs(null).Dim, "no prefs file = defaults");
         True(Logic.NextWall("auto") == "day" && Logic.NextWall("day") == "night" && Logic.NextWall("night") == "auto" && Logic.NextWall("auto", -1) == "night", "wallpaper cycle");
         // Watch / Play inputs

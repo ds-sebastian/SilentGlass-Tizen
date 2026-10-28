@@ -65,13 +65,14 @@ body.locked main,body.locked #save{display:none}
 <div class="group">
   <div class="row"><label for="watch">Watch</label><select id="watch"></select></div>
   <div class="row"><label for="play">Play</label><select id="play"></select></div>
+  <div class="row"><label for="close">Menu closes after</label><select id="close"><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="0">Never</option></select></div>
   <label class="row"><span>Apps in the bar</span><span class="switch"><input type="checkbox" id="apps"><span></span></span></label>
   <label class="row"><span>Dim when idle</span><span class="switch"><input type="checkbox" id="dim"><span></span></span></label>
   <div class="seg" id="wallseg"><button type="button" data-w="auto" class="on">Follows sunset</button><button type="button" data-w="day">Day</button><button type="button" data-w="night">Night</button></div>
   <div class="row"><label for="lat">Latitude</label><input id="lat" inputmode="decimal" placeholder="from the time zone"></div>
   <div class="row"><label for="lon">Longitude</label><input id="lon" inputmode="decimal" placeholder="from the time zone"></div>
 </div>
-<p class="foot">Watch and Play are the two inputs on the bar. The wallpaper follows sunset at this location (city level is plenty; without one, the TV's time zone is used).</p>
+<p class="foot">Watch and Play are the two inputs on the bar. The wallpaper follows sunset at this location (city level is plenty; without one, the TV's time zone is used). Over a picture the menu closes by itself after this long without a key press; over the wallpaper it stays.</p>
 
 <h2>Notifications</h2>
 <div class="group">
@@ -163,7 +164,7 @@ function show(s) {
   $('nquietrows').classList.toggle('hidden', !$('nquiet').checked);
   $('lat').value = s.lat ?? ''; $('lon').value = s.lon ?? '';
   fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
-  $('apps').checked = !s.hideapps; $('dim').checked = s.dim; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
+  $('apps').checked = !s.hideapps; $('dim').checked = s.dim; $('close').value = s.close || '20'; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
   $('thon').checked = s.thread_on;
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'],
     connecting: [null, 'Connecting…' + (s.mqtt_error ? ' (last time: ' + s.mqtt_error + ')' : '')] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
@@ -223,7 +224,7 @@ async function save() {
   if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
   const body = Object.assign(mqttBody(), noticeBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
     lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
-    watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').checked ? '1' : '0', wall,
+    watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').checked ? '1' : '0', close: $('close').value, wall,
     thread_on: $('thon').checked ? 'on' : 'off' });
   $('save').disabled = true; $('save').textContent = 'Saving…';
   try { const r = await api('/api/save', body); toast(r.message, 8000); $('password').value = ''; await load(); } catch (e) {}

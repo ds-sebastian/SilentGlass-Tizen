@@ -26,7 +26,7 @@ playing; nothing touches the video plane.
 
 - **Bar** (bottom): **Watch** and **Play** with the device each opens underneath (the TV's input name; a green dot
   when its device is on: the picture on the current input, HDMI-CEC for the others - [`Cec.cs`](../../launcher/src/Cec.cs)), Inputs, Controls, Apps (unless hidden) and Info. Left/Right move, Select (or Up on a
-  menu item) opens. Over a picture, Home toggles it; Back closes it; it steps aside after 45 idle seconds.
+  menu item) opens. Over a picture, Home toggles it; Back closes it; it steps aside after 20 idle seconds (phone page: 10 s to 1 min, or never).
 - **Inputs** (menu above its bar item): every input by the TV's name, a checkmark on the current one, the same green
   dots. A device without HDMI-CEC (or with it off) only gets one while it is on screen.
 - **Apps** (above the bar): the TV's apps and Samsung Home, as artwork; they are backups - the SHIELD has the real ones.
@@ -57,6 +57,7 @@ On the TV (Info) or the phone (Advanced settings; SilentGlass reloads the file w
 | Watch / Play | Automatic | which input each bar item opens: Automatic = the input the TV names `Shield` / `Switch` (else HDMI 3 / HDMI 1), or HDMI 1-4; never both the same |
 | Apps in the bar | on | off = no Apps item (the Apps menu is gone; Samsung Home stays reachable from Controls > TV Settings) |
 | Dim when idle | on | OLED care on the backdrop |
+| Menu closes after | 20 s | how long the bar stays over a picture without a key press: 10 s, 20 s, 30 s, 1 min or never (phone page only) |
 | Wallpaper | Auto | Auto (switch at local sunrise/sunset; location from the phone setup page) / Day / Night; only with the photo wallpaper installed |
 | Thread border router | on | starts/stops the border router units ([thread-border-router.md](thread-border-router.md)); only where installed |
 | Notifications | on | banners from Home Assistant ([ha-bridge.md](ha-bridge.md)) and the input plugged/unplugged toasts |
@@ -90,7 +91,7 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   path, native callbacks posted to the UI thread, interrupted animations land on their end state.
 
 Deploy: `launcher-deploy/update-vN.sh` (refuses unless the installed DLL is the previous version; keeps SMACK labels;
-verifies every file) and its inverse. The published pair upgrades from v42l (`update-v43a.sh` / `restore-v42l.sh`);
+verifies every file) and its inverse. The published pair upgrades from v43a (`update-v43b.sh` / `restore-v43a.sh`);
 it pins both DLL hashes, and builds are reproducible (`python3 tools/build.py launcher`).
 Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
 then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).

@@ -13,7 +13,7 @@ public sealed partial class SilentGlass
     enum Mode { Bar, Inputs, Apps, Controls, Info, Setup }
     Window ow; View oRoot, oDim, oLayer, capsule, highlight, currentMark;
     Mode mode; bool overlayShown; Tizen.NUI.Timer overlayIdle;
-    const int BandTop = 240, BarH = 104, BarBottom = 52, ItemH = 80, ItemPad = 30, GlyphS = 40, GlyphGap = 14, PopGap = 18, OverlayIdleMs = 45000;
+    const int BandTop = 240, BarH = 104, BarBottom = 52, ItemH = 80, ItemPad = 30, GlyphS = 40, GlyphGap = 14, PopGap = 18;
     int BarTop => 1080 - BarBottom - BarH;
 
     sealed class BarItem { public string Action; public ImageView Glyph; public TextLabel Title, Sub; public int X, W; }
@@ -89,12 +89,13 @@ public sealed partial class SilentGlass
         overlayParked = false; try { ow.Hide(); } catch { }
         Note("overlay:hidden:" + why);
     }
-    // over a picture the bar steps aside by itself; over the wallpaper it stays (the backdrop dims instead)
+    // over a picture the bar steps aside after prefs.Close seconds without a key (phone page; 0 = never); over the
+    // wallpaper it stays (the backdrop dims instead)
     void OverlayActivity()
     {
         lastActivity = Environment.TickCount64;
         if (backdropShown) return;
-        if (overlayIdle == null) { overlayIdle = new Tizen.NUI.Timer(5000); overlayIdle.Tick += (s, e) => { if (overlayShown && !backdropShown && mode != Mode.Setup && Environment.TickCount64 - lastActivity >= OverlayIdleMs) { CloseOverlay("idle"); return false; } return overlayShown; }; }
+        if (overlayIdle == null) { overlayIdle = new Tizen.NUI.Timer(1000); overlayIdle.Tick += (s, e) => { if (overlayShown && !backdropShown && mode != Mode.Setup && prefs.Close > 0 && Environment.TickCount64 - lastActivity >= prefs.Close * 1000L) { CloseOverlay("idle"); return false; } return overlayShown; }; }
         if (!overlayIdle.IsRunning()) overlayIdle.Start();
     }
 
