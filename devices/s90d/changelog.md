@@ -6,6 +6,9 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v43c** + **bridge 2.8.2** (installed on the TV 2026-10-28; files hash-checked): phone page and Info set how long
+  before the wallpaper dims (2, 5, 10, 30 min or never; was a 5-min switch, old files load as 5 min / never); the
+  wallpaper clock can be 12-hour, 24-hour or hidden; input plugged/unplugged alerts have their own switch.
 - **v43b** + **bridge 2.8.1** (installed and checked on the TV 2026-10-27): the bar over a picture closes after a
   time set on the phone page (Home screen › Menu closes after: 10 s, 20 s, 30 s, 1 min or never; default 20 s, was a
   fixed 45 s), checked every second instead of every 5 s. Saved in SilentGlass's prefs, so it applies without a restart.

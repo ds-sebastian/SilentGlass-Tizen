@@ -31,7 +31,7 @@ public sealed partial class SilentGlass
         noticeState = "shown:" + via; Note("notice:" + via);
     }
     // an input plugged in or unplugged: a small banner in the corner
-    void Toast(string text) { if (NoticesOn) ShowNotice(text, "", "small", "top-right", "", 0, 0, 4); }
+    void Toast(string text) { if (NoticesOn && prefs.InputAlerts) ShowNotice(text, "", "small", "top-right", "", 0, 0, 4); }
 
     void EnsureNoticeWindow()
     {

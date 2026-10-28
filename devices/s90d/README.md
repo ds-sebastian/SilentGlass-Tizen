@@ -56,11 +56,13 @@ On the TV (Info) or the phone (Advanced settings; SilentGlass reloads the file w
 |---|---|---|
 | Watch / Play | Automatic | which input each bar item opens: Automatic = the input the TV names `Shield` / `Switch` (else HDMI 3 / HDMI 1), or HDMI 1-4; never both the same |
 | Apps in the bar | on | off = no Apps item (the Apps menu is gone; Samsung Home stays reachable from Controls > TV Settings) |
-| Dim when idle | on | OLED care on the backdrop |
+| Dim after | 5 min | OLED care on the backdrop: 2, 5, 10 or 30 min without a key, or never |
+| Clock | 12-hour | the wallpaper clock: 12-hour, 24-hour or hidden (phone page only) |
 | Menu closes after | 20 s | how long the bar stays over a picture without a key press: 10 s, 20 s, 30 s, 1 min or never (phone page only) |
 | Wallpaper | Auto | Auto (switch at local sunrise/sunset; location from the phone setup page) / Day / Night; only with the photo wallpaper installed |
 | Thread border router | on | starts/stops the border router units ([thread-border-router.md](thread-border-router.md)); only where installed |
 | Notifications | on | banners from Home Assistant ([ha-bridge.md](ha-bridge.md)) and the input plugged/unplugged toasts |
+| Input alerts | on | the plugged/unplugged toasts alone, so they can go while banners stay (phone page only) |
 
 The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: build it with
 `tools/make_wallpapers.py DAY.jpg NIGHT.jpg`; without it the gradient wallpaper is used.
@@ -91,7 +93,7 @@ The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: 
   path, native callbacks posted to the UI thread, interrupted animations land on their end state.
 
 Deploy: `launcher-deploy/update-vN.sh` (refuses unless the installed DLL is the previous version; keeps SMACK labels;
-verifies every file) and its inverse. The published pair upgrades from v43a (`update-v43b.sh` / `restore-v43a.sh`);
+verifies every file) and its inverse. The published pair upgrades from v43b (`update-v43c.sh` / `restore-v43b.sh`);
 it pins both DLL hashes, and builds are reproducible (`python3 tools/build.py launcher`).
 Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
 then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).

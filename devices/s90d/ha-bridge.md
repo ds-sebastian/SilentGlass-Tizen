@@ -114,9 +114,9 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
 On the TV: **Home > Info > Advanced settings**. A sheet shows a QR code of the address and a 6-digit code; scan it with a phone
 on the same network (or open the address shown), then type the code - the QR never carries it. The page, served by the bridge on port 7680, has:
 
-- **Home screen**: the Watch and Play inputs, Apps in the bar, Dim when idle, the wallpaper (follows sunset / day /
-  night) and its location. Written to SilentGlass's own prefs file, which it reloads at once.
-- **Notifications**: on/off, and extra addresses allowed to send them (`notify_from`) if Home Assistant doesn't run
+- **Home screen**: the Watch and Play inputs, when the menu closes over a picture, Apps in the bar, when the wallpaper
+  dims, the clock (12-hour / 24-hour / hidden), the wallpaper (follows sunset / day / night) and its location. Written to SilentGlass's own prefs file, which it reloads at once.
+- **Notifications**: on/off, input plugged/unplugged alerts, and extra addresses allowed to send them (`notify_from`) if Home Assistant doesn't run
   on the broker's host.
 - **Thread border router** (where installed): on/off (the same switch as in Home Assistant), and its network: keep
   it, read Home Assistant's preferred network once (address + a long-lived token; the token is used for that one

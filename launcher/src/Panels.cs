@@ -68,7 +68,7 @@ public sealed partial class SilentGlass
         list.Add(Choice("tv", "Watch", () => PortChoice(prefs.Watch, watchPort), d => CyclePort(true, d)));
         list.Add(Choice("gamecontroller", "Play", () => PortChoice(prefs.Play, playPort), d => CyclePort(false, d)));
         list.Add(Toggle("apps", "Apps in the bar", () => !prefs.HideApps, on => { prefs.HideApps = !on; SavePrefs(); }));
-        list.Add(Toggle("moon", "Dim when idle", () => prefs.Dim, on => { prefs.Dim = on; SavePrefs(); }));
+        list.Add(Choice("moon", "Dim after", () => Logic.DimName(prefs.Dim), d => { prefs.Dim = Logic.NextDim(prefs.Dim, d); SavePrefs(); }));
         if (PhotoWall) list.Add(Choice("picture", "Wallpaper", () => Logic.WallName(prefs.Wall), d => { prefs.Wall = Logic.NextWall(prefs.Wall, d); SavePrefs(); CheckWallpaper(); }));
         list.Add(Toggle("bell", "Notifications", () => NoticesOn, SetNotices));
         list.Add(null);

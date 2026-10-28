@@ -13,7 +13,6 @@ public sealed partial class SilentGlass
     View backdrop;  // wallpaper + clock; hidden (with a clear window) except while the backdrop is wanted
     bool backdropShown, wallNight, dimmed;
     long lastActivity = Environment.TickCount64;
-    const long IdleMs = 5 * 60 * 1000;
     readonly Random drift = new();
     static bool PhotoWall => File.Exists(Res + "wallpapers/wall-day.jpg") && File.Exists(Res + "wallpapers/wall-night.jpg");
     string WallUrl(bool night) => Res + "wallpapers/wall-" + (night ? "night" : "day") + ".jpg";
@@ -72,7 +71,7 @@ public sealed partial class SilentGlass
             Note("placeholder:viewer"); Launch(Viewer);
         });
     }
-    void UpdateClock() { clock.Text = DateTime.Now.ToString("h:mm tt"); }
+    void UpdateClock() { clock.Text = Logic.ClockText(prefs.Clock, DateTime.Now, true); }
     void CheckWallpaper()
     {
         if (wallpaper == null) return;
@@ -84,7 +83,7 @@ public sealed partial class SilentGlass
     void IdleTick()
     {
         if (dimmed) { MoveDimClock(); return; }
-        if (prefs.Dim && backdropShown && Environment.TickCount64 - lastActivity >= IdleMs) Dim();
+        if (prefs.Dim > 0 && backdropShown && Environment.TickCount64 - lastActivity >= prefs.Dim * 60000L) Dim();
     }
     void Dim()
     {
@@ -98,7 +97,7 @@ public sealed partial class SilentGlass
     void MoveDimClock()
     {
         if (dimClock == null) return;
-        dimClock.Text = DateTime.Now.ToString("h:mm");
+        dimClock.Text = Logic.ClockText(prefs.Clock, DateTime.Now, false);
         dimClock.Position2D = new Position2D(120 + drift.Next(1920 - 240 - 360), 120 + drift.Next(1080 - 240 - 90));
     }
     // any key (or Home) wakes; over the backdrop the bar comes back
