@@ -123,6 +123,10 @@ class LauncherSource(unittest.TestCase):
             self.assertNotIn(banned, notice)
         # a notice image is a bare file name in our own data directory
         self.assertRegex(body(notice, "void TakeNotice("), r"image\.Contains\('/'\) \|\| image\.Contains\(\"\.\.\"\)")
+        # the same title while fully shown refreshes in place (no second fade-in); anything else animates in
+        show = body(notice, "void ShowNotice(")
+        self.assertIn("titleText.Length > 0 && titleText == nTitle", show)
+        self.assertIn("if (refresh) { nCard.Opacity = 1;", show)
         # the TV pauses us whenever only the overlay is up: a pause must not close it
         pause = body(launcher(), "protected override void OnPause()")
         self.assertNotIn("CloseOverlay", pause)

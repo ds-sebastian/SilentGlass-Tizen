@@ -47,7 +47,10 @@ top-left, center) and `data.fontsize` (small / medium / large / max = the banner
 Rules:
 - **Never wakes the TV.** In standby a notification is dropped (Home Assistant still gets *OK*); so is one while
   Ambient is up, or while `switch.<tv>_notifications` is off.
-- A newer notification replaces the one on screen.
+- A newer notification replaces the one on screen. With the same title while that one is fully shown, it refreshes in
+  place (no second pop-up): send a camera alert at once, then again a few seconds later with the longer clip. Animated
+  GIFs play, e.g. Frigate's `/api/frigate/notifications/<review id>/review_preview.gif`. (The SgtBatten blueprint
+  sends TVs a still of the review's first object instead.)
 - Accepted only from the MQTT broker's host (normally Home Assistant's machine) and the addresses in `notify_from=`
   of `silentglass-ha.conf`; anything else is refused. Port 7676, one request per connection, at most 12 MB.
 - The banner is SilentGlass's own small notification-level window that never takes focus; the video is not touched.

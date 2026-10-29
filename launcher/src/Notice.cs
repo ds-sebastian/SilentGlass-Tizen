@@ -8,11 +8,12 @@ using Tizen.NUI.BaseComponents;
 // rest over as data/notice.json (+ the image next to it). SilentGlass takes it at once (data watcher) - or, if it is
 // not running, the bridge starts it with sg_notice=1 and it starts hidden. Taking the file is the acknowledgement.
 // The banner is its own small notification-level window that never takes focus: the remote keeps controlling what is
-// on screen, and the picture is never touched. A newer notification replaces the one showing.
+// on screen, and the picture is never touched. A newer notification replaces the one showing; one with the same title
+// while it is fully shown refreshes it in place (no fade), e.g. a camera preview that has grown longer.
 public sealed partial class SilentGlass
 {
     Window nw; View nCard; Tizen.NUI.Timer nTimer; Animation nAnimation;
-    string noticeState = "none";
+    string noticeState = "none", nTitle = "";
     const int NoticeR = 36, NoticePad = 14, NoticeTextPad = 26, NoticeMaxAgeMs = 30000;
 
     static string NoticeFile => DataFile(Shared.NoticeFile);
@@ -48,8 +49,10 @@ public sealed partial class SilentGlass
     void ShowNotice(string titleText, string message, string size, string position, string image, int iw0, int ih0, int seconds)
     {
         EnsureNoticeWindow();
+        bool refresh = nCard != null && nCard.Opacity > 0.99f && titleText.Length > 0 && titleText == nTitle;
         StopAnimation(ref nAnimation);
         if (nCard != null) { nw.Remove(nCard); nCard.Dispose(); nCard = null; }
+        nTitle = titleText;
         int w = Logic.NoticeWidth(size), inner = w - 2 * NoticePad, tw = w - 2 * NoticeTextPad;
         bool img = image.Length > 0; int ih = img ? Logic.NoticeImageHeight(inner, iw0, ih0) : 0;
         var title = Label(titleText, NoticeTextPad, 0, tw, 10, 30, White, "Semibold"); title.MultiLine = true;
@@ -76,10 +79,13 @@ public sealed partial class SilentGlass
         try { nw.WindowPositionSize = new Rectangle(x, oy, w, h); } catch { }
         nw.Add(nCard);
         int from = position.StartsWith("top") ? -16 : 16;  // in from the nearer edge
-        nCard.Opacity = 0; nCard.Position2D = new Position2D(0, from);
-        nAnimation = new Animation(240) { DefaultAlphaFunction = Ease() };
-        nAnimation.AnimateTo(nCard, "Opacity", 1f); nAnimation.AnimateTo(nCard, "PositionY", 0f);
-        nw.Show(); nw.Raise(); nAnimation.Play();
+        if (refresh) { nCard.Opacity = 1; nCard.Position2D = new Position2D(0, 0); nw.Show(); }
+        else {
+            nCard.Opacity = 0; nCard.Position2D = new Position2D(0, from);
+            nAnimation = new Animation(240) { DefaultAlphaFunction = Ease() };
+            nAnimation.AnimateTo(nCard, "Opacity", 1f); nAnimation.AnimateTo(nCard, "PositionY", 0f);
+            nw.Show(); nw.Raise(); nAnimation.Play();
+        }
         nTimer?.Stop(); nTimer = new Tizen.NUI.Timer((uint)(Math.Clamp(seconds <= 0 ? 5 : seconds, 3, 60) * 1000));
         nTimer.Tick += (s, e) => { HideNotice(); return false; }; nTimer.Start();
     }

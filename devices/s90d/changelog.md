@@ -6,6 +6,9 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v43d** (installed and checked on the TV 2026-10-29): a notification with the same title as the banner fully on
+  screen refreshes it in place (no second fade-in), so a camera alert can be sent at once and updated with the longer
+  clip a few seconds later. Animated GIFs (Frigate's `review_preview.gif`) play in the banner.
 - **v43c** + **bridge 2.8.2** (installed on the TV 2026-10-28; files hash-checked): phone page and Info set how long
   before the wallpaper dims (2, 5, 10, 30 min or never; was a 5-min switch, old files load as 5 min / never); the
   wallpaper clock can be 12-hour, 24-hour or hidden; input plugged/unplugged alerts have their own switch.
