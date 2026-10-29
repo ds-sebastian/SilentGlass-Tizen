@@ -6,6 +6,9 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **v43e** + **bridge 2.8.3** (installed and checked on the TV 2026-10-29): notification transparency for the whole
+  banner, picture included: Advanced settings › Notifications › Transparency (As sent, None, 25%, 50%), and Home
+  Assistant's `transparency` is honoured (capped at 50%). The repo pair still upgrades from v43c (v1.1.0).
 - **v43d** (installed and checked on the TV 2026-10-29): a notification with the same title as the banner fully on
   screen refreshes it in place (no second fade-in), so a camera alert can be sent at once and updated with the longer
   clip a few seconds later. Animated GIFs (Frigate's `review_preview.gif`) play in the banner.

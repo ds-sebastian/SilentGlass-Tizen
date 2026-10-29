@@ -81,6 +81,7 @@ body.locked main,body.locked #save{display:none}
   <div class="row"><label for="npos">Position</label><select id="npos"><option value="">As sent</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="center">Center</option></select></div>
   <div class="row"><label for="nsize">Size</label><select id="nsize"><option value="">As sent</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
   <div class="row"><label for="ndur">On screen</label><select id="ndur"><option value="">As sent</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
+  <div class="row"><label for="nclear">Transparency</label><select id="nclear"><option value="">As sent</option><option value="0">None</option><option value="25">25%</option><option value="50">50%</option></select></div>
   <label class="row"><span>Input alerts</span><span class="switch"><input type="checkbox" id="inputalerts"><span></span></span></label>
   <label class="row"><span>Pictures</span><span class="switch"><input type="checkbox" id="nimg"><span></span></span></label>
   <label class="row"><span>Quiet hours</span><span class="switch"><input type="checkbox" id="nquiet"><span></span></span></label>
@@ -91,7 +92,7 @@ body.locked main,body.locked #save{display:none}
   <div class="row"><label for="from">Also from</label><input id="from" placeholder="addresses, optional" autocapitalize="off"></div>
   <button type="button" class="row btnrow" id="ntest" onclick="testNotice()">Send a test notification</button>
 </div>
-<p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. "As sent" keeps what each automation asks for. Input alerts are the small note when a device is plugged in or unplugged. Pictures are camera snapshots and other images. In quiet hours notifications are dropped, not saved for later. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV. The test uses the settings on this page, before you save.</p>
+<p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. "As sent" keeps what each automation asks for. Transparency covers the whole banner, picture included. Input alerts are the small note when a device is plugged in or unplugged. Pictures are camera snapshots and other images. In quiet hours notifications are dropped, not saved for later. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV. The test uses the settings on this page, before you save.</p>
 
 <div id="threadsec">
 <h2>Thread border router</h2>
@@ -159,7 +160,7 @@ function show(s) {
   $('name').value = s.name || ''; $('host').value = s.host || ''; $('port').value = s.port || ''; $('user').value = s.user || '';
   $('password').placeholder = s.has_password ? 'unchanged' : 'optional';
   $('notify').checked = s.notifications; $('from').value = s.notify_from || '';
-  $('npos').value = s.notify_position || ''; $('nsize').value = s.notify_size || ''; $('ndur').value = s.notify_duration || '';
+  $('npos').value = s.notify_position || ''; $('nsize').value = s.notify_size || ''; $('ndur').value = s.notify_duration || ''; $('nclear').value = s.notify_clear || '';
   $('nimg').checked = s.notify_images !== false;
   const q = (s.notify_quiet || '').split('-'); $('nquiet').checked = q.length === 2;
   if (q.length === 2) { $('nqfrom').value = q[0]; $('nqto').value = q[1]; }
@@ -198,7 +199,7 @@ document.querySelectorAll('#thseg button').forEach(b => b.onclick = () => {
 $('nquiet').addEventListener('change', () => $('nquietrows').classList.toggle('hidden', !$('nquiet').checked));
 function noticeBody() {
   const quiet = $('nquiet').checked;
-  return { notify_position: $('npos').value, notify_size: $('nsize').value, notify_duration: $('ndur').value, notify_images: $('nimg').checked ? '1' : '0',
+  return { notify_position: $('npos').value, notify_size: $('nsize').value, notify_duration: $('ndur').value, notify_clear: $('nclear').value, notify_images: $('nimg').checked ? '1' : '0',
     notify_quiet_from: quiet ? $('nqfrom').value : '', notify_quiet_to: quiet ? $('nqto').value : '' };
 }
 async function testNotice() {

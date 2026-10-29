@@ -16,7 +16,7 @@ static class NoticeHarness
             HttpRequest.Respond(s, 200);
             if (req == null || req.Method != "POST") { Console.WriteLine(JsonSerializer.Serialize(new { method = req?.Method })); continue; }
             var n = Bridge.BuildNotice(Bridge.ParseMultipart(req.Body, req.Boundary));
-            Console.WriteLine(JsonSerializer.Serialize(new { method = "POST", n.Title, n.Message, n.Size, n.Position, n.Duration, n.Ext, n.W, n.H, image = n.Image?.Length ?? 0 }));
+            Console.WriteLine(JsonSerializer.Serialize(new { method = "POST", n.Title, n.Message, n.Size, n.Position, n.Duration, n.Clear, n.Ext, n.W, n.H, image = n.Image?.Length ?? 0 }));
         }
         Console.WriteLine(JsonSerializer.Serialize(new {
             app_hidden = Bridge.OnScreenApp("com.samsung.tv.bixby-promotion", "ui=none\nbackdrop=hidden\nfg=org.tizen.tv-viewer\n"),
@@ -34,7 +34,7 @@ static class NoticeHarness
     static object[] Prefs()
     {
         var n = Bridge.ApplyPrefs(new Bridge.NoticeData { Title = "t", Image = new byte[600], Ext = "jpg", W = 4, H = 3 },
-            new() { ["notify_position"] = "top-left", ["notify_size"] = "small", ["notify_duration"] = "30", ["notify_images"] = "0" });
-        return new object[] { n.Position, n.Size, n.Duration, n.Image?.Length ?? 0 };
+            new() { ["notify_position"] = "top-left", ["notify_size"] = "small", ["notify_duration"] = "30", ["notify_images"] = "0", ["notify_clear"] = "25" });
+        return new object[] { n.Position, n.Size, n.Duration, n.Image?.Length ?? 0, n.Clear };
     }
 }

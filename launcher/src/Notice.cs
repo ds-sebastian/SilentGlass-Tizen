@@ -12,7 +12,7 @@ using Tizen.NUI.BaseComponents;
 // while it is fully shown refreshes it in place (no fade), e.g. a camera preview that has grown longer.
 public sealed partial class SilentGlass
 {
-    Window nw; View nCard; Tizen.NUI.Timer nTimer; Animation nAnimation;
+    Window nw; View nCard; Tizen.NUI.Timer nTimer; Animation nAnimation; float nAlpha = 1;
     string noticeState = "none", nTitle = "";
     const int NoticeR = 36, NoticePad = 14, NoticeTextPad = 26, NoticeMaxAgeMs = 30000;
 
@@ -28,7 +28,7 @@ public sealed partial class SilentGlass
         // only a bare file name in our own data directory
         if (image.Contains('/') || image.Contains("..") || image.Length > 0 && !File.Exists(DataFile(image))) image = "";
         if (n["title"].Length == 0 && n["message"].Length == 0 && image.Length == 0) return;
-        ShowNotice(n["title"], n["message"], n["size"], n["position"], image, n.Int("w"), n.Int("h"), n.Int("duration"));
+        ShowNotice(n["title"], n["message"], n["size"], n["position"], image, n.Int("w"), n.Int("h"), n.Int("duration"), n.Int("clear"));
         noticeState = "shown:" + via; Note("notice:" + via);
     }
     // an input plugged in or unplugged: a small banner in the corner
@@ -46,10 +46,13 @@ public sealed partial class SilentGlass
         nw.BackgroundColor = Clear;
         nw.SetAcceptFocus(false);  // never takes the remote away from what is on screen
     }
-    void ShowNotice(string titleText, string message, string size, string position, string image, int iw0, int ih0, int seconds)
+    void ShowNotice(string titleText, string message, string size, string position, string image, int iw0, int ih0, int seconds, int clear = 0)
     {
         EnsureNoticeWindow();
-        bool refresh = nCard != null && nCard.Opacity > 0.99f && titleText.Length > 0 && titleText == nTitle;
+        // the whole card, picture included, is see-through by `clear` % (0-50)
+        float alpha = 1 - Math.Clamp(clear, 0, 50) / 100f;
+        bool refresh = nCard != null && nCard.Opacity > nAlpha - 0.01f && titleText.Length > 0 && titleText == nTitle;
+        nAlpha = alpha;
         StopAnimation(ref nAnimation);
         if (nCard != null) { nw.Remove(nCard); nCard.Dispose(); nCard = null; }
         nTitle = titleText;
@@ -79,11 +82,11 @@ public sealed partial class SilentGlass
         try { nw.WindowPositionSize = new Rectangle(x, oy, w, h); } catch { }
         nw.Add(nCard);
         int from = position.StartsWith("top") ? -16 : 16;  // in from the nearer edge
-        if (refresh) { nCard.Opacity = 1; nCard.Position2D = new Position2D(0, 0); nw.Show(); }
+        if (refresh) { nCard.Opacity = alpha; nCard.Position2D = new Position2D(0, 0); nw.Show(); }
         else {
             nCard.Opacity = 0; nCard.Position2D = new Position2D(0, from);
             nAnimation = new Animation(240) { DefaultAlphaFunction = Ease() };
-            nAnimation.AnimateTo(nCard, "Opacity", 1f); nAnimation.AnimateTo(nCard, "PositionY", 0f);
+            nAnimation.AnimateTo(nCard, "Opacity", alpha); nAnimation.AnimateTo(nCard, "PositionY", 0f);
             nw.Show(); nw.Raise(); nAnimation.Play();
         }
         nTimer?.Stop(); nTimer = new Tizen.NUI.Timer((uint)(Math.Clamp(seconds <= 0 ? 5 : seconds, 3, 60) * 1000));

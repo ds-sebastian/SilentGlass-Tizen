@@ -41,8 +41,9 @@ Assistant's built-in integration and every existing automation works unchanged:
 
 What is honoured: `title`, `message`, `data.image` (URL or path; Home Assistant downloads it and sends the bytes - JPEG,
 PNG, GIF, WebP), `data.duration` (seconds, 3-60 on screen), `data.position` (bottom-right, bottom-left, top-right,
-top-left, center) and `data.fontsize` (small / medium / large / max = the banner width). `transparency`, `color` and
-`interrupt` are accepted and ignored: the banner never takes the remote, and its glass is always readable.
+top-left, center), `data.fontsize` (small / medium / large / max = the banner width) and `data.transparency` (0%, 25%,
+50%; the whole banner, picture included; 75% and 100% count as 50% so it stays readable). `color` and `interrupt` are
+accepted and ignored: the banner never takes the remote.
 
 Rules:
 - **Never wakes the TV.** In standby a notification is dropped (Home Assistant still gets *OK*); so is one while
@@ -102,7 +103,7 @@ is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
   (`ot-ctl state`) and the picture settings every minute; the picture/sound mode lists take dozens of settings calls,
   so they are never part of the frequent check. Only changes are published (retained), plus a full refresh every
   5 minutes and whenever Home Assistant restarts (`homeassistant/status`).
-- Notifications: the owner's settings (`notify_position`, `notify_size`, `notify_duration`, `notify_images`,
+- Notifications: the owner's settings (`notify_position`, `notify_size`, `notify_duration`, `notify_clear`, `notify_images`,
   `notify_quiet`; Advanced settings › Notifications) override what each Home Assistant notification asks for, and
   quiet hours drop notifications in that window. The page's test button sends one with the page's values.
 - Commands are a fixed list; there is no shell. Input: `launch_app com.samsung.tv.bixby-promotion sg_source <id>`

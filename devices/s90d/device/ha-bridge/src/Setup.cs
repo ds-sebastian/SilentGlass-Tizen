@@ -167,7 +167,7 @@ static partial class Bridge
             name = TvName, host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
             has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""), update = UpdateSeconds(c),
             notify_position = c.GetValueOrDefault("notify_position", ""), notify_size = c.GetValueOrDefault("notify_size", ""),
-            notify_duration = c.GetValueOrDefault("notify_duration", ""), notify_images = c.GetValueOrDefault("notify_images", "1") != "0",
+            notify_duration = c.GetValueOrDefault("notify_duration", ""), notify_clear = c.GetValueOrDefault("notify_clear", ""), notify_images = c.GetValueOrDefault("notify_images", "1") != "0",
             notify_quiet = c.GetValueOrDefault("notify_quiet", ""),
             notifications = NoticesOn, lat = loc.GetValueOrDefault("lat", ""), lon = loc.GetValueOrDefault("lon", ""),
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
@@ -236,13 +236,14 @@ static partial class Bridge
     // the notification settings from the page, checked; empty values mean "as sent"
     static (Dictionary<string, string>, string) NoticePrefs(Func<string, string> S)
     {
-        string pos = S("notify_position"), size = S("notify_size"), dur = S("notify_duration"), from = S("notify_quiet_from"), to = S("notify_quiet_to");
+        string pos = S("notify_position"), size = S("notify_size"), dur = S("notify_duration"), clear = S("notify_clear"), from = S("notify_quiet_from"), to = S("notify_quiet_to");
         if (pos.Length > 0 && !NoticePositions.Contains(pos)) return (null, "Pick where notifications appear.");
         if (size.Length > 0 && !NoticeSizes.Contains(size)) return (null, "Pick a notification size.");
         if (dur.Length > 0 && !(int.TryParse(dur, out int d) && NoticeDurations.Contains(d))) return (null, "Pick how long notifications stay.");
+        if (clear.Length > 0 && !(int.TryParse(clear, out int t) && NoticeClears.Contains(t))) return (null, "Pick a transparency.");
         string quiet = from.Length > 0 || to.Length > 0 ? from + "-" + to : "";
         if (!ValidQuiet(quiet)) return (null, "Quiet hours are two times, like 22:00 and 07:00.");
-        return (new Dictionary<string, string> { ["notify_position"] = pos, ["notify_size"] = size, ["notify_duration"] = dur,
+        return (new Dictionary<string, string> { ["notify_position"] = pos, ["notify_size"] = size, ["notify_duration"] = dur, ["notify_clear"] = clear,
             ["notify_images"] = S("notify_images") == "0" ? "0" : "", ["notify_quiet"] = quiet }, null);
     }
     static (bool, string) SaveSetup(Func<string, string> S)

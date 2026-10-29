@@ -50,13 +50,14 @@ static partial class Bridge
             if (req.Method == "POST") lock (noticeGate) HandleNotice(ApplyPrefs(BuildNotice(ParseMultipart(req.Body, req.Boundary)), conf));
         } catch (Exception e) { Log("notifications: " + e.GetType().Name + ": " + e.Message); }
     }
-    public sealed class NoticeData { public string Title = "", Message = "", Size = "large", Position = "bottom-right", Ext = ""; public int Duration = 5, W, H; public byte[] Image; }
+    public sealed class NoticeData { public string Title = "", Message = "", Size = "large", Position = "bottom-right", Ext = ""; public int Duration = 5, W, H, Clear; public byte[] Image; }  // Clear: % see-through, 0-50
     public static NoticeData BuildNotice(Dictionary<string, byte[]> parts)
     {
         string T(string k, int max) { if (!parts.TryGetValue(k, out var b)) return ""; var s = Regex.Replace(Encoding.UTF8.GetString(b), @"[\x00-\x08\x0b-\x1f\x7f]", "").Trim(); return s.Length > max ? s.Substring(0, max) : s; }
         int N(string k, int d) => int.TryParse(T(k, 6), out var v) ? v : d;
         var n = new NoticeData { Title = T("title", 120), Message = T("msg", 400), Duration = Math.Clamp(N("duration", 5), 1, 300) };
         n.Size = N("fontsize", 2) switch { 1 => "small", 0 => "medium", 3 => "max", _ => "large" };
+        n.Clear = Math.Min(Math.Max(N("transparency", 1) - 1, 0) * 25, 50);  // library: 1 = 0% ... 5 = 100%; capped so it stays readable
         n.Position = N("position", 0) switch { 1 => "bottom-left", 2 => "top-right", 3 => "top-left", 4 => "center", _ => "bottom-right" };
         // the image; the icon only when it is a real picture (the library always sends a 1x1 placeholder)
         foreach (var k in new[] { "filename2", "filename" })
@@ -69,7 +70,7 @@ static partial class Bridge
     // means "as Home Assistant sent it". ----
     public static readonly string[] NoticePositions = { "bottom-right", "bottom-left", "top-right", "top-left", "center" };
     public static readonly string[] NoticeSizes = { "small", "medium", "large" };
-    public static readonly int[] NoticeDurations = { 5, 10, 20, 30 };
+    public static readonly int[] NoticeDurations = { 5, 10, 20, 30 }, NoticeClears = { 0, 25, 50 };
     public static bool ValidQuiet(string spec) => spec.Length == 0 || Regex.IsMatch(spec, @"^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$");
     public static NoticeData ApplyPrefs(NoticeData n, Dictionary<string, string> c)
     {
@@ -78,6 +79,7 @@ static partial class Bridge
         if (NoticePositions.Contains(pos)) n.Position = pos;
         if (NoticeSizes.Contains(size)) n.Size = size;
         if (int.TryParse(c.GetValueOrDefault("notify_duration", ""), out int d) && NoticeDurations.Contains(d)) n.Duration = d;
+        if (int.TryParse(c.GetValueOrDefault("notify_clear", ""), out int t) && NoticeClears.Contains(t)) n.Clear = t;
         if (c.GetValueOrDefault("notify_images", "1") == "0") { n.Image = null; n.Ext = ""; n.W = n.H = 0; }
         return n.Title.Length > 0 || n.Message.Length > 0 || n.Image != null ? n : null;  // a picture-only notice with pictures off
     }
@@ -127,7 +129,7 @@ static partial class Bridge
         long id = ++noticeSeq; string image = n.Image != null ? "notice-" + id + "." + n.Ext : "";
         if (image.Length > 0) File.WriteAllBytes(DataFile(image), n.Image);
         var json = JsonSerializer.Serialize(new Dictionary<string, object> {
-            ["title"] = n.Title, ["message"] = n.Message, ["size"] = n.Size, ["position"] = n.Position, ["duration"] = n.Duration,
+            ["title"] = n.Title, ["message"] = n.Message, ["size"] = n.Size, ["position"] = n.Position, ["duration"] = n.Duration, ["clear"] = n.Clear,
             ["image"] = image, ["w"] = n.W, ["h"] = n.H, ["at"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
         string file = DataFile(Shared.NoticeFile);
         File.WriteAllText(file + ".tmp", json); File.Move(file + ".tmp", file, true);

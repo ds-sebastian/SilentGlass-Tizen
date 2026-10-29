@@ -42,7 +42,8 @@ class NoticeProtocolTests(unittest.TestCase):
         lines = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
         self.assertEqual(lines[0], {"method": "GET"})
         door, washer, misc = lines[1], lines[2], lines[3]
-        self.assertEqual((door["Title"], door["Size"], door["Position"], door["Duration"]), ("Doorbell", "large", "bottom-right", 10))
+        self.assertEqual((door["Title"], door["Size"], door["Position"], door["Duration"], door["Clear"]), ("Doorbell", "large", "bottom-right", 10, 50))
+        self.assertEqual(washer["Clear"], 0)
         self.assertEqual((door["image"], door["Ext"], door["W"], door["H"]), (len(JPEG), "jpg", 896, 672))
         # the library's 1x1 placeholder icon is not a picture
         self.assertEqual((washer["Title"], washer["Size"], washer["Position"], washer["image"]), ("Washer", "small", "top-right", 0))
@@ -52,7 +53,7 @@ class NoticeProtocolTests(unittest.TestCase):
         self.assertEqual(misc["game"], ["Automatic", "Always", "Never"])
         self.assertEqual(misc["names"], ["Shield (HDMI 1)", "HDMI 2", "Shield (HDMI 3)", "HDMI 4"])  # one name, two ports
         # owner settings override what was sent; pictures off drops a picture-only notice
-        self.assertEqual(misc["prefs"], ["top-left", "small", 30, 0])
+        self.assertEqual(misc["prefs"], ["top-left", "small", 30, 0, 25])
         self.assertEqual(misc["picture_only_dropped"], True)
         self.assertEqual(misc["slugs"], ["living_room_tv", "den_tv_2", "t_l_viseur", "samsung_tv"])
         self.assertEqual(misc["quiet"], [True, False, True, False, False])

@@ -126,7 +126,8 @@ class LauncherSource(unittest.TestCase):
         # the same title while fully shown refreshes in place (no second fade-in); anything else animates in
         show = body(notice, "void ShowNotice(")
         self.assertIn("titleText.Length > 0 && titleText == nTitle", show)
-        self.assertIn("if (refresh) { nCard.Opacity = 1;", show)
+        self.assertIn("if (refresh) { nCard.Opacity = alpha;", show)
+        self.assertIn("Math.Clamp(clear, 0, 50)", show)  # see-through, never invisible
         # the TV pauses us whenever only the overlay is up: a pause must not close it
         pause = body(launcher(), "protected override void OnPause()")
         self.assertNotIn("CloseOverlay", pause)
