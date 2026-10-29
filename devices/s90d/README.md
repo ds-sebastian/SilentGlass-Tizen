@@ -10,7 +10,7 @@ SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soun
   not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
   because it exists.
 
-## SilentGlass (v43a)
+## SilentGlass
 
 Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
 (`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
@@ -44,7 +44,8 @@ playing; nothing touches the video plane.
   capsule focus, SF Symbols-style icons (`tools/make_symbols.py`). `tools/overlay_mockup.py OUTDIR` renders the same
   screens 1:1 on the Pi before anything goes to the TV.
 
-![Info](../../docs/screenshots/s90d-info.jpg)
+<p><img src="../../docs/screenshots/s90d-overlay-inputs.jpg" width="49%" alt="Inputs">
+<img src="../../docs/screenshots/s90d-info.jpg" width="49%" alt="Info"></p>
 
 ### Settings
 

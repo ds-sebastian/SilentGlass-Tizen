@@ -34,6 +34,9 @@ an app), as a tvOS-style banner from SilentGlass Home - with the picture (a Frig
 and message. The bridge speaks the protocol of the *Notifications for Android TV* app, so the TV is added with Home
 Assistant's built-in integration and every existing automation works unchanged:
 
+<p><img src="../../docs/screenshots/s90d-notice.jpg" width="49%" alt="A doorbell notification with its picture">
+<img src="../../docs/screenshots/s90d-notice-transparent.jpg" width="49%" alt="The same card at 50% transparency"></p>
+
 1. Settings > Devices & services > Add integration > **Notifications for Android TV / Fire TV**, host = the TV's
    address. This makes a `notify.android_tv_fire_tv_<address>` action (and a notify entity).
 2. Use it directly, or put it in a notify group (`platform: group`) that your automations already target - e.g. the
@@ -137,6 +140,8 @@ on the same network (or open the address shown), then type the code - the QR nev
 Save writes the owner-only config, reconnects, and the sheet on the TV shows the result. The page only works while
 the sheet is open: Back on the TV, 10 minutes, or 8 wrong codes close it. It is plain HTTP on your LAN, like the TV's
 own setup flows; the code keeps others on the network out while it is open.
+
+![The phone page: home screen, notifications, Home Assistant](../../docs/screenshots/s90d-phone-settings.jpg)
 
 ## Install
 

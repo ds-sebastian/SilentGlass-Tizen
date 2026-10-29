@@ -28,5 +28,8 @@ trademarks remain subject to their owners' terms. The repository and its contrib
 Samsung, NVIDIA, Nintendo, Sony, Microsoft, Amazon, Apple, Google, the Thread Group or any streaming service.
 
 The S90D photo wallpaper (macOS Catalina Day/Night) is Apple artwork: it is not distributed, and
-`tools/make_wallpapers.py` builds it from images you supply. The screenshots in `docs/screenshots/` show it as
-rendered on the owner's TV; remove or replace them before publishing this repository.
+`tools/make_wallpapers.py` builds it from images you supply; the screenshots don't show it.
+
+The screenshots in `docs/screenshots/` are the TV's UI layer (the TV doesn't capture video) over stills from *Big
+Buck Bunny*, © Blender Foundation (peach.blender.org), CC BY 3.0, via Wikimedia Commons. The phone page is a
+local bridge with stand-in settings. Addresses, the QR code and the setup code are stand-ins.

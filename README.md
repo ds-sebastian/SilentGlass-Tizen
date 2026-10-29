@@ -27,6 +27,14 @@ radio joins your smart-home network.
 
 ![Controls over the picture](docs/screenshots/s90d-overlay-controls.jpg)
 
+<p><img src="docs/screenshots/s90d-overlay-inputs.jpg" width="49%" alt="Inputs, with a green dot on every device that is on">
+<img src="docs/screenshots/s90d-notice.jpg" width="49%" alt="A doorbell notification over the picture"></p>
+
+![Advanced settings on a phone](docs/screenshots/s90d-phone-settings.jpg)
+
+<sub>The TV can't capture its own video, so each screenshot is the TV's real UI layer over a still from *Big Buck
+Bunny* (© Blender Foundation, CC BY 3.0). Addresses and codes are stand-ins.</sub>
+
 More screenshots and how it works: [devices/s90d](devices/s90d/README.md). Guides:
 [Home Assistant](devices/s90d/ha-bridge.md), [Thread](devices/s90d/thread-border-router.md).
 
