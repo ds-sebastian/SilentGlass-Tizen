@@ -13,10 +13,11 @@ script files. Files are staged in `/home/owner/share/tmp/sdk_tools/quiet-tizen/`
 
 ## 1. Get the files
 
-**From a release** (no build needed): download `silentglass-<version>.tar.gz`, `ha-bridge-install.sh` and
+**From a release** (no build needed): download `silentglass-<version>.tar.gz`, `install.sh`, `undo.sh` and
 `SHA256SUMS` from the release page, check them with `sha256sum -c SHA256SUMS`, and stage the tarball as
-`quiet-tizen/package.tar.gz` (step 2). The package holds only this project's code and assets: no Samsung files, no
-photo wallpapers (it uses the built-in background unless you add `wallpapers/wall-day.jpg` and `wall-night.jpg`).
+`quiet-tizen/package.tar.gz`. It is one bundle: the launcher and the Home Assistant bridge, one version. It holds
+only this project's code and assets: no Samsung files, no photo wallpapers (it uses the built-in background unless
+you add `wallpapers/wall-day.jpg` and `wall-night.jpg`).
 
 **Or build it yourself.** SilentGlass is a native NUI/.NET app. Build it against the TV's own framework assemblies - pull these four from the
 TV (`find /usr/share/dotnet.tizen -name 'Tizen.NUI.dll' -o -name 'Tizen.Applications.Common.dll' -o -name
@@ -26,14 +27,14 @@ project files reference them with `Private=false`.
 ```sh
 python3 tools/build.py launcher --framework .local/tv-framework
 python3 tools/build.py bridge
-python3 tools/bridge_installer.py .local/build/ha-bridge   # embeds the build into ha-bridge-install.sh
+python3 tools/bundle.py --public   # .local/bundle/silentglass-<version>.tar.gz + the file list in install.sh
 ```
 
 Builds are reproducible with the pinned SDK (`global.json`, .NET SDK 6.0.428): the same commit gives the same
 bytes, so you can compare your build with a release's `SHA256SUMS`. `tools/release.py VERSION` makes the release
 files from a clean checkout.
 
-`.local/package/` then holds `BixbyPromotion.dll` (SilentGlass),
+`.local/package/` holds `BixbyPromotion.dll` (SilentGlass),
 `Probe.dll` (Home-handler tool) and the assets. Your TV's apps for the Apps menu come from
 `launcher/assets/apps.local.json` if present (see [app library](app-library.md)).
 
@@ -44,7 +45,7 @@ package's identity, privileges (including notification windows) and labels. It d
 
 ```sh
 /bin/sh -s -- home-01 < recipes/snapshot.sh        # registry, preferences and routing backup
-tar -czf .local/package.tar.gz -C .local/package . # stage as quiet-tizen/package.tar.gz on the TV
+# stage silentglass-<version>.tar.gz as quiet-tizen/package.tar.gz on the TV, then:
 /bin/sh -s -- home-01 < recipes/install-launcher.sh
 ```
 
@@ -68,7 +69,7 @@ Read all three back, restart with the remote, and check full boot, Home, standby
 ## 4. Home Assistant bridge (optional)
 
 ```sh
-/bin/sh < devices/s90d/device/ha-bridge/ha-bridge-install.sh
+/bin/sh -s -- bridge < devices/s90d/device/install.sh   # with the bundle staged as quiet-tizen/package.tar.gz
 ```
 
 It installs as an owner service and starts unconfigured. On the TV: **Home > Info > Advanced settings** shows a QR code;
@@ -88,16 +89,26 @@ TV only (owner-readable). Details: [Home Assistant bridge](../devices/s90d/ha-br
 - Privacy batches and boot units: the [S90D record](../devices/s90d/README.md) lists each phase with its inverse.
   What the targeted services do is in [Tizen notes](samsung-tizen-notes.md).
 
+## Updating
+
+Stage the new release's `silentglass-<version>.tar.gz` as `quiet-tizen/package.tar.gz` and run that release's
+`install.sh` (`/bin/sh < install.sh`). It updates the launcher from any SilentGlass version, and the bridge if it is
+installed (`/bin/sh -s -- all < install.sh` also adds it). It checks every file against its own list before changing
+anything, skips what is already current, keeps the bridge's settings, and backs up what it replaces to
+`/opt/usr/share/quiet-tizen-backups/silentglass-<version>-<time>/`. It prints that folder's name: going back one
+version is `/bin/sh -s -- <name> < undo.sh`, which refuses if either part changed since.
+
 ## Undo
 
 Each phase has its inverse; run them in reverse order (newest change first), and the launcher last:
 
 - the privacy batches and boot services: their `*-restore.sh` scripts (listed in the [S90D record](../devices/s90d/README.md))
-- `devices/s90d/device/ha-bridge/ha-bridge-restore.sh`
+- one update back: `devices/s90d/device/undo.sh` with the backup name the update printed (above)
+- the bridge entirely: `devices/s90d/device/ha-bridge/ha-bridge-restore.sh`
 - back to Samsung Home: `recipes/restore-launcher.sh home-01 ORIGINAL_MAIN_OPERATION_ID ORIGINAL_HOME_ID
   ORIGINAL_STARTUP_ID` - the three values you saved (all `com.samsung.tv.csfs` on the TVs seen so far; use yours).
-  It only replaces the version `install-launcher.sh` put there (it checks that DLL's hash); after an update, run
-  that update's inverse first.
+  It only replaces the version `install-launcher.sh` put there (it checks that DLL's hash); after updates, undo
+  them first, newest first.
   The tested TV was installed by an earlier trial script; its undo is
   `devices/s90d/device/launcher-deploy/restore-stock-home.sh`, which works from any SilentGlass version.
 

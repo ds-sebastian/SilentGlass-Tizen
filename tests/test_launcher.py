@@ -187,19 +187,13 @@ class LauncherSource(unittest.TestCase):
         self.assertIn('url + "?s=" + session', s)  # a fresh address per sheet: phones reuse a tab with the same one
         self.assertIn("CloseSetupServer();", body(launcher(), "void CloseOverlay("))  # closing the overlay closes the page
 
-    def test_deploy_pair_matches_the_version(self):
-        version = re.search(r'ModVersion = "(v\d+\w)"', (SRC / "SilentGlass.cs").read_text()).group(1)
+    def test_one_version_everywhere(self):
+        # the launcher and the bridge report Shared.Version; install.sh carries it (tests/test_install.py)
+        self.assertIn("ModVersion = Shared.Version;", (SRC / "SilentGlass.cs").read_text())
+        self.assertIn("const string Version = Shared.Version;", (ROOT / "devices/s90d/device/ha-bridge/src/Bridge.cs").read_text())
+        self.assertRegex((SRC / "Shared.cs").read_text(), r'public const string Version = "\d+\.\d+\.\d+";')
         deploy = ROOT / "devices/s90d/device/launcher-deploy"
-        update = deploy / f"update-{version}.sh"
-        self.assertTrue(update.exists(), update)
-        prev = re.search(r"Inverse: restore-(v\d+\w)\.sh", update.read_text()).group(1)
-        self.assertTrue((deploy / f"restore-{prev}.sh").exists())
-        # only the current pair, plus the way back to Samsung Home
-        self.assertEqual(sorted(p.name for p in deploy.glob("*.sh")), sorted([update.name, f"restore-{prev}.sh", "restore-stock-home.sh"]))
-        for p in deploy.glob("*.sh"):
-            r = subprocess.run(["sh", "-n"], stdin=p.open(), capture_output=True, text=True)
-            self.assertEqual(r.returncode, 0, f"{p.name}: {r.stderr}")
-
+        self.assertEqual(sorted(p.name for p in deploy.glob("*.sh")), ["restore-stock-home.sh"])  # updates are install.sh
 
 class DeviceRecord(unittest.TestCase):
     def test_catalog_only_has_installed_enabled_apps(self):

@@ -5,11 +5,13 @@ apps.local.json, the private device inventory) can slip in.
     python3 tools/release.py v1.0.0 [--commit HEAD] [--framework .local/tv-framework] [--dotnet dotnet]
 
 Writes .local/dist/<version>/:
-  silentglass-<version>.tar.gz   the launcher package for recipes/install-launcher.sh (stage it as package.tar.gz)
-  ha-bridge-install.sh           the Home Assistant bridge installer (bridge embedded, sha256-guarded)
-  ha-bridge-restore.sh           its inverse
+  silentglass-<version>.tar.gz   the bundle: launcher + Home Assistant bridge (stage it as quiet-tizen/package.tar.gz)
+  install.sh                     installs or updates both from it, every file sha256-checked
+  undo.sh                        puts back what one install replaced
+  ha-bridge-restore.sh           removes the bridge
   SHA256SUMS
-It refuses if the committed bridge installer doesn't match a fresh build of the committed bridge source.
+The version must be Shared.Version. It refuses if the committed install.sh doesn't list a fresh build of the
+committed source (rebuild with tools/bundle.py, commit, release again).
 The Samsung framework assemblies are only referenced at build time; they are never packaged.
 """
 import argparse
@@ -17,6 +19,7 @@ import gzip
 import hashlib
 import io
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -70,12 +73,15 @@ def main():
     try:
         run(sys.executable, "tools/build.py", "launcher", "--dotnet", a.dotnet, "--framework", framework, cwd=tree)
         run(sys.executable, "tools/build.py", "bridge", "--dotnet", a.dotnet, cwd=tree)
-        installer = tree / "devices/s90d/device/ha-bridge/ha-bridge-install.sh"
+        ver = re.search(r'Version = "(\d+\.\d+\.\d+)"', (tree / "launcher/src/Shared.cs").read_text()).group(1)
+        if a.version != "v" + ver:
+            sys.exit(f"{a.version} is not Shared.Version (v{ver})")
+        installer = tree / "devices/s90d/device/install.sh"
         committed = installer.read_bytes()
-        run(sys.executable, "tools/bridge_installer.py", ".local/build/ha-bridge", cwd=tree)
+        run(sys.executable, "tools/bundle.py", "--out", tree / ".local/bundle", cwd=tree)
         if installer.read_bytes() != committed:
-            sys.exit("The committed ha-bridge-install.sh doesn't match a fresh build of the bridge source: rebuild it "
-                     "(tools/bridge_installer.py), commit, and release again.")
+            sys.exit("The committed install.sh doesn't list a fresh build of this source: run tools/build.py launcher, "
+                     "tools/build.py bridge and tools/bundle.py, commit install.sh, and release again.")
         package = tree / ".local/package"
         leaked = [p for p in (package.rglob("*")) if any(p.relative_to(package).as_posix().startswith(f) for f in FORBIDDEN)]
         if leaked:
@@ -83,9 +89,10 @@ def main():
         if out.exists():
             shutil.rmtree(out)
         out.mkdir(parents=True)
-        deterministic_tar(package, out / f"silentglass-{a.version}.tar.gz")
-        shutil.copyfile(installer, out / "ha-bridge-install.sh")
-        shutil.copyfile(installer.with_name("ha-bridge-restore.sh"), out / "ha-bridge-restore.sh")
+        shutil.copyfile(tree / f".local/bundle/silentglass-{ver}.tar.gz", out / f"silentglass-{a.version}.tar.gz")
+        shutil.copyfile(installer, out / "install.sh")
+        shutil.copyfile(installer.with_name("undo.sh"), out / "undo.sh")
+        shutil.copyfile(tree / "devices/s90d/device/ha-bridge/ha-bridge-restore.sh", out / "ha-bridge-restore.sh")
         lines = [f"{sha256(p)}  {p.name}" for p in sorted(out.iterdir())]
         (out / "SHA256SUMS").write_text("\n".join(lines) + "\n", newline="\n")
         print("\n".join(lines))

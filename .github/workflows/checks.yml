@@ -18,10 +18,6 @@ jobs:
           global-json-file: global.json
       - name: Build the Home Assistant bridge (the setup-page test runs it)
         run: python3 tools/build.py bridge
-      - name: The committed bridge installer is this source, byte for byte
-        run: |
-          python3 tools/bridge_installer.py .local/build/ha-bridge
-          git diff --exit-code devices/s90d/device/ha-bridge/ha-bridge-install.sh
       - name: Tests (they also build and run the C# checks, the screen simulation and the notification harness)
         run: |
           pip install notifications-android-tv==0.1.5 qrcode==8.2

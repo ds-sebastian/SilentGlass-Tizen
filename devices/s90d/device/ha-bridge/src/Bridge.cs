@@ -21,7 +21,7 @@ static partial class Bridge
     static readonly string ConfPath = Environment.GetEnvironmentVariable("SG_CONF") ?? "/opt/usr/home/owner/.config/silentglass-ha.conf";
     static string DataFile(string name) => Data + "/" + name;
     static bool noTv;
-    const string Version = "2.8.3";
+    const string Version = Shared.Version;
     const int Mbr = -2;  // the TV keeps names per "activity index"; -2 is the default slot (Samsung's own binding uses it)
     static Dictionary<string, string> conf = new();
     static Mqtt mqtt;

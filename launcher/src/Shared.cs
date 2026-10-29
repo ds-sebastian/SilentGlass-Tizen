@@ -7,6 +7,8 @@ using System.Text.Json;
 // small key=value files read. No NUI, no native calls.
 public static class Shared
 {
+    // the one version of the whole thing: Info, the bridge (Home Assistant sw_version), the release and install.sh
+    public const string Version = "1.2.0";
     public const string Self = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", SamsungHome = "com.samsung.tv.csfs", Art = "org.tizen.art-app";
     public static bool IsAmbient(string id) => id is Art or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
 

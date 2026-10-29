@@ -1,5 +1,5 @@
 #!/bin/sh
-# Inverse of ha-bridge-install.sh. Retained discovery topics stay on the broker: delete the device in Home Assistant
+# Removes the bridge that install.sh put on the TV (to go back one version instead, use undo.sh). Retained discovery topics stay on the broker: delete the device in Home Assistant
 # (Settings > Devices > Living Room TV > Delete) or clear homeassistant/+/silentglass_s90d/# with an MQTT client.
 set -eu
 H=/opt/usr/home/owner; UD=$H/.config/systemd/user; N=silentglass-ha.service

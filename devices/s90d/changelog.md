@@ -6,6 +6,14 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.2.0** (one version for the launcher and the bridge; was launcher v43e + bridge 2.8.3; installed on
+  the TV 2026-10-29 with the new installer): one release bundle (`silentglass-<version>.tar.gz`: launcher + bridge)
+  and one `device/install.sh` that installs or updates both, from any SilentGlass version. It lists the sha256 of
+  every file and refuses before changing anything if one differs, skips what is current, keeps the bridge's settings,
+  and backs up what it replaces; `device/undo.sh` puts that back, refusing if either part changed since. Replaces
+  the per-version launcher pairs (`launcher-deploy/update-vN.sh`) and the bridge installer with the bridge embedded,
+  so the 64 KiB runner limit no longer bounds the bridge (install.sh is ~11 KB). `tests/test_install.py` runs both
+  scripts against a fake TV.
 - **v43e** + **bridge 2.8.3** (installed and checked on the TV 2026-10-29): notification transparency for the whole
   banner, picture included: Advanced settings › Notifications › Transparency (As sent, None, 25%, 50%), and Home
   Assistant's `transparency` is honoured (capped at 50%). The repo pair still upgrades from v43c (v1.1.0).

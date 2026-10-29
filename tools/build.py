@@ -23,7 +23,7 @@ def main():
         jobs.append((ROOT / "launcher/src/SilentGlass.csproj", "SilentGlass", "SilentGlass",
                      [f"-p:TV_FRAMEWORK_DIR={args.framework.resolve()}"]))
         jobs.append((ROOT / "launcher/probe/Probe.csproj", "Probe", "Probe", []))
-    if args.target == "bridge":  # then: python3 tools/bridge_installer.py .local/build/ha-bridge
+    if args.target == "bridge":  # then: python3 tools/bundle.py --public (install.sh lists every file)
         jobs.append((ROOT / "devices/s90d/device/ha-bridge/src/HaBridge.csproj", "ha-bridge", "ha-bridge", []))
     for project, output, intermediate, extra in jobs:
         subprocess.run([

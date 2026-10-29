@@ -140,8 +140,9 @@ own setup flows; the code keeps others on the network out while it is open.
 
 ## Install
 
-1. On the TV, as root: feed `device/ha-bridge/ha-bridge-install.sh` to `/bin/sh` on stdin. The bridge starts
-   unconfigured (Info shows *Set up*).
+1. On the TV, as root, with the release bundle staged as `quiet-tizen/package.tar.gz`:
+   `/bin/sh -s -- bridge < device/install.sh` (updates later come with the launcher; see
+   [install](../../docs/install.md#updating)). The bridge starts unconfigured (Info shows *Set up*).
 2. Set it up from a phone (above). By hand instead: copy `/opt/usr/home/owner/.config/silentglass-ha.conf.example`
    to `silentglass-ha.conf` (owner, mode 600, same SMACK label as the home directory), fill in the broker and
    restart the unit.

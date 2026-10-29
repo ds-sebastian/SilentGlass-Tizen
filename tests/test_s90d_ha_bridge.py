@@ -1,8 +1,5 @@
 """The Home Assistant bridge: the rules in its source that matter on the TV, and the installer that carries it there.
 Its behaviour off the TV: tests/test_s90d_setup.py (the phone page) and tests/test_s90d_notice.py (notifications)."""
-import base64
-import hashlib
-import lzma
 import re
 import unittest
 from pathlib import Path
@@ -67,24 +64,13 @@ class HaBridgeTests(unittest.TestCase):
         self.assertIn("if (!NoticeAllowed(peer))", SRC)
         self.assertIn('conf.GetValueOrDefault("host", "") + "," + conf.GetValueOrDefault("notify_from", "")', SRC)
 
-    def test_installer_ships_the_built_bridge_and_no_credentials(self):
-        inst = (DIR / "ha-bridge-install.sh").read_text()
-        self.assertIn('base64 -d <<\'B64_EOF\' | xz -dc > "$Q/silentglass-ha.dll.new"', inst)  # xz: the TV runner takes 64 KiB
-        self.assertLess(len(inst.encode()), 64 * 1024)
-        self.assertIn("N=silentglass-ha.service", inst)
-        blocks = re.findall(r"<<'B64_EOF'[^\n]*\n(.*?)\nB64_EOF\n\[ \"\$\(sha256sum [^)]*\)\" = ([0-9a-f]{64}) \]", inst, re.S)
-        self.assertEqual(len(blocks), 4)
-        for b64, sha in blocks:
-            data = base64.b64decode(b64)
-            if data[:6] == b"\xfd7zXZ\x00":
-                data = lzma.decompress(data)
-            self.assertEqual(hashlib.sha256(data).hexdigest(), sha)
+    def test_bridge_unit_and_example_ship_no_credentials(self):
         unit = (DIR / "silentglass-ha.service").read_text()
         self.assertNotIn("ConditionPathExists", unit)  # starts unconfigured: the phone setup page writes the config
         self.assertNotIn("User=", unit)  # owner session, never root
         example = (DIR / "silentglass-ha.conf.example").read_text()
         self.assertIn("password=change-me", example)
-        self.assertFalse(re.search(r"10\.3\.26\.", inst + example))
+        self.assertFalse(re.search(r"10\.3\.26\.", (ROOT / "devices/s90d/device/install.sh").read_text() + example))
 
     def test_thread_switch_is_the_file_the_path_unit_watches(self):
         watched = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-switch.path").read_text()
