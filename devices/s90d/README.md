@@ -1,154 +1,139 @@
 # Samsung QN65S90DAFXZA (S90D, 2024 OLED)
 
-SilentGlass-Tizen's tested TV: **SHIELD TV Pro** on HDMI 3 (through a Q990D soundbar) is the main device, a
-**Nintendo Switch** on HDMI 1; the TV's own apps are backups.
+The tested TV, set up like this:
+- a **SHIELD TV Pro** on HDMI 3, through a Q990D soundbar: the main device;
+- a **Nintendo Switch** on HDMI 1;
+- the TV's own apps, kept only as backups.
 
-- Firmware `T-PTMDAKUC-0090-REL-202605141701`.
-- Root: per-command sessions through [s90c-tools](https://github.com/invaliddayta/s90c-tools)' `tv-access` (not
-  bundled). Scripts go to `/bin/sh` on **stdin**, because UEP refuses unsigned script files.
-- Agents: start with the [agent workflow](../../docs/agent-workflow.md). Scripts and records here are dated evidence,
-  not proof of the current state: read the TV's state and hashes before acting, and never run an installer just
-  because it exists.
+- **Firmware:** `T-PTMDAKUC-0090-REL-202605141701`.
+- **Root:** [s90c-tools](https://github.com/invaliddayta/s90c-tools)' `tv-access`, not bundled. Scripts go to
+  `/bin/sh` on stdin, because the TV refuses unsigned script files.
+- **Agents:** start with the [agent workflow](../../docs/agent-workflow.md). The records here are dated evidence.
+  Read the TV's state before acting.
 
 ## SilentGlass
 
-Native NUI app installed in place of `com.samsung.tv.bixby-promotion` and set as the Home handler
-(`db/appfw/home_appid`); power-on still goes to the last input (`startup_appid=org.tizen.tv-viewer`).
-Version history: [changelog.md](changelog.md).
+The Home screen, installed in place of `com.samsung.tv.bixby-promotion`. Power-on still goes to the last input.
+History: [changelog.md](changelog.md).
 
 ![The bar over the picture](../../docs/screenshots/s90d-overlay-bar.jpg)
 
-### Overlays only
+Everything is an overlay over the TV's own viewer, so the picture keeps playing and the video is never touched.
 
-There are no full-screen pages. Everything interactive lives in one partial, transparent window of type Notification
-at level Top ([`Overlay.cs`](../../launcher/src/Overlay.cs)) above the TV viewer, which stays in front and keeps
-playing; nothing touches the video plane.
-
-- **Bar** (bottom): **Watch** and **Play** with the device each opens underneath (the TV's input name; a green dot
-  when its device is on: the picture on the current input, HDMI-CEC for the others - [`Cec.cs`](../../launcher/src/Cec.cs)), Inputs, Controls, Apps (unless hidden) and Info. Left/Right move, Select (or Up on a
-  menu item) opens. Over a picture, Home toggles it; Back closes it; it steps aside after 20 idle seconds (phone page: 10 s to 1 min, or never).
-- **Inputs** (menu above its bar item): every input by the TV's name, a checkmark on the current one, the same green
-  dots. A device without HDMI-CEC (or with it off) only gets one while it is on screen.
-- **Apps** (above the bar): the TV's apps and Samsung Home, as artwork; they are backups - the SHIELD has the real ones.
-- **Controls** (panel on the right, replacing the bar; translucent so the picture shows the change): Brightness,
-  Contrast, Volume (Select mutes); Picture Mode, Sound Mode, Sound Output, Game Mode (Automatic / Always / Never -
-  the TV's single three-way `game-mode-auto`), Sleep Timer, Pixel Shift; Ambient, Bluetooth, Network, TV Settings.
-- **Info** (panel on the right, near-opaque): Privacy, Network, Thread, Home Assistant and This TV status (refreshed
-  every 3 s), then the settings below, then **Advanced settings** (phone sheet: QR code + 6-digit code; the phone
-  page also has these settings, notifications, the Thread border router and MQTT - see [ha-bridge.md](ha-bridge.md)).
-- **Backdrop**: with nothing to draw over (no signal, or Home from Ambient or an app) the app's own window shows the
-  wallpaper and time behind the bar; Back there goes to the last input. After 5 idle minutes it fades to a dim
-  drifting clock (OLED care). It is hidden whenever anything else is in front, so it never flashes over the picture.
-- **Notifications and toasts** have their own non-focusable window ([`Notice.cs`](../../launcher/src/Notice.cs)).
-- Look: dark translucent glass with a hairline edge and a soft dimming gradient (video can't be blurred), white
-  capsule focus, SF Symbols-style icons (`tools/make_symbols.py`). `tools/overlay_mockup.py OUTDIR` renders the same
-  screens 1:1 on the Pi before anything goes to the TV.
+| Part | What it does |
+|---|---|
+| **Bar** | Watch and Play (your two main inputs), Inputs, Controls, Apps, Info. Home toggles it, and it hides after 20 s idle. |
+| **Inputs** | every input by the TV's name. A green dot means its device is on (picture or HDMI-CEC). |
+| **Controls** | brightness, contrast, volume; picture, sound and Game Mode; sleep timer, pixel shift; Ambient, Bluetooth, settings |
+| **Apps** | the TV's apps as artwork (backups; the SHIELD has the real ones) |
+| **Info** | privacy, network, Thread and Home Assistant status, settings, and Advanced settings (phone) |
+| **Wallpaper** | shown only when there's no picture, with a clock; dims after 5 min for the OLED |
+| **Banners** | Home Assistant notifications and input alerts, in their own window, which never takes the remote |
 
 <p><img src="../../docs/screenshots/s90d-overlay-inputs.jpg" width="49%" alt="Inputs">
 <img src="../../docs/screenshots/s90d-info.jpg" width="49%" alt="Info"></p>
 
 ### Settings
 
-On the TV (Info) or the phone (Advanced settings; SilentGlass reloads the file when the phone saves it). Saved as
-`silentglass-prefs.txt` in the app's data directory, so they survive reboots; an older
-`quiet-home-prefs.txt` is read once and replaced):
+These are on Info or the phone page, and stored in `silentglass-prefs.txt`.
 
-| Setting | Default | Does |
+| Setting | Default | Options |
 |---|---|---|
-| Watch / Play | Automatic | which input each bar item opens: Automatic = the input the TV names `Shield` / `Switch` (else HDMI 3 / HDMI 1), or HDMI 1-4; never both the same |
-| Apps in the bar | on | off = no Apps item (the Apps menu is gone; Samsung Home stays reachable from Controls > TV Settings) |
-| Dim after | 5 min | OLED care on the backdrop: 2, 5, 10 or 30 min without a key, or never |
-| Clock | 12-hour | the wallpaper clock: 12-hour, 24-hour or hidden (phone page only) |
-| Menu closes after | 20 s | how long the bar stays over a picture without a key press: 10 s, 20 s, 30 s, 1 min or never (phone page only) |
-| Wallpaper | Auto | Auto (switch at local sunrise/sunset; location from the phone setup page) / Day / Night; only with the photo wallpaper installed |
-| Thread border router | on | starts/stops the border router units ([thread-border-router.md](thread-border-router.md)); only where installed |
-| Notifications | on | banners from Home Assistant ([ha-bridge.md](ha-bridge.md)) and the input plugged/unplugged toasts |
-| Input alerts | on | the plugged/unplugged toasts alone, so they can go while banners stay (phone page only) |
+| Watch / Play | Automatic | the inputs named `Shield` / `Switch` (else HDMI 3 / 1), or any HDMI port |
+| Apps in the bar | on | off hides Apps |
+| Menu closes after | 20 s | 10 s, 20 s, 30 s, 1 min, never |
+| Dim after | 5 min | 2, 5, 10, 30 min, never |
+| Clock | 12-hour | 24-hour, hidden |
+| Wallpaper | Auto | sunrise/sunset, Day, Night (photo wallpaper only) |
+| Notifications / Input alerts | on | [ha-bridge.md](ha-bridge.md) |
+| Thread border router | on | [thread-border-router.md](thread-border-router.md) |
 
-The photo wallpaper (macOS Catalina Day/Night) is Apple artwork and not in git: build it with
-`tools/make_wallpapers.py DAY.jpg NIGHT.jpg`; without it the gradient wallpaper is used.
+The photo wallpaper is Apple artwork and isn't included. To build it from your own copies, run
+`tools/make_wallpapers.py DAY.jpg NIGHT.jpg`.
 
-### How it works
+### How it works (for developers)
 
-- **Inputs** are pushed by the TV, no polling: `libsource-api` `register_sourcelist_changed_callback` and vconf
-  notifications on `memory/system/source_type`, `memory/tv-viewer/mainscreen_signal_state` (settled for 800 ms) and
-  `memory/appfw/current_fullscreen_appid`. Names: edit name > detected name > port. `powerState` is ignored: behind
-  the soundbar the SHIELD reports Off.
-- **Ambient**: the Art app always hands Home to Samsung Home (hard-coded); SilentGlass watches the foreground app and
-  brings itself back on that one hand-off.
-- **What is on screen**: `Screen.cs` alone decides wallpaper vs bar vs nothing; `tests/screen-sim` runs it against a
-  simulated TV. Rules it enforces: the wallpaper never covers a live picture; a visible bar always gets the keys;
-  nothing of ours stays over another app; Home always leaves a working bar (or closes one); Home with no picture brings
-  the wallpaper. Change the model in `tests/screen-sim/ScreenSim.cs` when the TV shows new behaviour.
-- **Cold start**: the TV's launch placeholder holds the remote's keys until the app's main window has been shown once,
-  so that window starts shown (black, empty) and Home hides it as the bar opens. The TV also pauses the app whenever
-  only the overlay is up; a pause never closes the overlay - another app coming to the front does.
-- **Shared with the bridge**: app ids, launch extras and the files in the data directory are all in
-  [`Shared.cs`](../../launcher/src/Shared.cs), compiled into both.
-- **Launch extras**: `sg_source=<type>` (switch input) and `sg_notice=1` (start hidden for a notification) from the
-  bridge; `sg_open=controls|info|apps|inputs|setup` opens one part directly (for `app_launcher`).
-- **State file** `/tmp/silentglass-state.txt` (coalesced, never on the key path): version, what is showing
-  (`ui=`, `backdrop=`, `fg=`), focus, key timing, inputs, settings values. The bridge reads it to report the app on
-  screen.
-- Source: [`launcher/src`](../../launcher/src). Latency rules are enforced by tests: no IPC or file I/O on the key
-  path, native callbacks posted to the UI thread, interrupted animations land on their end state.
+- **Inputs** are pushed by the TV, with no polling:
+  - `libsource-api` `register_sourcelist_changed_callback`;
+  - vconf `memory/system/source_type`, `memory/tv-viewer/mainscreen_signal_state` (settled 800 ms) and
+    `memory/appfw/current_fullscreen_appid`.
+  - `powerState` is ignored, because the SHIELD reports Off from behind the soundbar.
+- **Screen.cs** alone decides between wallpaper, bar and nothing. `tests/screen-sim` checks it against a simulated
+  TV:
+  - the wallpaper never covers a picture;
+  - a visible bar always gets the keys;
+  - Home always leaves a working bar.
+- **Ambient:** the Art app always hands Home to Samsung Home, so SilentGlass takes it back.
+- **Cold start:**
+  - The launch placeholder holds the keys until the main window has been shown once, so it starts shown (black).
+  - The TV pauses the app while only the overlay is up, and a pause never closes it.
+- **Launch extras:**
+  - `sg_source=<type>` switches input;
+  - `sg_notice=1` starts hidden for a banner;
+  - `sg_open=controls|info|apps|inputs|setup` opens one part directly.
+- **State file:** `/tmp/silentglass-state.txt`, which records what's showing, plus inputs and settings.
+- **Shared with the bridge:** [`Shared.cs`](../../launcher/src/Shared.cs) has app ids, file names and the version.
+- **Speed rules, enforced by tests:**
+  - no IPC or file I/O on the key path;
+  - native callbacks are posted to the UI thread.
+- **Deploy:**
+  - `device/install.sh` installs the bundle. It checks every file's sha256, keeps SMACK labels and backs up what it
+    replaces.
+  - `device/undo.sh` puts one install back.
+  - `launcher-deploy/restore-stock-home.sh` goes back to Samsung Home from any version.
 
-Deploy: `device/install.sh` with the release bundle (launcher + bridge, one version: `Shared.Version`). It lists the
-sha256 of every file, updates from any SilentGlass version, keeps SMACK labels and the bridge's settings, and backs up
-what it replaces; `device/undo.sh` puts that back. Builds are reproducible, so the list matches a fresh build.
-Back to Samsung Home from any version: `launcher-deploy/restore-stock-home.sh` (routing to the recorded originals,
-then the original app from the first install's backup, checked by hash, labels and ownership; nothing deleted).
-A first install: [docs/install.md](../../docs/install.md).
+## Device changes
 
-## Device changes (device/)
+Each has its own undo script in `device/`.
 
-| Area | What | Inverse |
+| Change | What | Undo |
 |---|---|---|
-| privacy/ | Phase B: `app_disable` on ACR, voice/Bixby/Alexa stacks, TV Plus (registry SQL + `AppMetadata` helper reload) | restore.sh / restore.sql |
-| cleanup/batchc | ad targeting (`targeted-ad-service`), voice leftovers (`utterance-recommender-core`, `AICompanionAgent`, `aov-dashboard`) | batchc-restore.sh |
-| cleanup/prime* | Prime Video boot metadata removed, companion disabled, `disable.appbooting` (ineffective, kept) | prime-restore.sh, prime-noboot-restore.sh |
-| boot-units/quiet-recog-off | owner user-systemd watcher stopping content recognition (later boot targets restart it) | recog-boot-restore.sh |
-| cleanup/batchd | SHIELD does everything: Prime Video, Apple TV, web browser **uninstalled**; TV YouTube and Samsung Home media rows disabled (cast to SHIELD's Chromecast; AirPlay unaffected); janitor unit removed | batchd-restore.sh (store apps: reinstall from Samsung Apps) |
-| cleanup/batchf | Prime Video, Apple TV and the web browser came back ~3.5 h after batch D uninstalled them (Samsung country preloads are reinstalled); kept installed but **disabled** instead, which sticks. Inverse `batchf-restore.sh` |
-| cleanup/batchf2 | Apple TV's second app `com.samsung.tv.aria-dummy`, missed by batch F; Info counted Apple TV as on. Inverse `batchf2-restore.sh` |
-| cleanup/reapply | Re-disables anything on the privacy list that a Samsung app update re-enabled, through `pkgcmd -D`. Inverse `reapply-restore.sh` (latest run) |
-| cleanup/batchg | Turns off the automatic updates that ignore the menu settings: Samsung's built-in app upgrader and the OMA-DM firmware auto-update. Inverse `batchg-restore.sh` |
-| cleanup/batche | content-info feed for ACR (`cis`, `cis-api-service-app`), usage analytics (`samsung-analytics`), voice leftovers (`multi-assistant-service`, always-on `aov-service`, voice instant/onboarding, three Bixby apps), ad players (`adplatform.ADPlayer`, `adplayer`, `ad-web-framework`); chosen from Vetro's catalog and checked on this TV. Not included: `coba.adagent` (Samsung Home loads it), `content-grab-service` / `nvision-analysis-dbmgr` (may feed picture processing / Ambient) | batche-restore.sh |
-| cleanup/multiview | Multi View no longer preloads at boot (marker that Samsung's own unit checks: `ConditionPathExists=!.../disable_preloading`); opens on demand, cold | multiview-restore.sh |
-| boot-units/quiet-csfs-off | owner watcher: while SilentGlass is the Home app, closes Samsung Home (`csfs`, ~100 MB) after it has sat in the background for two one-minute checks; never while it is on screen. Identity by SMACK label | csfs-off-restore.sh |
-| ha-bridge | Home Assistant bridge over MQTT discovery: power, input (selectable, TV-named), per-port rename + CEC name resync, volume/mute, brightness/contrast, picture/sound mode, sound output, sleep timer, game mode, app, Thread role and switch, Home/Ambient buttons, temperature, memory. Owner service, fixed command list. See [ha-bridge.md](ha-bridge.md) | ha-bridge-restore.sh |
-| boot-units/quiet-prime-off | *removed by batch D* - janitor that closed Prime/Apple TV/browser in the background (its scripts are in git history before v43a) | batchd-restore.sh |
-| thread-border-router/ | standalone Thread border router that joins your existing network (or forms one: `otbr-join.sh`): owner user units run the hub `cpcd` + a capability copy of Samsung's `otbr-agent` on the default-route interface, hub stays off; radio on the hub image; on/off switch on the phone page and in Home Assistant ([thread-border-router.md](thread-border-router.md)) | otbr-restore.sh (radio back to stock: ncp-updater + stZigbeeRcp-mfg); switch upgrade: otbr-switch-restore.sh |
+| privacy/ (B) | disables content recognition (ACR), the Bixby/Alexa voice stacks and TV Plus | restore.sh |
+| cleanup/batchc | ad targeting (`targeted-ad-service`), voice leftovers | batchc-restore.sh |
+| cleanup/batche | ACR content feed (`cis`), usage analytics, always-on voice, ad players | batche-restore.sh |
+| cleanup/batchd + batchf/f2 | Prime Video, Apple TV and the browser disabled (the SHIELD has them); TV YouTube off (cast to the SHIELD) | batchd/batchf/batchf2-restore.sh |
+| cleanup/prime* | Prime Video boot metadata and its companion | prime-restore.sh, prime-noboot-restore.sh |
+| cleanup/multiview | Multi View no longer preloads at boot | multiview-restore.sh |
+| cleanup/batchg | Samsung's hidden app upgrader and firmware auto-update off | batchg-restore.sh |
+| cleanup/reapply | re-disables anything an update turned back on | reapply-restore.sh |
+| boot-units/quiet-recog-off | stops content recognition when boot restarts it | recog-boot-restore.sh |
+| boot-units/quiet-csfs-off | closes Samsung Home after it idles hidden for 2 min (~100 MB) | csfs-off-restore.sh |
+| ha-bridge | [Home Assistant bridge](ha-bridge.md) | ha-bridge-restore.sh |
+| thread-border-router | [Thread border router](thread-border-router.md) | otbr-restore.sh |
 
-Install the units with `*-install.sh`, then the latest `*-update*.sh` (recognition watcher: `recog-boot-update5.sh`). UEP also blocks `sh -n file`; check syntax with `sh -n < file`. User units live in
-`/opt/usr/home/owner/.config/systemd/user` (label `User::Home`) and are driven with
-`DBUS_SESSION_BUS_ADDRESS=kernel:path=/sys/fs/kdbus/5001-user/bus XDG_RUNTIME_DIR=/run/user/5001 systemctl --user`.
+**Lessons from these changes:**
+- **Uninstalled preloads come back.** Prime Video, Apple TV and the browser returned ~3.5 h after being
+  uninstalled, so batch F disables them instead.
+- **Batch E keeps three services on purpose:**
+  - `coba.adagent`, because Samsung Home loads it;
+  - `content-grab-service` and `nvision-analysis-dbmgr`, which may feed picture processing and Ambient.
+- **Closing these apps is pointless:** TV YouTube (`cobalt-yt`), Samsung Home and its media rows relaunch within
+  seconds to a minute. That only burns CPU.
+- **Memory:** after batch E, Multi View and the csfs watcher, free memory is ~780-835 MB with the TV on, up from
+  ~600-630 MB.
+- **Worth checking on other TVs:** firmware auto-update (`db/menu/support/softwareupdate/autoupdate`) and Smart Hub
+  autostart (`db/menu/smart_hub/ontvsetting/auto_start`). Both were already off on this one.
+- **Block in DNS:** two diagnostic-log hosts, `fc.samsungcloud.tv` and `www.samsungrm.net`. They're used by a root
+  service that can't be stopped.
 
-Measured after a reboot with batch E, Multi View and the csfs watcher: MemAvailable ~780-835 MB (TV on), against
-~600-630 MB before. Two Samsung diagnostic-log hosts still resolve (`fc.samsungcloud.tv`, `www.samsungrm.net`, used by
-`emergencyLogTransmitter`, a root system service that cannot be stopped from the owner session): block them in your DNS.
-Already off on this TV and worth checking on others: firmware auto-update (`db/menu/support/softwareupdate/autoupdate`)
-and Smart Hub autostart (`db/menu/smart_hub/ontvsetting/auto_start`).
-
-Not done on purpose: TV YouTube (`cobalt-yt`) is relaunched by litewebappservice within seconds when closed;
-Samsung Home (`csfs`, ~100-120 MB) and its media rows (`home.media`, ~70-150 MB) are relaunched within ~1 min (measured), so closing them only burns CPU;
-SmartThings/OTBR components are kept (the TV is a Thread border router on the home network, see
-[thread-border-router.md](thread-border-router.md)); Art/Ambient services kept.
+**Running services:**
+- **Install:** `*-install.sh`, then the latest `*-update*.sh`.
+- **Where they live:** `/opt/usr/home/owner/.config/systemd/user`, label `User::Home`.
+- **Control:** use `DBUS_SESSION_BUS_ADDRESS=kernel:path=/sys/fs/kdbus/5001-user/bus XDG_RUNTIME_DIR=/run/user/5001
+  systemctl --user`.
+- **Syntax check:** `sh -n < file`. The TV blocks `sh -n file`.
 
 ## Pi side (pi/)
 
-`s90d_drift_check.py` + `s90d_expected.json` (set `tv`): weekly read-only check of firmware, Home/startup apps,
-vendor markers, disabled apps, update settings, the SilentGlass DLL hash, boot units and recognition. Prints nothing when all is well
-(cron watchdog pattern); reports only after 3 consecutive unreachable runs.
+- **`s90d_drift_check.py`:** a weekly read-only check of firmware, Home, disabled apps, update settings, DLL hash
+  and services. It's silent when all is well.
+- **`thread_dataset.py`:** saves Home Assistant's Thread network to a private file.
+- **`probe_forwarding.py`:** proves with one packet that the TV routes to Thread.
 
-`thread_dataset.py`: saves Home Assistant's preferred Thread dataset to a private file for `otbr-join.sh`.
+## Findings
 
-`probe_forwarding.py`: one-packet proof that LAN -> Thread traffic is routed through the TV (see thread-border-router.md).
-
-## Findings worth knowing
-
-- Settings API takes short menuitem ids from `settings-datafw/jsons/tv/*.json`; long catalog paths do not resolve.
-- `get_source_list()` returns a malloc'd JSON string - bind it as `string` so the marshaller frees it.
-- Google DNS `8.8.8.8` is a connmand fallback; a router "force local DNS" rule redirects it, no TV change needed.
-- Soundbar input flips (TV eARC <-> HDMI 1) when leaving/entering SHIELD are CEC "active source" changes caused by
-  the soundbar pass-through wiring; SHIELD straight into the TV (soundbar on eARC only) avoids them.
+- The settings API takes the short menu ids from `settings-datafw/jsons/tv/*.json`.
+- `get_source_list()` returns a malloc'd string, so bind it as `string`.
+- `8.8.8.8` is a connmand fallback. A router "force local DNS" rule handles it.
+- **Soundbar input flips** (eARC ↔ HDMI 1) when switching to or from the SHIELD are CEC active-source changes.
+  Wiring the SHIELD straight to the TV avoids them.

@@ -1,160 +1,112 @@
 # Home Assistant bridge
 
-`silentglass-ha` puts the TV into Home Assistant as one MQTT-discovered device, with live state and a few controls.
-It is a 23 KB .NET program (`device/ha-bridge/src`, run by the TV's own `dotnet`, about 20 MB RSS) with a minimal
-built-in MQTT 3.1.1 client. It runs as the TV's owner user from a systemd user unit, not as root.
+`silentglass-ha` adds the TV to Home Assistant as one MQTT device, and shows Home Assistant notifications on the
+TV. It's a small .NET service (about 20 MB of memory) that runs as the TV's normal user, not root.
 
 ## What Home Assistant gets
 
 | Entity | What |
 |---|---|
-| `switch.<tv>_power` | on / standby, switched on the TV itself (see Power) |
-| `select.<tv>_input` | the input on screen, by the TV's own input names; choosing one switches to it like a card press |
-| `text.<tv>_hdmi_N_name` | the port's name on the TV (attributes: the HDMI-CEC detected name, connected). Editing it renames the input everywhere: TV menu, SilentGlass Home, this selector. Ports only take a name once a device has been seen on them |
-| `button.<tv>_resync_input_names` | re-scans HDMI-CEC and fixes stale detected names (see below) |
-| `number.<tv>_volume`, `switch.<tv>_mute` | TV master volume (also drives the soundbar over ARC) |
-| `number.<tv>_brightness`, `number.<tv>_contrast` | picture settings (the TV's own ranges, 0-50) |
-| `select.<tv>_picture_mode`, `select.<tv>_sound_mode` | only the modes the TV offers right now (they change with the input and the soundbar) |
-| `select.<tv>_sound_output` | TV Speaker / Soundbar |
-| `select.<tv>_sleep_timer` | |
-| `select.<tv>_game_mode` | Automatic / Always / Never - the TV's one Game Mode setting (Auto / On / Off). Bridge 2.0-2.1 had a switch that drove the value which only mirrors whether Game Mode is engaged |
-| `switch.<tv>_notifications` | banners on the TV (see Notifications); off drops them |
-| `sensor.<tv>_app` | foreground app: SilentGlass Home, Ambient, Samsung Home, or the input's name while watching it (also while SilentGlass only shows a banner over it) |
-| `sensor.<tv>_thread_role` | router / child / leader / detached / off (only if the border router is installed) |
-| `switch.<tv>_thread_border_router` | same as the phone page's switch; survives reboots |
-| `button.<tv>_home`, `button.<tv>_ambient` | open SilentGlass Home / Ambient |
-| `sensor.<tv>_chip_temperature`, `sensor.<tv>_free_memory` | diagnostics |
+| `switch.<tv>_power` | on / standby |
+| `select.<tv>_input` | the input on screen, by the TV's names; pick one to switch |
+| `text.<tv>_hdmi_N_name` | rename an input everywhere (TV menu, SilentGlass, Home Assistant) |
+| `button.<tv>_resync_input_names` | fix stale HDMI-CEC device names |
+| `number.<tv>_volume`, `switch.<tv>_mute` | volume (also drives the soundbar) |
+| `number.<tv>_brightness`, `_contrast` | picture (0-50) |
+| `select.<tv>_picture_mode`, `_sound_mode`, `_sound_output` | only the modes the TV offers right now |
+| `select.<tv>_sleep_timer`, `_game_mode` | Game Mode: Automatic / Always / Never |
+| `switch.<tv>_notifications` | banners on the TV |
+| `sensor.<tv>_app` | what's on screen: an input's name, Ambient, Samsung Home… |
+| `switch.<tv>_thread_border_router`, `sensor.<tv>_thread_role` | where Thread is installed |
+| `button.<tv>_home`, `_ambient` | open SilentGlass or Ambient |
+| `sensor.<tv>_chip_temperature`, `_free_memory` | diagnostics |
 
-The device shows as unavailable only when the TV is unplugged or rebooting (retained MQTT last will).
+The device shows unavailable only while the TV is unplugged or rebooting.
 
 ## Notifications
 
-Home Assistant can show notifications **on the TV itself, over whatever input is on screen** (SHIELD, the Switch,
-an app), as a tvOS-style banner from SilentGlass Home - with the picture (a Frigate snapshot, a doorbell frame), title
-and message. The bridge speaks the protocol of the *Notifications for Android TV* app, so the TV is added with Home
-Assistant's built-in integration and every existing automation works unchanged:
+Banners over any input, with a picture, title and message.
 
 <p><img src="../../docs/screenshots/s90d-notice.jpg" width="49%" alt="A doorbell notification with its picture">
 <img src="../../docs/screenshots/s90d-notice-transparent.jpg" width="49%" alt="The same card at 50% transparency"></p>
 
-1. Settings > Devices & services > Add integration > **Notifications for Android TV / Fire TV**, host = the TV's
-   address. This makes a `notify.android_tv_fire_tv_<address>` action (and a notify entity).
-2. Use it directly, or put it in a notify group (`platform: group`) that your automations already target - e.g. the
-   SgtBatten Frigate blueprint's *notify group* with its TV options (`tv_position`, `tv_size`, `tv_duration`).
+**Set up:** add Home Assistant's built-in **Notifications for Android TV / Fire TV** integration with the TV's
+address. Existing automations and blueprints work unchanged, through `notify.send_message`, `notify.<name>` or a
+notify group.
 
-What is honoured: `title`, `message`, `data.image` (URL or path; Home Assistant downloads it and sends the bytes - JPEG,
-PNG, GIF, WebP), `data.duration` (seconds, 3-60 on screen), `data.position` (bottom-right, bottom-left, top-right,
-top-left, center), `data.fontsize` (small / medium / large / max = the banner width) and `data.transparency` (0%, 25%,
-50%; the whole banner, picture included; 75% and 100% count as 50% so it stays readable). `color` and `interrupt` are
-accepted and ignored: the banner never takes the remote.
+**Options:**
+- `image`: a URL or file (JPEG, PNG, WebP, or an animated GIF);
+- `duration`: 3-60 s;
+- `position`: bottom-right, bottom-left, top-right, top-left or center;
+- `fontsize`: small, medium, large or max;
+- `transparency`: 0, 25 or 50%, for the whole card, picture included.
 
-Rules:
-- **Never wakes the TV.** In standby a notification is dropped (Home Assistant still gets *OK*); so is one while
-  Ambient is up, or while `switch.<tv>_notifications` is off.
-- A newer notification replaces the one on screen. With the same title while that one is fully shown, it refreshes in
-  place (no second pop-up): send a camera alert at once, then again a few seconds later with the longer clip. Animated
-  GIFs play, e.g. Frigate's `/api/frigate/notifications/<review id>/review_preview.gif`. (The SgtBatten blueprint
-  sends TVs a still of the review's first object instead.)
-- Accepted only from the MQTT broker's host (normally Home Assistant's machine) and the addresses in `notify_from=`
-  of `silentglass-ha.conf`; anything else is refused. Port 7676, one request per connection, at most 12 MB.
-- The banner is SilentGlass's own small notification-level window that never takes focus; the video is not touched.
+`color` and `interrupt` are ignored.
 
-How it travels: the bridge writes the image and `notice.json` into SilentGlass Home's data folder (the app's own
-SMACK label, so the app may read them); the running app picks it up at once with a file watcher and deletes it as the
-acknowledgement. SilentGlass is closed whenever the TV goes to standby, so the first notification after power-on
-finds it not running: the bridge then starts it with `quiet_notice=1`, and it starts **hidden** (no flash, the viewer
-stays in front, ~1 s later the banner appears). It is only started like that over the TV viewer (inputs); over another
-app it would push that app to the background, so the notification is dropped there instead and logged.
-
-Checked on the TV: dropped in standby (no wake); shown on a cold start (SilentGlass started hidden) and from the
-watcher; remote focus stayed on the viewer (`enlightenment_info -topvwins` Foc column), the HDMI signal never dropped,
-and Home still opened the bar afterwards. Off the TV, `tests/test_s90d_notice.py` runs Home Assistant's own client
-library (notifications-android-tv 0.1.5) against the bridge's request reader and parser (`tests/notice-harness`).
-
-## Input names
-
-Each port has two names on the TV: the one you set (`editName`, TV menu or Home Assistant) and the one the device
-announced over HDMI-CEC (`detectedName`). Everything shows the set name, else the detected one, else "HDMI n";
-nothing is hard-coded. Detected names go stale: the TV keeps the last device it saw on a port (HDMI 1 said
-"PlayStation 5" long after the Switch replaced it), and a device behind a soundbar shows up as the soundbar.
-
-**Resync input names** asks the TV for a fresh HDMI-CEC device search (20 s), then sets each port's detected name to
-what answers on it now. With the TV on, ports where nothing answers are cleared; in standby (devices asleep) names
-are only learned, never cleared. The TV resets a port's own name when its detected name changes, so the bridge puts
-it back. Details: the names live in "activity index" -2 (Samsung's default; index 0 is a separate, unused slot), and
-the source library only refreshes its cached list from D-Bus signals, so the bridge runs a GLib loop for them.
-
-## Power
-
-The bridge presses Power through its own virtual key: a `/dev/uinput` device ("SilentGlass power key") that can only
-send KEY_POWER. That is how Samsung's own remote server (`msf-server`, via `libautoinput`) sends remote keys, and
-`/dev/uinput` is open to the owner user on this TV, so no root and nothing in Home Assistant is needed. Power is a
-toggle, so the bridge only presses it when the TV is not already in the requested state. It wakes the TV from
-standby and puts it into standby.
-
-Ruled out on the way: deviced's `device_power_set_state(Normal)` and D-Bus `ChangePowerState`/`changestate` return
--22 even as root (wake is event-driven, not a settable state), `device_power_wakeup` is not supported, `input_keyevent`
-is root-only, and the TV's remote WebSocket ignores clients on 127.0.0.1.
-
-## How it works
-
-- Power, input and the app in front are sent when they change: vconf change notifications on `memory/pm/state`
-  (4 = standby), `memory/eden/source/current_source` (`SOURCE_TYPE_HDMIn`) and
-  `memory/appfw/current_fullscreen_appid`, plus the source library's list-changed callback. Volume, mute, input
-  names (`get_source_list`) and SilentGlass's own state (`/tmp/silentglass-state.txt`) are checked every 10 s
-  (`update=` 2, 5, 10, 30 or 60; Advanced settings › Home Assistant). Temperature, memory, the Thread role
-  (`ot-ctl state`) and the picture settings every minute; the picture/sound mode lists take dozens of settings calls,
-  so they are never part of the frequent check. Only changes are published (retained), plus a full refresh every
-  5 minutes and whenever Home Assistant restarts (`homeassistant/status`).
-- Notifications: the owner's settings (`notify_position`, `notify_size`, `notify_duration`, `notify_clear`, `notify_images`,
-  `notify_quiet`; Advanced settings › Notifications) override what each Home Assistant notification asks for, and
-  quiet hours drop notifications in that window. The page's test button sends one with the page's values.
-- Commands are a fixed list; there is no shell. Input: `launch_app com.samsung.tv.bixby-promotion sg_source <id>`
-  (the launcher only accepts an input it lists). Home / Ambient: `launch_app`. Thread: writes or removes the
-  `thread-off` marker and touches `thread-switch`, exactly like the phone page's switch.
-- Topics: `silentglass/s90d/...`; discovery under `homeassistant/<component>/silentglass_s90d/...`.
+**Rules:**
+- **Never wakes the TV.** Banners are dropped in standby, in Ambient and in quiet hours.
+- **A newer banner replaces the old one.** With the same title it updates in place. So you can send a camera alert at
+  once, then send it again with a better clip. Frigate's `review_preview.gif` animates.
+- **Only trusted senders.** Banners come only from the MQTT broker's machine, plus any addresses in `notify_from`.
+- **The remote stays with the picture.** The banner never takes the remote, and the video is never touched.
+- **Your settings win.** The phone page's position, size, time on screen and transparency override what each
+  notification asks for.
 
 ## Set up from a phone
 
 ![Setup sheet on the TV](../../docs/screenshots/s90d-setup.jpg)
 
-On the TV: **Home > Info > Advanced settings**. A sheet shows a QR code of the address and a 6-digit code; scan it with a phone
-on the same network (or open the address shown), then type the code - the QR never carries it. The page, served by the bridge on port 7680, has:
+On the TV, open **Info › Advanced settings**. Scan the QR code and enter the 6-digit code; the QR never carries the
+code. The page has:
 
-- **Home screen**: the Watch and Play inputs, when the menu closes over a picture, Apps in the bar, when the wallpaper
-  dims, the clock (12-hour / 24-hour / hidden), the wallpaper (follows sunset / day / night) and its location. Written to SilentGlass's own prefs file, which it reloads at once.
-- **Notifications**: on/off, input plugged/unplugged alerts, and extra addresses allowed to send them (`notify_from`) if Home Assistant doesn't run
-  on the broker's host.
-- **Thread border router** (where installed): on/off (the same switch as in Home Assistant), and its network: keep
-  it, read Home Assistant's preferred network once (address + a long-lived token; the token is used for that one
-  request and not stored), or paste a dataset. The dataset is applied as the owner user with `ot-ctl`, with Thread
-  stopped first so nothing is pushed to the rest of the mesh.
-- **Home Assistant**: MQTT server, port, username, password, with a **Test connection** button. The password is never
-  sent back to the phone; leave it empty to keep the current one. Info on the TV shows its status.
-- **This TV**: the TV's own name (Settings › General › System Manager › Device Name), which Home Assistant, phones,
-  SmartThings and Bluetooth show. Saving a new one renames the TV the way Samsung's Device Name screen does (one
-  write of `db/menu/network/devicename/tv_name`); Home Assistant's device follows a rename made either way. New
-  installs get entity ids from it (`living_room_tv_power`); existing entities keep theirs. The model comes from the
-  TV. The network hostname ("Samsung") is fixed in the firmware and not changed.
+- **Home screen:** Watch/Play inputs, menu close time, Apps in the bar, wallpaper dim and clock, wallpaper and its
+  location;
+- **Notifications:** on/off, input alerts, position, size, time, transparency, pictures, quiet hours, a test button;
+- **Thread border router:** on/off, and its network: keep it, import Home Assistant's, or paste a dataset;
+- **Home Assistant:** MQTT server and login, with **Test connection**. The password is never sent back;
+- **This TV:** the TV's name, as Home Assistant, phones and Bluetooth see it.
 
-Save writes the owner-only config, reconnects, and the sheet on the TV shows the result. The page only works while
-the sheet is open: Back on the TV, 10 minutes, or 8 wrong codes close it. It is plain HTTP on your LAN, like the TV's
-own setup flows; the code keeps others on the network out while it is open.
+The page works only while the sheet is open, for 10 minutes at most. It's plain HTTP on your network, and the code
+keeps everyone else out.
 
 ![The phone page: home screen, notifications, Home Assistant](../../docs/screenshots/s90d-phone-settings.jpg)
 
 ## Install
 
-1. On the TV, as root, with the release bundle staged as `quiet-tizen/package.tar.gz`:
-   `/bin/sh -s -- bridge < device/install.sh` (updates later come with the launcher; see
-   [install](../../docs/install.md#updating)). The bridge starts unconfigured (Info shows *Set up*).
-2. Set it up from a phone (above). By hand instead: copy `/opt/usr/home/owner/.config/silentglass-ha.conf.example`
-   to `silentglass-ha.conf` (owner, mode 600, same SMACK label as the home directory), fill in the broker and
-   restart the unit.
-3. The device appears in Home Assistant under Settings > Devices (MQTT).
+1. With the bundle copied to the TV as `quiet-tizen/package.tar.gz`: `/bin/sh -s -- bridge < device/install.sh`.
+   Later updates come with the launcher ([updating](../../docs/install.md#updating)).
+2. Set it up from a phone (above). To set it up by hand instead, copy `silentglass-ha.conf.example` to
+   `silentglass-ha.conf` in the owner's `.config`.
+3. The TV appears in Home Assistant under Settings › Devices.
 
-The credentials live only in that file on the TV, never in the repo. A broker user limited to `silentglass/#` and
-`homeassistant/+/silentglass_s90d/#` is the tidy choice; a shared house user works too.
+- The MQTT login is stored only on the TV, readable only by its owner.
+- A broker user limited to `silentglass/#` and `homeassistant/+/silentglass_s90d/#` is the tidy choice.
+- **Remove:** `ha-bridge-restore.sh`, then delete the device in Home Assistant.
 
-Remove: `ha-bridge-restore.sh` (then delete the device in Home Assistant to clear the retained discovery topics).
-Log (events only): `/run/user/5001/silentglass-ha.log`; status for Info: the launcher's `data/bridge-status.txt`.
+## How it works (for developers)
+
+- **Updates:** power, input and app changes come from vconf notifications (`memory/pm/state`,
+  `memory/eden/source/current_source`, `memory/appfw/current_fullscreen_appid`). Volume and names are checked every
+  10 s (the `update=` setting), and temperature and picture settings every minute. Only changes are published, plus
+  a full refresh every 5 min.
+- **Power:** pressed through the bridge's own `/dev/uinput` device, which can only send KEY_POWER. Samsung's remote
+  server sends keys the same way, and the owner user may open it. What doesn't work:
+  - `device_power_set_state`, `ChangePowerState` and `changestate` return -22 even as root;
+  - `input_keyevent` is root-only;
+  - the remote WebSocket ignores 127.0.0.1.
+- **Notifications:** the bridge speaks the *Notifications for Android TV* protocol on port 7676 (at most 12 MB per
+  request).
+  - It writes `notice.json` and the picture into SilentGlass's data folder, and SilentGlass shows them in its own
+    window, which never takes focus.
+  - If SilentGlass isn't running, the bridge starts it hidden with `sg_notice=1`, but only over an input. Over
+    another app the banner is dropped.
+  - `tests/test_s90d_notice.py` runs Home Assistant's own client library against it.
+- **Input names:**
+  - Each port has the name you set and the name its device announced over HDMI-CEC.
+  - The TV keeps a stale announced name after the device is gone, and a device behind a soundbar shows as the
+    soundbar.
+  - Resync runs a 20 s CEC search, then puts back your own name, which the TV resets.
+  - The names live in activity index -2.
+- **Commands** are a fixed list with no shell. To switch inputs it launches SilentGlass with `sg_source`.
+- **Topics:** `silentglass/s90d/...`. Discovery is under `homeassistant/<component>/silentglass_s90d/...`.
+- **Log:** `/run/user/5001/silentglass-ha.log`.
