@@ -245,6 +245,26 @@ are ordinary optional features rather than trackers.
   keyboard focus; the keypad directions still worked. Yielding focus while the native menu is open fixed it. Not
   seen on the S90D, where SilentGlass only holds focus while its own overlay is up.
 
+## PiP and Multi View (S90D)
+
+Investigated on QN65S90DAFXZA, Tizen 9, firmware `T-PTMDAKUC-0090-REL-202605141701`.
+[Multi View research](multiview-pip.md) records the capability keys, component paths, launch JSON, focus/exit
+requests, native status/audio APIs and the eight tested layouts.
+
+- Firmware exposes one simultaneous HDMI receiver; two HDMI sources are not supported by the inspected stack.
+- An owner-session app-control request with `LaunchBy=ExternalLaunch` and JSON `LaunchData` selects a layout.
+  `MVSetupApp` from the temporary process fell back to default split.
+- Four PiP corners, equal/unequal splits and HDMI as inset passed geometry + hardware video-plane checks.
+  The second pane was an unconnected mobile placeholder, not a second live video.
+- Replacing an active composition by resending a preset was ignored; the tested route exits/re-enters and
+  resynchronizes HDMI. Launching `org.tizen.tv-viewer` restores normal viewing.
+- State keys `memory/multiscreen/info` and `memory/multiscreen/state` are readable, but legacy style labels
+  do not identify the PiP corner. Cross-check virtual-screen geometry and the `VD` plane.
+- Native status/callback and per-zone audio calls were not fully usable in the temporary probe. This is an
+  unresolved access/initialization boundary, not a confirmed cause of stock Multi View bugs.
+- No replacement PiP UI is shipped. Live dual-source playback, custom camera sources, audio routing and smooth
+  layout changes need separate validation.
+
 ## Security boundaries seen
 
 - **SMACK:** other apps' `/proc` and vendor marker files are unreadable to an app. Show "unknown" rather than

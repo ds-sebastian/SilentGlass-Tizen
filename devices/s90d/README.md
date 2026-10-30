@@ -132,6 +132,9 @@ Each has its own undo script in `device/`.
 
 ## Findings
 
+- **PiP / Multi View research:** [capabilities, APIs and tested layouts](../../docs/multiview-pip.md).
+  Eight layouts passed geometry/video-plane checks; one HDMI source at a time. This is research, not an installed
+  SilentGlass feature; live second-source playback and audio routing remain unverified.
 - The settings API takes the short menu ids from `settings-datafw/jsons/tv/*.json`.
 - `get_source_list()` returns a malloc'd string, so bind it as `string`.
 - `8.8.8.8` is a connmand fallback. A router "force local DNS" rule handles it.
