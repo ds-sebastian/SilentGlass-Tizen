@@ -19,6 +19,7 @@ echo "up=$(cut -d. -f1 /proc/uptime)"
 echo "build=$(sed -n 's/^Build=//p' /etc/prd_info.ini 2>/dev/null | cut -d';' -f1)"
 echo "home=$(buxton2ctl get system db/appfw/home_appid | sed 's/.*= String: //')"
 echo "startup=$(buxton2ctl get system db/appfw/startup_appid | sed 's/.*= String: //')"
+echo "epgop=$(sqlite3 -readonly /opt/dbspace/user/5001/.appsvc.db "select pkg_name from appsvc where operation='http://samsung.com/tv/appcontrol/operation/epg';")"
 echo "markers=$(ls /opt/usr/share/systemd/system 2>/dev/null | sort | tr '\\n' ',')"
 DB=/opt/dbspace/.pkgmgr_parser.db
 for a in {ids}; do echo "app $a $(sqlite3 -readonly $DB "select app_disable from package_app_info where app_id='$a';")"; done
@@ -67,6 +68,7 @@ if kv.get("build") != EXP["build"]:
     problems.append(f"Firmware changed: {kv.get('build')} (was {EXP['build']}) - re-check everything below")
 want(kv.get("home") == EXP["home_appid"], f"Home button no longer opens Quiet Home (home_appid={kv.get('home')})")
 want(kv.get("startup") == EXP["startup_appid"], f"Power-on app changed (startup_appid={kv.get('startup')})")
+want(kv.get("epgop") == EXP.get("epg_operation_app", kv.get("epgop")), f"Guide button goes to Samsung's guide again (operation/epg={kv.get('epgop')}); see docs/samsung-tizen-notes.md (Guide key)")
 have = set(filter(None, kv.get("markers", "").split(",")))
 missing = sorted(set(EXP["markers"]) - have)
 want(not missing, f"Vendor blocks missing: {', '.join(missing)}")

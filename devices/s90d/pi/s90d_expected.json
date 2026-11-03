@@ -67,5 +67,6 @@
     "db/built-in-app-upgrader/server_upgrade": "False",
     "db/menu/support/softwareupdate/autoupdate": "0",
     "db/SyncML/ivi-oma-dm-service/software-update/autoupdate/setting": "0"
-  }
+  },
+  "epg_operation_app": "com.samsung.tv.bixby-promotion"
 }

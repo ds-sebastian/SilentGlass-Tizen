@@ -62,6 +62,17 @@ are ordinary optional features rather than trackers.
   `key_filter` or `hotkey-service`. Disabling the target app does not disable its button: the launch hangs, and with
   TV Plus disabled its button froze the remote, Home included, for about 30 s. An exclusive key grab
   (`KeyGrabUtilVd`, from an app holding the keygrab privilege) can take a button over. Not checked on the S90D.
+- **Guide key** (S90D, T-PTMDAKUC-0090; `KeyHandlerProduct::OnEpgKeyPressed` in `libapp-context-manager.so`):
+  - Pushing the CH rocker in sends `XF86ChannelGuide`.
+  - Kids mode (`db/cnmedia/kids_mode`) → "not available". Otherwise the event `key.epg` launches the app-control
+    operation `http://samsung.com/tv/appcontrol/operation/epg`.
+  - That operation's handler is the per-user default in `/opt/dbspace/user/5001/.appsvc.db` (`org.tizen.epg` by
+    default), the same table as Home's `operation/main`. Set it with `app_operation_set_current_app` (as for Home).
+  - Disabling `org.tizen.epg` instead freezes the remote for ~30 s.
+  - Pointed at SilentGlass, the guide key arrives as a launch with `called_app` and a constant start-time stamp.
+    The duplicate filter drops it, so the key does nothing.
+  - The TV Plus button is different: `ContextProduct::ProcessTvplus` calls `VirtualChannelsAPI->LaunchTVPlusHomeScreen()`
+    directly, so no default-app setting reaches it.
 
 ## Stopping vendor services
 
