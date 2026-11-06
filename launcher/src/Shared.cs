@@ -8,7 +8,7 @@ using System.Text.Json;
 public static class Shared
 {
     // the one version of the whole thing: Info, the bridge (Home Assistant sw_version), the release and install.sh
-    public const string Version = "1.2.0";
+    public const string Version = "1.3.0";
     public const string Self = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", SamsungHome = "com.samsung.tv.csfs", Art = "org.tizen.art-app";
     public static bool IsAmbient(string id) => id is Art or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
 
@@ -22,9 +22,34 @@ public static class Shared
         BridgeStatus = "bridge-status.txt",                       // bridge -> Info, rewritten every minute
         PrefsFile = "silentglass-prefs.txt", LocationFile = "location.txt", // SilentGlass's settings; the phone page edits them too
         NotifyOff = "notify-off", ThreadOff = "thread-off",       // switches: present = off
+        InternetOff = "internet-off", InternetController = "internet-controller", InternetState = "internet-state.txt",
         ThreadSwitch = "thread-switch";                           // touched to apply ThreadOff now (quiet-otbr-switch.path)
     public const string StateFile = "/tmp/silentglass-state.txt";  // SilentGlass's state (ui=, backdrop=, fg=, ...), read by the bridge
     public const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";  // the border router is installed
+
+    public const int InternetFreshSeconds = 1200;  // the paired controller re-checks a block every 10 min
+    public static bool InternetInstalled(string data) => System.IO.File.Exists(data + "/" + InternetController);
+    public static bool InternetWanted(string data) => !System.IO.File.Exists(data + "/" + InternetOff);
+    public static void SetInternet(string data, bool on)
+    {
+        if (on) System.IO.File.Delete(data + "/" + InternetOff);
+        else System.IO.File.WriteAllText(data + "/" + InternetOff, "");
+    }
+    public static string BootId() { try { return System.IO.File.ReadAllText("/proc/sys/kernel/random/boot_id").Trim(); } catch { return ""; } }
+    public static double Uptime() { try { return double.Parse(System.IO.File.ReadAllText("/proc/uptime").Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture); } catch { return -1; } }
+    // Confirmed filter state, not proof of Internet reachability. A stale/previous-boot check is never "blocked".
+    public static string InternetStatus(string data)
+    {
+        try {
+            var s = ParseConf(System.IO.File.ReadAllText(data + "/" + InternetState));
+            if (s.GetValueOrDefault("boot") != BootId() || !double.TryParse(s.GetValueOrDefault("up"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double up) || Uptime() - up < 0) return "Unverified";
+            string actual = s.GetValueOrDefault("internet", "error"), wanted = InternetWanted(data) ? "on" : "off";
+            if (actual == "error") return "Error";
+            if (actual != wanted) return "Applying";
+            if (actual == "on") return "Allowed";  // only our own job adds the rules
+            return Uptime() - up <= InternetFreshSeconds ? "Blocked" : "Unverified";
+        } catch { return "Unverified"; }
+    }
 
     // the TV's one Game Mode setting (Off / On / Auto) in plain words
     public static string GameName(string tvName) => tvName switch { "Auto" => "Automatic", "On" => "Always", "Off" => "Never", _ => tvName };

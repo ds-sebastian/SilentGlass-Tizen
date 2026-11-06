@@ -100,6 +100,7 @@ Each has its own undo script in `device/`.
 | boot-units/quiet-csfs-off | closes Samsung Home after it idles hidden for 2 min (~100 MB) | csfs-off-restore.sh |
 | ha-bridge | [Home Assistant bridge](ha-bridge.md) | ha-bridge-restore.sh |
 | thread-border-router | [Thread border router](thread-border-router.md) | otbr-restore.sh |
+| internet | [Internet switch](internet.md): marker file + private iptables chains, applied from a paired computer | `firewall.sh allow`, then delete `internet-controller` |
 
 **Lessons from these changes:**
 - **Uninstalled preloads come back.** Prime Video, Apple TV and the browser returned ~3.5 h after being
@@ -151,16 +152,4 @@ Each has its own undo script in `device/`.
   Ambient's own auto-off).
 - **Artwork in My Photos:** public-domain museum scans (16:9, 4K) imported by USB or SmartThings. Direct copy to
   the TV only after one real import shows the `MyPhoto` row format, with a database backup first.
-- **Internet off switch** (exploring): block everything outside the LAN, keep HA/MQTT, Thread, phone page and
-  computer access working.
-  - The TV has `iptables`/`ip6tables` (filter table, OUTPUT policy ACCEPT; Samsung's `STC_OUT`,
-    `DPM-ALLOW` and `DPM-DENY` chains were empty).
-  - IPv4 default route via the router; no global IPv6 route today, but block both.
-  - Root or `CAP_NET_ADMIN` is needed: `stc-iptables` (D-Bus) is root/`network_fw` only. Likely route: an owner unit
-    running a private capability copy of `xtables-multi`, triggered by a marker file (the Thread switch pattern).
-  - Clock sync uses `time.samsungcloudsolution.{com,net}` (vd-net-config), so time drifts while off.
-  - Use REJECT, not DROP, so apps fail fast instead of waiting on timeouts.
-  - Runtime trial (standby, ~11 min, LAN/Thread/multicast allowed): WAN fully blocked, HA bridge, MQTT, Cast LAN
-    and computer access unaffected. CPU 17.8 % → 18.9 %, memory unchanged: no speed gain in standby. Owner-user
-    apps (SmartThings cloud, Cast) retried HTTPS ~3 times a second without backing off; removal restored
-    SmartThings within a minute. Value is privacy and update control, not performance.
+- **Internet switch:** built in 1.3.0, see [internet.md](internet.md).

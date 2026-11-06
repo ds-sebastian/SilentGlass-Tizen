@@ -22,6 +22,8 @@ Tested on one TV: Samsung **QN65S90D** (2024 OLED), firmware `T-PTMDAKUC-0090-RE
   standby.
 - **Privacy.** Content recognition (ACR), Bixby and other voice assistants, ad targeting and recommendations are
   off. HDMI, eARC, Ambient/Art, AirPlay and phone power-on still work.
+- **Internet kill switch (optional).** Blocks the TV's Internet traffic and updates while the home network, Home
+  Assistant and Thread keep working. Needs an always-on computer on the LAN; see [Internet switch](devices/s90d/internet.md).
 - **Set up from your phone.** Scan a QR code on the TV. No app needed.
 
 ![Controls over the picture](docs/screenshots/s90d-overlay-controls.jpg)
@@ -43,6 +45,7 @@ Tested on one TV: Samsung **QN65S90D** (2024 OLED), firmware `T-PTMDAKUC-0090-RE
 | Home does nothing | Possible after a bad update; the TV still turns on to the last input | `undo.sh`, or back to Samsung Home |
 | Thread or SmartThings stops | Possible after the radio flash; nothing else is affected | flash again with Samsung's tool |
 | No security updates | Certain: automatic updates are off so they can't remove root access | install updates yourself |
+| Internet switch leaks after a reboot | Certain until the paired computer reapplies it (about a minute after the bridge reconnects); not a router firewall | block the TV at the router for a hard guarantee |
 | Warranty | Samsung may refuse service on a modified TV | — |
 
 - Every undo needs root, from [s90c-tools](https://github.com/invaliddayta/s90c-tools)' `tv-access` (Developer
@@ -60,6 +63,8 @@ Tested on one TV: Samsung **QN65S90D** (2024 OLED), firmware `T-PTMDAKUC-0090-RE
   - `quiet-recog-off`: stops content recognition when Samsung restarts it;
   - `quiet-csfs-off`: closes Samsung Home when it idles hidden in the background (~100 MB);
   - `quiet-otbr-*`: the Thread border router.
+- **Optional Internet switch:** two private firewall chains (`SG_WAN_OUT`, `SG_WAN_IN`), added only while the
+  switch is off, by a controller on a paired computer. Samsung's own chains are never edited.
 - **One-time settings:** apps disabled, automatic updates off, Multi View not preloaded, and the Thread radio
   switched to Samsung's hub firmware.
 

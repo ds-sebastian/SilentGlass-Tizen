@@ -6,6 +6,11 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.3.0** (installed on the TV 2026-11-06): optional Internet switch. Info › Internet access, the phone
+  page (Privacy and updates) and Home Assistant (`switch.*_internet_access`, `sensor.*_internet_filter`) set a marker
+  file; a controller on a paired computer applies two private iptables/ip6tables chains through `tv-access` and writes
+  a boot-bound confirmation. Status shows Blocked only for a check from this boot within 20 min. LAN, link-local,
+  ULA/Thread and multicast stay open. Not fail-closed at boot. Tests: `tests/test_internet.py`.
 - **SilentGlass 1.2.0** (one version for the launcher and the bridge; was launcher v43e + bridge 2.8.3; installed on
   the TV 2026-10-29 with the new installer): one release bundle (`silentglass-<version>.tar.gz`: launcher + bridge)
   and one `device/install.sh` that installs or updates both, from any SilentGlass version. It lists the sha256 of

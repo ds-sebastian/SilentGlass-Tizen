@@ -8,7 +8,7 @@
 # /opt/usr/share/quiet-tizen-backups/silentglass-<version>-<time>/. Undo: /bin/sh -s -- <that folder's name> < undo.sh
 # The bridge's settings (silentglass-ha.conf) are never touched.
 set -eu
-VER=1.2.0
+VER=1.3.0
 P=${SILENTGLASS_TEST_ROOT:-}   # tests only: a fake TV under this folder; empty on the TV
 S=$P/home/owner/share/tmp/sdk_tools/quiet-tizen
 A=$P/opt/usr/apps/com.samsung.tv.bixby-promotion; LBL=User::Pkg::com.samsung.tv.bixby-promotion::RO
@@ -33,10 +33,10 @@ BK=$B/silentglass-$VER-$(date +%Y%m%dT%H%M%S)
 mkdir -p "$B"; mkdir -m 700 "$BK"; mkdir "$BK/stage"
 [ "$(stat -c %d "$A/res" 2>/dev/null || stat -c %d "$B")" = "$(stat -c %d "$B")" ] || { echo 'backup is on another filesystem; mv would not keep labels - refusing'; exit 7; }
 cat > "$BK/files.sha256" <<'SUMS'
-d32662e486d01570ab801ff2522399702c42f9e8418765ebe26cdb86d442f608  BixbyPromotion.dll
+f0fde1de3b66dc4f423acedc79233e1352751dbfa5d0e651398d4e1fde9509e6  BixbyPromotion.dll
 13e781d4e1f13494233e000124102caad8c9a5bb41bc244517f3bdcaea5ad730  Probe.dll
 530d94cae62b04c4677ff4a6549f72b84c13115b13e16283fc2197a56442a275  bridge/silentglass-ha.conf.example
-4647c9007b43c4dfe3ac2ded2f39ad245204940bd8b646e1f2bbd292be82ef93  bridge/silentglass-ha.dll
+7f599c5494c18b8b820a09058d9cb3ec469764fc6f0164431a323b20dd07899e  bridge/silentglass-ha.dll
 a0882085ebc8618322fb819cc0e92bac0499419af91124d05f6d27662818ea83  bridge/silentglass-ha.runtimeconfig.json
 439b5d9d79665666e981a80dfe2450325464f996a2fddff48a9efef6627a7c42  bridge/silentglass-ha.service
 236ead33439cced94720eb7a4e89afcc2dfeecf4b72de0dae3a97b024e700538  quiet-home/apps.json

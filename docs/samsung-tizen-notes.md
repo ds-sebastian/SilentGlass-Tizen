@@ -302,6 +302,11 @@ Checked read-only on QN65S90DAFXZA, firmware `T-PTMDAKUC-0090-REL-202605141701`.
   stdin works.
 - **Native images:** a stale `.native_image` cache next to an app's DLL keeps running the old assembly. Move it
   aside when replacing the DLL.
+- **UEP also covers copied binaries:** a `cp -a` copy of `/usr/sbin/xtables-multi` (vendor file caps
+  `cap_net_admin,cap_net_raw=ei`) with `setcap ...=ep` is refused at exec for every label
+  (`[Verification fail] file ... is not signed`, EPERM). The working Thread `otbr-agent` copy predates this
+  check or carries a signature this copy lost; don't count on the cap-copy route for new tools. Owner units
+  therefore can't change iptables; `stc-iptables` (D-Bus) only answers root/`network_fw`.
 - **Root:** root obtained through the SDK route is still constrained by SMACK and UEP. Nothing here unlocks secure
   boot or installs a permanent root service.
 

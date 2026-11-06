@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEV = ROOT / "devices/s90d/device"
 sys.path.insert(0, str(ROOT / "tools"))
 import bundle  # noqa: E402
+VERSION = bundle.version()
 
 STUBS = {
     "id": "echo 0",
@@ -84,18 +85,18 @@ class InstallUndo(unittest.TestCase):
 
     def test_update_then_already_current_then_undo(self):
         rc, out = self.run_sh(self.installer)  # default: launcher + the bridge that is installed
-        self.assertEqual(rc, 0, out); self.assertIn("SILENTGLASS 1.2.0 INSTALLED", out)
+        self.assertEqual(rc, 0, out); self.assertIn(f"SILENTGLASS {VERSION} INSTALLED", out)
         self.assertEqual((self.app / "bin/BixbyPromotion.dll").read_bytes(), b"MZ new SilentGlass build")
         self.assertEqual(sorted(p.name for p in (self.app / "res/quiet-home").iterdir()), ["apps.json", "sym-new.svg"])
         self.assertEqual((self.q / "silentglass-ha.dll").read_bytes(), b"new bridge")
         self.assertIn("ExecStart=", (self.ud / "silentglass-ha.service").read_text())
         self.assertEqual(self.conf.read_text(), "host=broker\npassword=secret\n")  # settings never touched
         self.assertFalse((self.stage / "package.tar.gz").exists())
-        name = re.search(r"undo: /bin/sh -s -- (silentglass-1\.2\.0-\d{8}T\d{6})", out).group(1)
+        name = re.search(rf"undo: /bin/sh -s -- (silentglass-{re.escape(VERSION)}-\d{{8}}T\d{{6}})", out).group(1)
         installed = self.now()
         # the same bundle again changes nothing and leaves no backup folder behind
         rc, out = self.run_sh(self.installer)
-        self.assertEqual(rc, 0, out); self.assertIn("launcher: already 1.2.0", out); self.assertIn("bridge: already 1.2.0", out)
+        self.assertEqual(rc, 0, out); self.assertIn(f"launcher: already {VERSION}", out); self.assertIn(f"bridge: already {VERSION}", out)
         self.assertIn("nothing to change", out); self.assertEqual(self.now(), installed)
         self.assertEqual(sorted(p.name for p in self.backups.iterdir()), [name])
         # undo puts back exactly what was there
@@ -110,12 +111,12 @@ class InstallUndo(unittest.TestCase):
         shutil.rmtree(self.q); (self.ud / "silentglass-ha.service").unlink(); self.before = self.now()
         rc, out = self.run_sh(self.installer)  # default: no bridge installed -> launcher only
         self.assertEqual(rc, 0, out); self.assertFalse(self.q.exists())
-        name1 = re.search(r"-- (silentglass-1\.2\.0-\d{8}T\d{6})", out).group(1)
+        name1 = re.search(rf"-- (silentglass-{re.escape(VERSION)}-\d{{8}}T\d{{6}})", out).group(1)
         rc, out = self.run_sh(self.installer, "all")
-        self.assertEqual(rc, 0, out); self.assertIn("launcher: already 1.2.0", out)
+        self.assertEqual(rc, 0, out); self.assertIn(f"launcher: already {VERSION}", out)
         self.assertEqual((self.q / "silentglass-ha.dll").read_bytes(), b"new bridge")
         self.assertTrue((self.ud / "default.target.wants/silentglass-ha.service").is_symlink())
-        name2 = re.search(r"-- (silentglass-1\.2\.0-\d{8}T\d{6})", out).group(1)
+        name2 = re.search(rf"-- (silentglass-{re.escape(VERSION)}-\d{{8}}T\d{{6}})", out).group(1)
         rc, out = self.run_sh(DEV / "undo.sh", name2, stage=False)
         self.assertEqual(rc, 0, out); self.assertIn("bridge: removed", out)
         self.assertFalse((self.q / "silentglass-ha.dll").exists()); self.assertFalse((self.ud / "silentglass-ha.service").exists())
@@ -129,7 +130,7 @@ class InstallUndo(unittest.TestCase):
         (work / "bridge/silentglass-ha.dll").write_bytes(b"tampered")
         subprocess.run(["tar", "-czf", str(self.bundle), "-C", str(work), "."], check=True)
         rc, out = self.run_sh(self.installer, "all")
-        self.assertNotEqual(rc, 0); self.assertIn("is not SilentGlass 1.2.0 - refusing (nothing changed)", out)
+        self.assertNotEqual(rc, 0); self.assertIn(f"is not SilentGlass {VERSION} - refusing (nothing changed)", out)
         self.assertEqual(self.now(), self.before); self.assertEqual(list(self.backups.iterdir()), [])
         # not a SilentGlass install (Samsung's own app): the first install is a separate, manual step
         (self.app / "bin/BixbyPromotion.dll").write_bytes(b"MZ Samsung original"); shutil.rmtree(self.app / "res/quiet-home")
@@ -142,7 +143,7 @@ class InstallUndo(unittest.TestCase):
 
     def test_undo_refuses_when_the_launcher_changed_since(self):
         rc, out = self.run_sh(self.installer)
-        name = re.search(r"-- (silentglass-1\.2\.0-\d{8}T\d{6})", out).group(1)
+        name = re.search(rf"-- (silentglass-{re.escape(VERSION)}-\d{{8}}T\d{{6}})", out).group(1)
         (self.app / "bin/BixbyPromotion.dll").write_bytes(b"MZ another SilentGlass build")
         before = self.now()
         rc, out = self.run_sh(DEV / "undo.sh", name, stage=False)

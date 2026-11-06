@@ -94,6 +94,15 @@ body.locked main,body.locked #save{display:none}
 </div>
 <p class="foot">Add the TV in Home Assistant with the "Notifications for Android TV" integration. "As sent" keeps what each automation asks for. Transparency covers the whole banner, picture included. Input alerts are the small note when a device is plugged in or unplugged. Pictures are camera snapshots and other images. In quiet hours notifications are dropped, not saved for later. Notifications are accepted from the MQTT server's address and the ones listed here, and never wake the TV. The test uses the settings on this page, before you save.</p>
 
+<div id="internetsec" class="hidden">
+<h2>Privacy and updates</h2>
+<div class="group">
+  <label class="row"><span>Internet access</span><span class="switch"><input type="checkbox" id="ineton"><span></span></span></label>
+  <div class="status"><span class="dot" id="inetdot"></span><span id="inetstate">Unverified</span></div>
+</div>
+<p class="foot">Off blocks the TV's direct Internet connections, including updates. Local notifications, Home Assistant and Thread stay on. The SHIELD is unaffected. Changes and reapplying after a reboot need the paired computer and MQTT; Internet may be open before they reconnect. This is not a speed boost. Status is the last verified filter check, not a connectivity test.</p>
+</div>
+
 <div id="threadsec">
 <h2>Thread border router</h2>
 <div class="group">
@@ -169,6 +178,10 @@ function show(s) {
   fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
   $('apps').checked = !s.hideapps; $('dim').value = s.dim || '5'; $('clock').value = s.clock || '12'; $('inputalerts').checked = s.inputalerts !== false; $('close').value = s.close || '20'; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
   $('thon').checked = s.thread_on;
+  $('internetsec').classList.toggle('hidden', !s.internet_installed);
+  $('ineton').checked = s.internet_on;
+  $('inetstate').textContent = s.internet_status || 'Unverified';
+  dot($('inetdot'), s.internet_status === 'Blocked' ? true : s.internet_status === 'Allowed' ? null : false);
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'],
     connecting: [null, 'Connecting…' + (s.mqtt_error ? ' (last time: ' + s.mqtt_error + ')' : '')] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
   dot($('mqttdot'), m[0]); $('mqttstate').textContent = m[1];
@@ -226,7 +239,7 @@ async function save() {
   if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep network.'); return; }
   if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
   const body = Object.assign(mqttBody(), noticeBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
-    lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
+    internet_on: $('ineton').checked ? 'on' : 'off', lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
     watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').value, close: $('close').value, clock: $('clock').value, inputalerts: $('inputalerts').checked ? '1' : '0', wall,
     thread_on: $('thon').checked ? 'on' : 'off' });
   $('save').disabled = true; $('save').textContent = 'Saving…';

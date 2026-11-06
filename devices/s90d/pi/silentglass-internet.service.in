@@ -1,0 +1,15 @@
+[Unit]
+Description=SilentGlass Internet filter controller (paired TV only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Replace placeholders with absolute paths. Config contains MQTT credentials (chmod 600).
+ExecStart=@PYTHON@ @CONTROLLER@ @CONFIG@
+Restart=on-failure
+RestartSec=15
+UMask=0077
+
+[Install]
+WantedBy=default.target
