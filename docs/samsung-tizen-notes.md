@@ -276,6 +276,24 @@ requests, native status/audio APIs and the eight tested layouts.
 - No replacement PiP UI is shipped. Live dual-source playback, custom camera sources, audio routing and smooth
   layout changes need separate validation.
 
+## Ambient Mode (S90D)
+
+Checked read-only on QN65S90DAFXZA, firmware `T-PTMDAKUC-0090-REL-202605141701`.
+
+- **No Art Mode.** Port 8001 `/api/v2/` reports `FrameTVSupport: false`. The Ambient app (`org.tizen.art-app`) is
+  the same build The Frame/The Wall use, so its resources hold Art Store, collection and subscription strings.
+  This model's switches are off: `ArtAppBasicInfo` has `ArtStoreSupport = none`, `DefaultJsonVersion = AmbientQD_*`.
+- **Content:** catalog in `apps_rw/org.tizen.art-app/data/db/artapp.db` (tables `Category`, `ContentList`,
+  `Content`). Three server categories: featured (8 Samsung/Onformative pieces), cinemagraph (26), Relaxation (9).
+  Decor, Info, Background Theme and My Photos are built in. No painting collections.
+- **My Photos:** the only way to show real artwork. Imports go through Samsung's importer (USB or SmartThings app)
+  into the `MyPhoto` table (~50 columns: paths, image/thumbnail CRC32s, mat, filter). Don't write rows by hand
+  before one real import has shown the format.
+- **No idle trigger.** "Ambient Auto On/Off" is a schedule/light-sensor routine set from SmartThings, not an
+  idle screensaver. The TV can't see idle over a live HDMI picture.
+- **Launch:** `org.tizen.art-app` (SilentGlass Controls → Ambient; HA button). Its Home key hard-codes Samsung
+  Home; SilentGlass catches that and goes to the picture first.
+
 ## Security boundaries seen
 
 - **SMACK:** other apps' `/proc` and vendor marker files are unreadable to an app. Show "unknown" rather than

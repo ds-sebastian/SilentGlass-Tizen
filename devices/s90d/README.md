@@ -140,3 +140,23 @@ Each has its own undo script in `device/`.
 - `8.8.8.8` is a connmand fallback. A router "force local DNS" rule handles it.
 - **Soundbar input flips** (eARC ↔ HDMI 1) when switching to or from the SHIELD are CEC active-source changes.
   Wiring the SHIELD straight to the TV avoids them.
+- **Ambient / Art Mode:** no Art Store on this model; see [Ambient Mode](../../docs/samsung-tizen-notes.md#ambient-mode-s90d).
+
+## Ideas (not built)
+
+- **Ambient on the bar:** move Ambient from Controls onto the bar (Home → arrow → Select), or a phone-page toggle
+  like "Apps in the bar".
+- **Ambient as the no-picture screensaver:** phone-page choice "No picture for N min → Dim / Ambient".
+  Trade-offs: the bridge drops notifications while Ambient is up, and long Ambient sessions add OLED wear (set
+  Ambient's own auto-off).
+- **Artwork in My Photos:** public-domain museum scans (16:9, 4K) imported by USB or SmartThings. Direct copy to
+  the TV only after one real import shows the `MyPhoto` row format, with a database backup first.
+- **Internet off switch** (exploring): block everything outside the LAN, keep HA/MQTT, Thread, phone page and
+  computer access working.
+  - The TV has `iptables`/`ip6tables` (filter table, OUTPUT policy ACCEPT; Samsung's `STC_OUT`,
+    `DPM-ALLOW` and `DPM-DENY` chains were empty).
+  - IPv4 default route via the router; no global IPv6 route today, but block both.
+  - Root or `CAP_NET_ADMIN` is needed: `stc-iptables` (D-Bus) is root/`network_fw` only. Likely route: an owner unit
+    running a private capability copy of `xtables-multi`, triggered by a marker file (the Thread switch pattern).
+  - Clock sync uses `time.samsungcloudsolution.{com,net}` (vd-net-config), so time drifts while off.
+  - Use REJECT, not DROP, so apps fail fast instead of waiting on timeouts.
