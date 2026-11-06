@@ -160,3 +160,7 @@ Each has its own undo script in `device/`.
     running a private capability copy of `xtables-multi`, triggered by a marker file (the Thread switch pattern).
   - Clock sync uses `time.samsungcloudsolution.{com,net}` (vd-net-config), so time drifts while off.
   - Use REJECT, not DROP, so apps fail fast instead of waiting on timeouts.
+  - Runtime trial (standby, ~11 min, LAN/Thread/multicast allowed): WAN fully blocked, HA bridge, MQTT, Cast LAN
+    and computer access unaffected. CPU 17.8 % → 18.9 %, memory unchanged: no speed gain in standby. Owner-user
+    apps (SmartThings cloud, Cast) retried HTTPS ~3 times a second without backing off; removal restored
+    SmartThings within a minute. Value is privacy and update control, not performance.
