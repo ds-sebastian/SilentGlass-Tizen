@@ -100,7 +100,7 @@ body.locked main,body.locked #save{display:none}
   <label class="row"><span>Internet access</span><span class="switch"><input type="checkbox" id="ineton"><span></span></span></label>
   <div class="status"><span class="dot" id="inetdot"></span><span id="inetstate">Unverified</span></div>
 </div>
-<p class="foot">Off blocks the TV's direct Internet connections, including updates. Local notifications, Home Assistant and Thread stay on. The SHIELD is unaffected. Changes and reapplying after a reboot need the paired computer and MQTT; Internet may be open before they reconnect. This is not a speed boost. Status is the last verified filter check, not a connectivity test.</p>
+<p class="foot">Off removes the TV's route to the Internet (its own network settings, no gateway): Samsung's cloud, apps, ads and updates can't connect. The home network, Home Assistant, notifications and Thread keep working, and it holds through restarts. If it ever gets stuck: Settings › General › Network › Network Status › IP Settings › Obtain automatically. A privacy and update switch, not a speed boost.</p>
 </div>
 
 <div id="threadsec">
@@ -181,7 +181,7 @@ function show(s) {
   $('internetsec').classList.toggle('hidden', !s.internet_installed);
   $('ineton').checked = s.internet_on;
   $('inetstate').textContent = s.internet_status || 'Unverified';
-  dot($('inetdot'), s.internet_status === 'Blocked' ? true : s.internet_status === 'Allowed' ? null : false);
+  dot($('inetdot'), s.internet_status === 'Blocked' || s.internet_status === 'Allowed');
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'],
     connecting: [null, 'Connecting…' + (s.mqtt_error ? ' (last time: ' + s.mqtt_error + ')' : '')] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
   dot($('mqttdot'), m[0]); $('mqttstate').textContent = m[1];

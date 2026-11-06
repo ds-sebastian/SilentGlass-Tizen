@@ -171,7 +171,7 @@ static partial class Bridge
             notify_quiet = c.GetValueOrDefault("notify_quiet", ""),
             notifications = NoticesOn, lat = loc.GetValueOrDefault("lat", ""), lon = loc.GetValueOrDefault("lon", ""),
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
-            thread_on = ThreadWanted, internet_installed = Shared.InternetInstalled(Data), internet_on = Shared.InternetWanted(Data), internet_status = Shared.InternetStatus(Data),
+            thread_on = ThreadWanted, internet_installed = true, internet_on = Shared.InternetWanted(Data), internet_status = Shared.InternetStatus(Data),
             // SilentGlass's own settings (the launcher reloads its prefs file when it changes)
             watch = p.GetValueOrDefault("watch", "0"), play = p.GetValueOrDefault("play", "0"), wall = p.GetValueOrDefault("wall", "auto"),
             hideapps = p.GetValueOrDefault("hideapps", "0") == "1", dim = p.GetValueOrDefault("dim", "5") switch { "1" => "5", var d => d }, close = p.GetValueOrDefault("close", "20"),  // dim before v43c: 1 / 0
@@ -300,7 +300,7 @@ static partial class Bridge
                 File.WriteAllText(DataFile(Shared.PrefsFile), string.Concat(p.Select(kv => kv.Key + "=" + kv.Value + "\n")));
             }
         } catch { }
-        if (Shared.InternetInstalled(Data) && internetOn is "on" or "off") Shared.SetInternet(Data, internetOn == "on");
+        if (internetOn is "on" or "off") { Shared.SetInternet(Data, internetOn == "on"); netCheck.Set(); }
         bool threadStarting = false;
         if (ThreadInstalled && threadOn is "on" or "off" && (threadOn == "on") != ThreadWanted) {
             SetThreadSwitch(threadOn == "on"); threadStarting = threadOn == "on";

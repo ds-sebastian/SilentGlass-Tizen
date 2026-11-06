@@ -1,6 +1,6 @@
-# Internet switch (optional)
+# Internet switch
 
-Blocks the TV's Internet traffic: Samsung cloud, SmartThings, ads, analytics and updates. The home network keeps
+Cuts the TV off from the Internet: Samsung cloud, SmartThings, ads, analytics and updates. The home network keeps
 working: Home Assistant, notifications, Thread/Matter, the phone page and computer access. Your streaming box is a
 separate device and isn't affected. It's a **privacy and update kill switch, not a speed boost**: in a standby
 trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 times a second.
@@ -8,41 +8,32 @@ trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 ti
 ## Use it
 - TV: Info › **Internet access**. Phone page: **Privacy and updates**. Home Assistant: the **Internet access**
   switch, with **Internet filter** as its status.
-- Status: **Blocked** (verified this boot, within 20 min), **Allowed**, **Applying**, **Unverified** or **Error**.
-  Only Blocked means the filter was checked.
+- Status, read from the TV's own routes: **Blocked**, **Allowed**, **Applying** (off, but a gateway route is still
+  there), **IPv6 open** (off, but the TV has a public IPv6 address and route) or **No connection**.
+- Stuck? On the TV: Settings › General › Network › Network Status › IP Settings › Obtain automatically.
 
 ## How it works
 1. The switch writes `internet-off` in SilentGlass's data folder (present = off).
-2. The bridge publishes `<boot id>|on/off` over MQTT. That's only a wake-up: the controller never takes commands
-   from MQTT.
-3. `pi/internet_controller.py` (on an always-on computer with `tv-access`) runs the fixed `device/internet/firewall.sh`
-   as root. It reads the marker on the TV, adds or removes the chains, checks every rule in IPv4 and IPv6, and writes
-   `internet-state.txt` (boot id, uptime, result).
-4. While blocked it re-checks every 10 min and repairs drift. A TV reboot (new boot id) triggers a reapply.
+2. The bridge watches that file and asks connman (the TV's network manager) over D-Bus to set the connected network
+   to manual IPv4: **the same address and netmask, no gateway**. The owner user is allowed to do this; it's the same
+   call as Samsung's IP Settings menu. Before the first change it saves what it replaced in `internet-applied.txt`.
+3. Switch on: the bridge puts back exactly what was there (DHCP, or your own manual settings) and deletes the record.
+4. connman saves the setting, so it holds through restarts and power cuts with no gap. The bridge re-checks every
+   minute.
 
-Rules: `SG_WAN_OUT`/`SG_WAN_IN` first in OUTPUT/INPUT. They let through loopback, RFC1918, link-local, multicast and
-broadcast (IPv6: ::1, fe80::/10, fc00::/7, ff00::/8), then REJECT everything else (tcp-reset for TCP, so apps fail
-fast). FORWARD (Thread routing) and Samsung's `STC_*`/`DPM-*` chains are never touched.
+Nothing runs off the TV and nothing runs as root. No firewall rules; Thread forwarding and IPv6 are untouched.
 
 ## Limits
-- **Not fail-closed.** After a TV reboot the Internet is open until the bridge reconnects and the controller
-  reapplies the block (about a minute). It also needs that computer running. For a hard guarantee, block the TV at
-  your router.
-- **Why a computer, not the TV:** an owner service can't change the firewall. A copy of `xtables-multi` with file
-  capabilities is refused at exec by Samsung's signature check (`[Verification fail] ... is not signed`), even with
-  `cp -a`. `stc-iptables` only answers root/`network_fw`.
+- **DHCP lease:** while off, the TV keeps its address but stops renewing the lease. Reserve the TV's address in your
+  router (a fixed IP) so nothing else gets it during a long block.
+- **IPv6:** the home network's IPv6 is local only (ULA/Thread), so there's nothing to block. If your router ever
+  hands out public IPv6, the status shows **IPv6 open**: the TV can reach the Internet over IPv6.
+- Samsung's apps keep trying. They broadcast ARP for Internet addresses that nobody answers: a few small packets a
+  second on the home network.
 - The clock syncs from Samsung (`time.samsungcloudsolution.*`) and drifts slowly while blocked.
-
-## Install
-1. TV (root, stdin): `device/internet/prepare.sh`. It backs up the rule lists and creates the `internet-controller`
-   marker that shows the switch.
-2. Computer: `uv venv && uv pip install paho-mqtt==2.1.0`, write a `chmod 600` JSON config (`host`, `port`, `user`,
-   `password`, `tv_access`, `tv_ip`, `script`), and install `pi/silentglass-internet.service.in` as a user unit.
+- Why not a firewall: the owner user can't change iptables. A copy of `xtables-multi` with file capabilities is
+  refused at exec by Samsung's signature check, and `stc-iptables` only answers root/`network_fw`.
 
 ## Undo
-1. Turn the switch on (or run `firewall.sh allow` as root): our chains are removed.
-2. Stop and disable the controller.
-3. Delete `internet-controller` from the data folder: the switch disappears.
-
-`allow` was run on the TV in the offline tests only; the on/off round trip through the switch ran on the TV on
-2026-11-06.
+Turn the switch on, or use the TV menu above. Removing SilentGlass with the switch off leaves the TV on manual
+IPv4 without a gateway; set it to Obtain automatically in that menu.

@@ -164,28 +164,19 @@ class SetupPageTests(unittest.TestCase):
         self.assertIn(b"Advanced settings", page); self.assertIn(b"z-index:10", page)
         self.assertNotIn(b"location.search", page)  # the code is never read from the address
 
-    def test_internet_marker_and_verified_status(self):
-        (self.data / "internet-controller").touch()
+    def test_internet_switch_follows_the_real_routes(self):
+        # runs on the build machine, which has a default route: on = Allowed, off but still routed = Applying
+        if "00000000" not in "".join(l.split()[1] for l in Path("/proc/net/route").read_text().splitlines()[1:] if l.split()):
+            self.skipTest("no default route on this machine")
         code = self.open_page()
         def state(): return json.loads(self.api("/api/state", code=code)[1])
-        self.assertTrue(state()["internet_installed"])
-        self.assertEqual(state()["internet_status"], "Unverified")
+        self.assertTrue(state()["internet_installed"]); self.assertEqual(state()["internet_status"], "Allowed")
         self.assertFalse(json.loads(self.api("/api/save", {"internet_on": "maybe"}, code)[1])["ok"])
         self.assertTrue(json.loads(self.api("/api/save", {"internet_on": "off"}, code)[1])["ok"])
-        self.assertFalse(state()["internet_on"])
-        boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
-        up = float(Path('/proc/uptime').read_text().split()[0])
-        f = self.data / "internet-state.txt"
-        f.write_text(f'boot={boot}\nup={up}\ninternet=off\n')
-        self.assertEqual(state()["internet_status"], "Blocked")
-        f.write_text(f'boot=previous-boot\nup={up}\ninternet=off\n')
-        self.assertEqual(state()["internet_status"], "Unverified")
-        f.write_text(f'boot={boot}\nup={up-1201}\ninternet=off\n')
-        self.assertEqual(state()["internet_status"], "Unverified")
-        f.write_text(f'boot={boot}\nup={up}\ninternet=on\n')
-        self.assertEqual(state()["internet_status"], "Applying")
+        self.assertTrue((self.data / "internet-off").exists())
+        self.assertEqual((state()["internet_on"], state()["internet_status"]), (False, "Applying"))
         self.assertTrue(json.loads(self.api("/api/save", {"internet_on": "on"}, code)[1])["ok"])
-        self.assertEqual(state()["internet_status"], "Allowed")
+        self.assertFalse((self.data / "internet-off").exists())
 
     def test_new_settings_report_their_own_outcome(self):
         # connected first; then a wrong password must not be reported with the old connection's "Connected"

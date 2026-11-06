@@ -100,7 +100,7 @@ Each has its own undo script in `device/`.
 | boot-units/quiet-csfs-off | closes Samsung Home after it idles hidden for 2 min (~100 MB) | csfs-off-restore.sh |
 | ha-bridge | [Home Assistant bridge](ha-bridge.md) | ha-bridge-restore.sh |
 | thread-border-router | [Thread border router](thread-border-router.md) | otbr-restore.sh |
-| internet | [Internet switch](internet.md): marker file + private iptables chains, applied from a paired computer | `firewall.sh allow`, then delete `internet-controller` |
+| internet | [Internet switch](internet.md): marker file; while off, the TV's IPv4 settings have no gateway | switch on, or TV menu IP Settings › Obtain automatically |
 
 **Lessons from these changes:**
 - **Uninstalled preloads come back.** Prime Video, Apple TV and the browser returned ~3.5 h after being

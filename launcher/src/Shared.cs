@@ -22,33 +22,56 @@ public static class Shared
         BridgeStatus = "bridge-status.txt",                       // bridge -> Info, rewritten every minute
         PrefsFile = "silentglass-prefs.txt", LocationFile = "location.txt", // SilentGlass's settings; the phone page edits them too
         NotifyOff = "notify-off", ThreadOff = "thread-off",       // switches: present = off
-        InternetOff = "internet-off", InternetController = "internet-controller", InternetState = "internet-state.txt",
+        InternetOff = "internet-off", InternetApplied = "internet-applied.txt", // present = off; what the switch replaced
         ThreadSwitch = "thread-switch";                           // touched to apply ThreadOff now (quiet-otbr-switch.path)
     public const string StateFile = "/tmp/silentglass-state.txt";  // SilentGlass's state (ui=, backdrop=, fg=, ...), read by the bridge
     public const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";  // the border router is installed
 
-    public const int InternetFreshSeconds = 1200;  // the paired controller re-checks a block every 10 min
-    public static bool InternetInstalled(string data) => System.IO.File.Exists(data + "/" + InternetController);
+    public const string BridgeUnit = "/opt/usr/home/owner/.config/systemd/user/silentglass-ha.service";  // applies the Internet switch
     public static bool InternetWanted(string data) => !System.IO.File.Exists(data + "/" + InternetOff);
     public static void SetInternet(string data, bool on)
     {
         if (on) System.IO.File.Delete(data + "/" + InternetOff);
         else System.IO.File.WriteAllText(data + "/" + InternetOff, "");
     }
-    public static string BootId() { try { return System.IO.File.ReadAllText("/proc/sys/kernel/random/boot_id").Trim(); } catch { return ""; } }
-    public static double Uptime() { try { return double.Parse(System.IO.File.ReadAllText("/proc/uptime").Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture); } catch { return -1; } }
-    // Confirmed filter state, not proof of Internet reachability. A stale/previous-boot check is never "blocked".
+    // routes to the Internet from the kernel's own tables. Only routes through a gateway count: with the switch off,
+    // connman leaves an on-link "default dev eth0" that can't leave the home network (nothing answers its ARP).
+    public static bool DefaultRoute4(string routeTable)
+    {
+        foreach (var line in (routeTable ?? "").Split('\n')) {
+            var f = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (f.Length > 7 && f[0] != "Iface" && f[0] != "lo" && f[1] == "00000000" && f[7] == "00000000"
+                && int.TryParse(f[3], System.Globalization.NumberStyles.HexNumber, null, out int fl) && (fl & 3) == 3) return true;  // up + gateway
+        }
+        return false;
+    }
+    // IPv6 reaches the Internet only with a gateway route AND a global address (2000::/3); the home network's
+    // ULA/Thread routers advertise routes, but without a public address nothing gets out.
+    public static bool DefaultRoute6(string routeTable, string addresses)
+    {
+        bool global = false;
+        foreach (var line in (addresses ?? "").Split('\n')) {
+            var f = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (f.Length >= 6 && f[5] != "lo" && f[0].Length == 32 && (f[0][0] == '2' || f[0][0] == '3')) global = true;
+        }
+        if (!global) return false;
+        foreach (var line in (routeTable ?? "").Split('\n')) {
+            var f = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (f.Length >= 10 && f[0] == new string('0', 32) && f[1] == "00" && f[9] != "lo"
+                && int.TryParse(f[8], System.Globalization.NumberStyles.HexNumber, null, out int fl) && (fl & 0x200) == 0 && (fl & 3) == 3) return true;
+        }
+        return false;
+    }
+    public static string InternetStatus(bool wanted, string route4, string route6, string addr6)
+    {
+        bool v4 = DefaultRoute4(route4), v6 = DefaultRoute6(route6, addr6);
+        if (wanted) return v4 || v6 ? "Allowed" : "No connection";
+        return v4 ? "Applying" : v6 ? "IPv6 open" : "Blocked";
+    }
     public static string InternetStatus(string data)
     {
-        try {
-            var s = ParseConf(System.IO.File.ReadAllText(data + "/" + InternetState));
-            if (s.GetValueOrDefault("boot") != BootId() || !double.TryParse(s.GetValueOrDefault("up"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double up) || Uptime() - up < 0) return "Unverified";
-            string actual = s.GetValueOrDefault("internet", "error"), wanted = InternetWanted(data) ? "on" : "off";
-            if (actual == "error") return "Error";
-            if (actual != wanted) return "Applying";
-            if (actual == "on") return "Allowed";  // only our own job adds the rules
-            return Uptime() - up <= InternetFreshSeconds ? "Blocked" : "Unverified";
-        } catch { return "Unverified"; }
+        string R(string p) { try { return System.IO.File.ReadAllText(p); } catch { return ""; } }
+        return InternetStatus(InternetWanted(data), R("/proc/net/route"), R("/proc/net/ipv6_route"), R("/proc/net/if_inet6"));
     }
 
     // the TV's one Game Mode setting (Off / On / Auto) in plain words

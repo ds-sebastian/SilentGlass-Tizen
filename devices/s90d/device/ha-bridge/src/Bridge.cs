@@ -99,11 +99,8 @@ static partial class Bridge
         if (mute >= 0) Pub("mute", mute == 1 ? "ON" : "OFF", force);
         if (ThreadInstalled) Pub("thread_switch", ThreadWanted ? "ON" : "OFF", force);
         Pub("notifications", NoticesOn ? "ON" : "OFF", force);
-        if (Shared.InternetInstalled(Data)) {
-            Pub("internet_access", Shared.InternetWanted(Data) ? "ON" : "OFF", force);
-            Pub("internet_status", Shared.InternetStatus(Data), force);
-            Pub("internet_request", Shared.BootId() + "|" + (Shared.InternetWanted(Data) ? "on" : "off"), force);
-        }
+        Pub("internet_access", Shared.InternetWanted(Data) ? "ON" : "OFF", force);
+        Pub("internet_status", Shared.InternetStatus(Data), force);
     }
     static void PublishSlow(bool force)
     {
@@ -158,10 +155,8 @@ static partial class Bridge
                 ",\"max\":30,\"json_attributes_topic\":\"" + Base + "/hdmi" + p + "_attr\"");
         cfg("sensor", "temperature", common("temperature", "Chip temperature", "mdi:thermometer", diag: true) + st("temperature", false) + ",\"device_class\":\"temperature\",\"unit_of_measurement\":\"°C\",\"state_class\":\"measurement\"");
         cfg("sensor", "memory", common("memory", "Free memory", "mdi:memory", diag: true) + st("memory", false) + ",\"device_class\":\"data_size\",\"unit_of_measurement\":\"MB\",\"state_class\":\"measurement\"");
-        if (Shared.InternetInstalled(Data)) {
-            cfg("switch", "internet_access", common("internet_access", "Internet access", "mdi:web", config: true) + st("internet_access"));
-            cfg("sensor", "internet_status", common("internet_status", "Internet filter", "mdi:shield-check", diag: true) + st("internet_status", false));
-        }
+        cfg("switch", "internet_access", common("internet_access", "Internet access", "mdi:web", config: true) + st("internet_access"));
+        cfg("sensor", "internet_status", common("internet_status", "Internet filter", "mdi:shield-check", diag: true) + st("internet_status", false));
         if (ThreadInstalled) {
             cfg("sensor", "thread", common("thread", "Thread role", "mdi:access-point-network") + st("thread", false));
             cfg("switch", "thread_switch", common("thread_switch", "Thread border router", "mdi:access-point") + st("thread_switch"));
@@ -188,8 +183,8 @@ static partial class Bridge
             case "home/press": LaunchApp(Shared.Self); slow = false; break;
             case "ambient/press": LaunchApp(Shared.Art); slow = false; break;
             case "resync/press": ResyncNames(); break;
-            case "internet_access/set" when Shared.InternetInstalled(Data) && (payload == "ON" || payload == "OFF"):
-                Shared.SetInternet(Data, payload == "ON"); slow = false; break;
+            case "internet_access/set" when payload == "ON" || payload == "OFF":
+                Shared.SetInternet(Data, payload == "ON"); netCheck.Set(); slow = false; break;
             case "thread_switch/set" when ThreadInstalled && (payload == "ON" || payload == "OFF"):
                 SetThreadSwitch(payload == "ON"); slow = false; break;
             case "volume/set" when double.TryParse(payload, NumberStyles.Float, CultureInfo.InvariantCulture, out var vol):
@@ -233,7 +228,7 @@ static partial class Bridge
     {
         noTv = args.Contains("--no-tv");  // tests: setup page and broker connection only, no TV APIs, nothing published
         Log("start " + Version);
-        if (!noTv) { StartSourceWatch(); OpenPowerKey(); StartNoticeServer(); }
+        if (!noTv) { StartSourceWatch(); OpenPowerKey(); StartNoticeServer(); StartInternetWatch(); }
         StartSetupWatch();
         int backoff = 5;
         while (true) {
