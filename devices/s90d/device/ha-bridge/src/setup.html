@@ -97,10 +97,10 @@ body.locked main,body.locked #save{display:none}
 <div id="internetsec" class="hidden">
 <h2>Privacy and updates</h2>
 <div class="group">
-  <label class="row"><span>Outside internet</span><span class="switch"><input type="checkbox" id="ineton"><span></span></span></label>
+  <label class="row"><span>Home network only</span><span class="switch"><input type="checkbox" id="ineton"><span></span></span></label>
   <div class="status"><span class="dot" id="inetdot"></span><span id="inetstate">Unverified</span></div>
 </div>
-<p class="foot">Off blocks only the outside Internet. Everything on your home network keeps working: Home Assistant, notifications, Thread and this page. Off removes the TV's route out (its own network settings, no gateway), so Samsung's cloud, apps, ads and updates can't connect. It holds through restarts. If it ever gets stuck: Settings › General › Network › Network Status › IP Settings › Obtain automatically. A privacy and update switch, not a speed boost.</p>
+<p class="foot">On blocks only the outside Internet. Everything on your home network keeps working: Home Assistant, notifications, Thread and this page. It removes the TV's route out (its own network settings, no gateway), so Samsung's cloud, apps, ads and updates can't connect. It holds through restarts. If it ever gets stuck: Settings › General › Network › Network Status › IP Settings › Obtain automatically. A privacy and update switch, not a speed boost.</p>
 </div>
 
 <div id="threadsec">
@@ -179,8 +179,8 @@ function show(s) {
   $('apps').checked = !s.hideapps; $('dim').value = s.dim || '5'; $('clock').value = s.clock || '12'; $('inputalerts').checked = s.inputalerts !== false; $('close').value = s.close || '20'; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
   $('thon').checked = s.thread_on;
   $('internetsec').classList.toggle('hidden', !s.internet_installed);
-  $('ineton').checked = s.internet_on;
-  $('inetstate').textContent = ({Blocked: 'Blocked, home network on', Allowed: 'On'})[s.internet_status] || s.internet_status || 'Unverified';
+  $('ineton').checked = !s.internet_on;
+  $('inetstate').textContent = ({Blocked: 'Internet blocked', Allowed: 'Internet connected'})[s.internet_status] || s.internet_status || 'Unverified';
   dot($('inetdot'), s.internet_status === 'Blocked' || s.internet_status === 'Allowed');
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'],
     connecting: [null, 'Connecting…' + (s.mqtt_error ? ' (last time: ' + s.mqtt_error + ')' : '')] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];
@@ -239,7 +239,7 @@ async function save() {
   if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep network.'); return; }
   if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
   const body = Object.assign(mqttBody(), noticeBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
-    internet_on: $('ineton').checked ? 'on' : 'off', lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
+    internet_on: $('ineton').checked ? 'off' : 'on', lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
     watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').value, close: $('close').value, clock: $('clock').value, inputalerts: $('inputalerts').checked ? '1' : '0', wall,
     thread_on: $('thon').checked ? 'on' : 'off' });
   $('save').disabled = true; $('save').textContent = 'Saving…';

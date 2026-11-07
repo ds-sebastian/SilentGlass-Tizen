@@ -6,12 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
-- **SilentGlass 1.3.0** (installed on the TV 2026-11-06): Internet switch. Info › Internet access, the phone page
-  (Privacy and updates) and Home Assistant (`switch.*_internet_access`, `sensor.*_internet_filter`) set a marker
-  file; the bridge sets the TV's own network settings (connman) to the same address with no gateway, saving what it
-  replaced, and puts it back when the switch goes on. Runs on the TV alone, no root, and holds through restarts.
-  Status comes from the kernel's routes. LAN, Home Assistant, notifications and Thread keep working. Tests:
-  `tests/test_internet.py`.
+- **SilentGlass 1.3.0** (2026-11-06): **Home network only**, a privacy and update kill switch. On (Info, the phone
+  page's Privacy and updates, or Home Assistant `switch.*_home_network_only`) blocks the outside Internet while the
+  home network, Home Assistant, notifications and Thread keep working. The bridge sets the TV's own network settings
+  (connman) to the same address with no gateway, saving what it replaced, and puts it back when turned off. Runs on
+  the TV alone, no root, holds through restarts. Status (`sensor.*_internet_status`, "Internet") comes from the
+  kernel's routes. Tests: `tests/test_internet.py`.
 - **SilentGlass 1.2.0** (one version for the launcher and the bridge; was launcher v43e + bridge 2.8.3; installed on
   the TV 2026-10-29 with the new installer): one release bundle (`silentglass-<version>.tar.gz`: launcher + bridge)
   and one `device/install.sh` that installs or updates both, from any SilentGlass version. It lists the sha256 of

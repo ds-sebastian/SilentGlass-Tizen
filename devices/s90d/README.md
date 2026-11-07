@@ -100,7 +100,7 @@ Each has its own undo script in `device/`.
 | boot-units/quiet-csfs-off | closes Samsung Home after it idles hidden for 2 min (~100 MB) | csfs-off-restore.sh |
 | ha-bridge | [Home Assistant bridge](ha-bridge.md) | ha-bridge-restore.sh |
 | thread-border-router | [Thread border router](thread-border-router.md) | otbr-restore.sh |
-| internet | [Internet switch](internet.md): marker file; while off, the TV's IPv4 settings have no gateway | switch on, or TV menu IP Settings › Obtain automatically |
+| internet | [Home network only](internet.md): marker file; while on, the TV's IPv4 settings have no gateway | turn it off, or TV menu IP Settings › Obtain automatically |
 
 **Lessons from these changes:**
 - **Uninstalled preloads come back.** Prime Video, Apple TV and the browser returned ~3.5 h after being
@@ -152,4 +152,4 @@ Each has its own undo script in `device/`.
   Ambient's own auto-off).
 - **Artwork in My Photos:** public-domain museum scans (16:9, 4K) imported by USB or SmartThings. Direct copy to
   the TV only after one real import shows the `MyPhoto` row format, with a database backup first.
-- **Internet switch:** built in 1.3.0, see [internet.md](internet.md).
+- **Home network only (Internet kill switch):** built in 1.3.0, see [internet.md](internet.md).
