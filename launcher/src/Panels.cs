@@ -61,7 +61,8 @@ public sealed partial class SilentGlass
     {
         var list = new List<Row> {
             Status("Privacy", PrivacyStatus), Status("Network", NetworkStatus) };
-        if (File.Exists(Shared.BridgeUnit)) list.Add(Status("Internet", () => Shared.InternetStatus(DataDir) is var s && (s == "Blocked" || s == "Allowed") ? (s, Live) : (s, Amber)));
+        if (File.Exists(Shared.BridgeUnit)) list.Add(Status("Outside internet", () => Shared.InternetStatus(DataDir) switch {
+            "Blocked" => ("Blocked, home network on", Live), "Allowed" => ("On", Live), var s => (s, Amber) }));
         if (ThreadInstalled) list.Add(Status("Thread", ThreadStatus));
         list.Add(Status("Home Assistant", BridgeStatus));
         list.Add(Status("This TV", TvStatus));
@@ -72,7 +73,7 @@ public sealed partial class SilentGlass
         list.Add(Choice("moon", "Dim after", () => Logic.DimName(prefs.Dim), d => { prefs.Dim = Logic.NextDim(prefs.Dim, d); SavePrefs(); }));
         if (PhotoWall) list.Add(Choice("picture", "Wallpaper", () => Logic.WallName(prefs.Wall), d => { prefs.Wall = Logic.NextWall(prefs.Wall, d); SavePrefs(); CheckWallpaper(); }));
         list.Add(Toggle("bell", "Notifications", () => NoticesOn, SetNotices));
-        if (File.Exists(Shared.BridgeUnit)) list.Add(Toggle("network", "Internet access", () => Shared.InternetWanted(DataDir), on => Shared.SetInternet(DataDir, on)));
+        if (File.Exists(Shared.BridgeUnit)) list.Add(Toggle("network", "Outside internet", () => Shared.InternetWanted(DataDir), on => Shared.SetInternet(DataDir, on)));
         list.Add(null);
         // everything else (Home Assistant, the Thread border router, the wallpaper's location) is set from a phone
         list.Add(Open("gear", "Advanced settings", OpenSetup));

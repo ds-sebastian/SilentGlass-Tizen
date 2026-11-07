@@ -155,8 +155,8 @@ static partial class Bridge
                 ",\"max\":30,\"json_attributes_topic\":\"" + Base + "/hdmi" + p + "_attr\"");
         cfg("sensor", "temperature", common("temperature", "Chip temperature", "mdi:thermometer", diag: true) + st("temperature", false) + ",\"device_class\":\"temperature\",\"unit_of_measurement\":\"°C\",\"state_class\":\"measurement\"");
         cfg("sensor", "memory", common("memory", "Free memory", "mdi:memory", diag: true) + st("memory", false) + ",\"device_class\":\"data_size\",\"unit_of_measurement\":\"MB\",\"state_class\":\"measurement\"");
-        cfg("switch", "internet_access", common("internet_access", "Internet access", "mdi:web", config: true) + st("internet_access"));
-        cfg("sensor", "internet_status", common("internet_status", "Internet filter", "mdi:shield-check", diag: true) + st("internet_status", false));
+        cfg("switch", "internet_access", common("internet_access", "Outside internet", "mdi:web", config: true) + st("internet_access"));
+        cfg("sensor", "internet_status", common("internet_status", "Outside internet status", "mdi:shield-check", diag: true) + st("internet_status", false));
         if (ThreadInstalled) {
             cfg("sensor", "thread", common("thread", "Thread role", "mdi:access-point-network") + st("thread", false));
             cfg("switch", "thread_switch", common("thread_switch", "Thread border router", "mdi:access-point") + st("thread_switch"));

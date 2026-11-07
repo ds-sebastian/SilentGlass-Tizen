@@ -97,10 +97,10 @@ body.locked main,body.locked #save{display:none}
 <div id="internetsec" class="hidden">
 <h2>Privacy and updates</h2>
 <div class="group">
-  <label class="row"><span>Internet access</span><span class="switch"><input type="checkbox" id="ineton"><span></span></span></label>
+  <label class="row"><span>Outside internet</span><span class="switch"><input type="checkbox" id="ineton"><span></span></span></label>
   <div class="status"><span class="dot" id="inetdot"></span><span id="inetstate">Unverified</span></div>
 </div>
-<p class="foot">Off removes the TV's route to the Internet (its own network settings, no gateway): Samsung's cloud, apps, ads and updates can't connect. The home network, Home Assistant, notifications and Thread keep working, and it holds through restarts. If it ever gets stuck: Settings › General › Network › Network Status › IP Settings › Obtain automatically. A privacy and update switch, not a speed boost.</p>
+<p class="foot">Off blocks only the outside Internet. Everything on your home network keeps working: Home Assistant, notifications, Thread and this page. Off removes the TV's route out (its own network settings, no gateway), so Samsung's cloud, apps, ads and updates can't connect. It holds through restarts. If it ever gets stuck: Settings › General › Network › Network Status › IP Settings › Obtain automatically. A privacy and update switch, not a speed boost.</p>
 </div>
 
 <div id="threadsec">
@@ -180,7 +180,7 @@ function show(s) {
   $('thon').checked = s.thread_on;
   $('internetsec').classList.toggle('hidden', !s.internet_installed);
   $('ineton').checked = s.internet_on;
-  $('inetstate').textContent = s.internet_status || 'Unverified';
+  $('inetstate').textContent = ({Blocked: 'Blocked, home network on', Allowed: 'On'})[s.internet_status] || s.internet_status || 'Unverified';
   dot($('inetdot'), s.internet_status === 'Blocked' || s.internet_status === 'Allowed');
   const m = { connected: [true, 'Connected to ' + (s.host || 'the broker')], unconfigured: [null, 'Not set up yet'],
     connecting: [null, 'Connecting…' + (s.mqtt_error ? ' (last time: ' + s.mqtt_error + ')' : '')] }[s.mqtt] || [false, s.mqtt_error || 'Cannot connect'];

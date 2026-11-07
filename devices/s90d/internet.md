@@ -6,8 +6,9 @@ separate device and isn't affected. It's a **privacy and update kill switch, not
 trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 times a second.
 
 ## Use it
-- TV: Info › **Internet access**. Phone page: **Privacy and updates**. Home Assistant: the **Internet access**
-  switch, with **Internet filter** as its status.
+- TV: Info › **Outside internet**. Phone page: **Privacy and updates › Outside internet**. Home Assistant: the
+  **Outside internet** switch, with **Outside internet status**. Off blocks only the outside Internet; the home
+  network stays on.
 - Status, read from the TV's own routes: **Blocked**, **Allowed**, **Applying** (off, but a gateway route is still
   there), **IPv6 open** (off, but the TV has a public IPv6 address and route) or **No connection**.
 - Stuck? On the TV: Settings › General › Network › Network Status › IP Settings › Obtain automatically.
@@ -22,6 +23,12 @@ trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 ti
    minute.
 
 Nothing runs off the TV and nothing runs as root. No firewall rules; Thread forwarding and IPv6 are untouched.
+
+## What counts as the home network
+There's no allow list. Without a gateway the TV can only reach addresses on its own subnet, as set by the netmask
+from DHCP (a /24 here), plus IPv6 link-local and the local ULA/Thread prefixes. Anything else needs the gateway, so
+it's out of reach. Devices on other subnets or VLANs, and VPN/Tailscale addresses, are unreachable while off, even
+if they're yours. Home Assistant, the MQTT broker and the DNS server must be on the TV's subnet (they are here).
 
 ## Limits
 - **DHCP lease:** while off, the TV keeps its address but stops renewing the lease. Reserve the TV's address in your
