@@ -11,7 +11,9 @@ trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 ti
   network keeps working. Off is normal.
 - Status, read from the TV's own routes: **Blocked**, **Allowed**, **Applying** (off, but a gateway route is still
   there), **IPv6 open** (off, but the TV has a public IPv6 address and route) or **No connection**.
-- Stuck? On the TV: Settings › General › Network › Network Status › IP Settings › Obtain automatically.
+- Stuck? On the TV: Settings › General › Network › Network Status › IP Settings › Obtain automatically. The Menu
+  key opens Samsung's Settings even with the switch on, and Developer Mode stays reachable too (Controls ›
+  **Developer Mode** opens Samsung's Apps; dismiss its Network Error popup, then type 1 2 3 4 5 on the remote).
 
 ## How it works
 1. Turning it on writes `internet-off` in SilentGlass's data folder (present = off).
@@ -21,6 +23,13 @@ trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 ti
 3. Turning it off: the bridge puts back exactly what was there (DHCP, or your own manual settings) and deletes the record.
 4. connman saves the setting, so it holds through restarts and power cuts with no gap. The bridge re-checks every
    minute.
+5. **Home stays openable (1.3.1).** Samsung checks its web-app list before opening the Home app, and SilentGlass's
+   slot inherited a "needs network" mark, so with no gateway Home showed Samsung's network error. The bridge watches
+   `/opt/dbspace/.webappservice.db` and keeps that mark at 0; Samsung rewrites it on every launch, and it's cleared
+   again in under a second.
+6. **Fail-safe (1.3.1).** If neither the router nor the Home Assistant broker answers for 10 minutes while the link is
+   up (a new router, another subnet), the bridge puts the TV's own network settings back and reports
+   **Open · home network lost**. It blocks again once the home network answers.
 
 Nothing runs off the TV and nothing runs as root. No firewall rules; Thread forwarding and IPv6 are untouched.
 
@@ -37,7 +46,10 @@ if they're yours. Home Assistant, the MQTT broker and the DNS server must be on 
   hands out public IPv6, the status shows **IPv6 open**: the TV can reach the Internet over IPv6.
 - Samsung's apps keep trying. They broadcast ARP for Internet addresses that nobody answers: a few small packets a
   second on the home network.
-- The clock syncs from Samsung (`time.samsungcloudsolution.*`) and drifts slowly while blocked.
+- **Clock:** Samsung sets the clock only from its own time server, so after a cold start with the switch on, the
+  TV's clock reads 1970. Since 1.3.1 the bridge reads the time from the `Date:` header of the router's (or Home
+  Assistant's) web server, and SilentGlass's clocks and day/night wallpaper use it. Samsung's own menus still show
+  the wrong time until the switch is off.
 - Why not a firewall: the owner user can't change iptables. A copy of `xtables-multi` with file capabilities is
   refused at exec by Samsung's signature check, and `stc-iptables` only answers root/`network_fw`.
 

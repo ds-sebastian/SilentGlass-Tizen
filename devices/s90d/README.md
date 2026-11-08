@@ -152,4 +152,5 @@ Each has its own undo script in `device/`.
   Ambient's own auto-off).
 - **Artwork in My Photos:** public-domain museum scans (16:9, 4K) imported by USB or SmartThings. Direct copy to
   the TV only after one real import shows the `MyPhoto` row format, with a database backup first.
-- **Home network only (Internet kill switch):** built in 1.3.0, see [internet.md](internet.md).
+- **Home network only (Internet kill switch):** built in 1.3.0; Home with no gateway, the fail-safe and the clock
+  came in 1.3.1. See [internet.md](internet.md).
