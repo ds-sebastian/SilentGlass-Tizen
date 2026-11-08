@@ -16,7 +16,7 @@ public sealed partial class SilentGlass
     readonly Random drift = new();
     static bool PhotoWall => File.Exists(Res + "wallpapers/wall-day.jpg") && File.Exists(Res + "wallpapers/wall-night.jpg");
     string WallUrl(bool night) => Res + "wallpapers/wall-" + (night ? "night" : "day") + ".jpg";
-    bool WantNight() => prefs.Wall == "night" || prefs.Wall != "day" && Logic.IsNight(DateTime.UtcNow, prefs.Lat, prefs.Lon);
+    bool WantNight() => prefs.Wall == "night" || prefs.Wall != "day" && Logic.IsNight(Shared.UtcNow(DataDir), prefs.Lat, prefs.Lon);
 
     void BuildBackdrop()
     {
@@ -71,7 +71,7 @@ public sealed partial class SilentGlass
             Note("placeholder:viewer"); Launch(Viewer);
         });
     }
-    void UpdateClock() { clock.Text = Logic.ClockText(prefs.Clock, DateTime.Now, true); }
+    void UpdateClock() { clock.Text = Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true); }
     void CheckWallpaper()
     {
         if (wallpaper == null) return;
@@ -97,7 +97,7 @@ public sealed partial class SilentGlass
     void MoveDimClock()
     {
         if (dimClock == null) return;
-        dimClock.Text = Logic.ClockText(prefs.Clock, DateTime.Now, false);
+        dimClock.Text = Logic.ClockText(prefs.Clock, Shared.Now(DataDir), false);
         dimClock.Position2D = new Position2D(120 + drift.Next(1920 - 240 - 360), 120 + drift.Next(1080 - 240 - 90));
     }
     // any key (or Home) wakes; over the backdrop the bar comes back

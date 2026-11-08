@@ -6,6 +6,21 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.3.1** (2026-11-08): fixes for **Home network only**.
+  - **Home works with no gateway.** Samsung checks its web-app list before opening the Home app. Our slot inherited
+    the Bixby app's `is_network=1` mark, so with no gateway (the switch on, or the router down) Home showed
+    Samsung's "network error" instead of SilentGlass. Samsung's web-app service rewrites that row from memory on
+    every launch, so the bridge watches `/opt/dbspace/.webappservice.db` and keeps the mark at 0 (cleared in under
+    1 s). The clock was not the cause.
+  - **Fail-safe.** On, the switch pins the TV's address with no DHCP. If neither the router nor the Home Assistant
+    broker answers for 10 minutes while the link is up (new router, other subnet), the bridge puts the TV's own
+    network settings back and reports "Open · home network lost". It switches off again once the home network
+    answers. Samsung's own Settings (Menu key, IP Settings) and Developer Mode (Apps, 1-2-3-4-5) also stay reachable
+    with the switch on.
+  - **Clock.** Samsung sets the clock only from its own time server, so after a cold start with the switch on it
+    reads 1970. The bridge reads the time from the `Date:` header of the router's (or Home Assistant's) web server
+    and leaves the difference in `clock-offset`. SilentGlass's clocks and day/night wallpaper use it until the TV's
+    own clock is set. Samsung's own menus still show its clock.
 - **SilentGlass 1.3.0** (2026-11-06): **Home network only**, a privacy and update kill switch. On (Info, the phone
   page's Privacy and updates, or Home Assistant `switch.*_home_network_only`) blocks the outside Internet while the
   home network, Home Assistant, notifications and Thread keep working. The bridge sets the TV's own network settings

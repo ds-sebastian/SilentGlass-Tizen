@@ -38,6 +38,34 @@ class InternetSwitch(unittest.TestCase):
         self.assertIn('"/proc/net/if_inet6"', SHARED)  # IPv6 only counts with a public address
         self.assertIn('return v4 ? "Applying" : v6 ? "IPv6 open" : "Blocked";', SHARED)
 
+    def test_failsafe_gives_the_tv_its_own_settings_back(self):
+        # off pins an address with no DHCP; if the home network changes, the TV must not stay unreachable
+        self.assertIn("const long FailsafeMs = 10 * 60_000;", NET)
+        watch = NET[NET.index("static void WatchHomeNetwork"):NET.index("static bool Answers")]
+        self.assertLess(watch.index("File.WriteAllText(hold"), watch.index("PutBack(rec, path)"))  # the hold is recorded first
+        self.assertIn("if (path == null) return;", watch)  # a cable pulled out is not a changed network
+        self.assertIn('"\\nrouter=" + Field(cur, "Gateway")', NET)  # the router to watch is recorded when switching off
+        rec = NET[NET.index("static void ReconcileInternet"):NET.index("static bool PutBack")]
+        self.assertIn("if (wanted && File.Exists(hold)) File.Delete(hold);", rec)
+        self.assertIn("if (!Answers(RouteGateway())) return;", rec)  # off again only once the home network answers
+        self.assertIn('"Open · home network lost"', SHARED)
+
+    def test_home_guard_keeps_samsungs_network_mark_off(self):
+        guard = NET[NET.index("static void GuardHome"):NET.index("static string Sqlite")]
+        self.assertIn("update widgetinfo set is_network=0 where tizen_id='\" + Shared.Self + \"' and is_network<>0", guard)
+        self.assertIn('"/usr/bin/sqlite3"', NET)
+        self.assertIn('".timeout 5000"', NET)  # Samsung's service holds the database briefly
+        self.assertIn('public const string WasDb = "/opt/dbspace/.webappservice.db";', SHARED)
+        self.assertIn("StartHomeGuard();", (ROOT / "devices/s90d/device/ha-bridge/src/Bridge.cs").read_text())
+
+    def test_clock_offset_only_while_the_tv_clock_is_unset(self):
+        self.assertIn("public static bool ClockUnset(DateTime utc) => utc.Year < 2020;", SHARED)
+        self.assertIn("if (!ClockUnset(now)) return now;", SHARED)
+        self.assertIn('"HEAD / HTTP/1.0', NET)
+        self.assertIn("!Shared.ClockUnset(t)", NET)  # a router that is itself unset is ignored
+        back = (ROOT / "launcher/src/Backdrop.cs").read_text()
+        self.assertNotIn("DateTime.Now", back); self.assertNotIn("DateTime.UtcNow", back)
+
 
 if __name__ == "__main__":
     unittest.main()

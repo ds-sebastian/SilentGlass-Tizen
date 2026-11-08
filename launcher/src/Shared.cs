@@ -8,7 +8,7 @@ using System.Text.Json;
 public static class Shared
 {
     // the one version of the whole thing: Info, the bridge (Home Assistant sw_version), the release and install.sh
-    public const string Version = "1.3.0";
+    public const string Version = "1.3.1";
     public const string Self = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", SamsungHome = "com.samsung.tv.csfs", Art = "org.tizen.art-app";
     public static bool IsAmbient(string id) => id is Art or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
 
@@ -23,7 +23,12 @@ public static class Shared
         PrefsFile = "silentglass-prefs.txt", LocationFile = "location.txt", // SilentGlass's settings; the phone page edits them too
         NotifyOff = "notify-off", ThreadOff = "thread-off",       // switches: present = off
         InternetOff = "internet-off", InternetApplied = "internet-applied.txt", // present = off; what the switch replaced
-        ThreadSwitch = "thread-switch";                           // touched to apply ThreadOff now (quiet-otbr-switch.path)
+        ThreadSwitch = "thread-switch",                           // touched to apply ThreadOff now (quiet-otbr-switch.path)
+        ClockOffset = "clock-offset",                             // bridge -> SilentGlass: seconds the TV's unset clock is behind the router's
+        InternetFailsafe = "internet-failsafe.txt";               // bridge: the switch is off, but the home network was lost, so the TV's own settings are back until it answers again
+    // Samsung's app list. Its `is_network` = 1 on our app slot (a leftover of the Bixby app) makes Samsung refuse to open
+    // SilentGlass from Home ("network error") whenever there is no gateway; the bridge keeps it 0.
+    public const string WasDb = "/opt/dbspace/.webappservice.db";
     public const string StateFile = "/tmp/silentglass-state.txt";  // SilentGlass's state (ui=, backdrop=, fg=, ...), read by the bridge
     public const string ThreadUnit = "/opt/usr/home/owner/.config/systemd/user/quiet-otbr-switch.path";  // the border router is installed
 
@@ -71,8 +76,26 @@ public static class Shared
     public static string InternetStatus(string data)
     {
         string R(string p) { try { return System.IO.File.ReadAllText(p); } catch { return ""; } }
+        if (!InternetWanted(data) && System.IO.File.Exists(data + "/" + InternetFailsafe)) return "Open · home network lost";
         return InternetStatus(InternetWanted(data), R("/proc/net/route"), R("/proc/net/ipv6_route"), R("/proc/net/if_inet6"));
     }
+
+    // ---- the clock. Samsung sets the TV's clock only from its own time server, so after a cold start with the
+    // Internet switch off it stays at 1970. The bridge then measures the router's clock and leaves the difference in
+    // ClockOffset; these add it while (and only while) the TV's own clock is unset. ----
+    public static bool ClockUnset(DateTime utc) => utc.Year < 2020;
+    static long offsetRead = long.MinValue / 2; static double offsetSec;
+    public static DateTime UtcNow(string data)
+    {
+        var now = DateTime.UtcNow;
+        if (!ClockUnset(now)) return now;
+        if (Environment.TickCount64 - offsetRead > 30_000) {  // read the file at most every 30 s
+            offsetRead = Environment.TickCount64; offsetSec = 0;
+            try { double.TryParse(System.IO.File.ReadAllText(data + "/" + ClockOffset).Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out offsetSec); } catch { }
+        }
+        return now.AddSeconds(offsetSec);
+    }
+    public static DateTime Now(string data) => UtcNow(data).ToLocalTime();
 
     // the TV's one Game Mode setting (Off / On / Auto) in plain words
     public static string GameName(string tvName) => tvName switch { "Auto" => "Automatic", "On" => "Always", "Off" => "Never", _ => tvName };

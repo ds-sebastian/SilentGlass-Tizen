@@ -229,7 +229,7 @@ static partial class Bridge
     {
         noTv = args.Contains("--no-tv");  // tests: setup page and broker connection only, no TV APIs, nothing published
         Log("start " + Version);
-        if (!noTv) { StartSourceWatch(); OpenPowerKey(); StartNoticeServer(); StartInternetWatch(); }
+        if (!noTv) { StartSourceWatch(); OpenPowerKey(); StartNoticeServer(); StartInternetWatch(); StartHomeGuard(); }
         StartSetupWatch();
         int backoff = 5;
         while (true) {
