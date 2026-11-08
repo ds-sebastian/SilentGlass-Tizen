@@ -53,6 +53,7 @@ public sealed partial class SilentGlass
             Open("bluetooth", "Bluetooth", () => OpenTvMenu("add-bluetooth-keyboard")),
             Open("network", "Network", () => OpenTvMenu("networksettings")),
             Open("gear", "TV Settings", () => OpenTvMenu(null)),
+            Open("apps", "Developer Mode", () => OpenApp(Shared.SamsungApps), () => "1 2 3 4 5"),
         });
     }
 
@@ -135,7 +136,7 @@ public sealed partial class SilentGlass
         oDim = Dimming(true, wx, 0, 1920 - wx, 1080, .45f); oRoot.Add(oDim); oRoot.Add(oLayer);
         int h = 32 + (title != null ? HeadH : 0);
         foreach (var r in list) h += r == null ? RuleH : r.Kind == RowKind.Level ? SliderH : r.Kind == RowKind.Status ? StatusH : ValueH;
-        var panel = Glass(CcX, Math.Max(32, (1080 - h) / 2), CcW, h, CcR, solid); oLayer.Add(panel);
+        var panel = Glass(CcX, Math.Max(16, (1080 - h) / 2), CcW, h, CcR, solid); oLayer.Add(panel);
         int y = 16;
         if (title != null) {
             var t = Label(title, 24, y + 8, CcW - 48, 52, 34, White, "Display"); panel.Add(t); y += HeadH;

@@ -195,6 +195,21 @@ class LauncherSource(unittest.TestCase):
         deploy = ROOT / "devices/s90d/device/launcher-deploy"
         self.assertEqual(sorted(p.name for p in deploy.glob("*.sh")), ["restore-stock-home.sh"])  # updates are install.sh
 
+class BarClockAndDeveloperMode(unittest.TestCase):
+    def test_clock_comes_first_and_is_not_focusable(self):
+        src = launcher(); ob = body(src, "void OpenBar(bool keepFocus)")
+        self.assertLess(ob.index("capsule.Add(barClock)"), ob.index("for (int i = 0; i < items.Count; i++)"))
+        self.assertNotIn("barClock", ob[ob.index("bar.Add(new BarItem"):ob.index("bar.Add(new BarItem") + 120])
+        self.assertIn('string BarClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);', src)
+        self.assertIn("UpdateBarClock(); if (overlayShown", src)  # the idle timer ticks it every second
+        self.assertIn("barClock = null;", body(src, "void ClearOverlay()"))
+
+    def test_developer_mode_opens_samsungs_apps(self):
+        src = launcher()
+        self.assertIn('Open("apps", "Developer Mode", () => OpenApp(Shared.SamsungApps), () => "1 2 3 4 5")', src)
+        self.assertIn('SamsungApps = "org.volt.apps"', (SRC / "Shared.cs").read_text())
+
+
 class DeviceRecord(unittest.TestCase):
     def test_catalog_only_has_installed_enabled_apps(self):
         if not INVENTORY.is_file():

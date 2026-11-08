@@ -6,6 +6,10 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.3.2** (2026-11-08): the time is the first thing on the bar (not focusable, then a separator;
+  hidden over the wallpaper, which shows its own clock; follows the 12 / 24 / off clock setting). Controls ends with
+  **Developer Mode**: it opens Samsung's Apps screen, where 1 2 3 4 5 on the remote opens the Developer Mode box
+  (the Host PC IP). Samsung offers no direct way into that box. Tall panels may now start 16 px from the top.
 - **SilentGlass 1.3.1** (2026-11-08): fixes for **Home network only**.
   - **Home works with no gateway.** Samsung checks its web-app list before opening the Home app. Our slot inherited
     the Bixby app's `is_network=1` mark, so with no gateway (the switch on, or the router down) Home showed

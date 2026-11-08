@@ -81,6 +81,8 @@ public static class Logic
     // the wallpaper clock (big = with AM / PM in 12-hour mode; the dimmed clock never shows it)
     public static string ClockText(string mode, DateTime t, bool big) =>
         mode == "off" ? "" : mode == "24" ? t.ToString("H:mm", CultureInfo.InvariantCulture) : t.ToString(big ? "h:mm tt" : "h:mm", CultureInfo.InvariantCulture);
+    // the bar clock's widest text (0 is among the widest digits), so its width stays put as the minutes tick
+    public static string[] ClockWidest(string mode) => mode == "24" ? new[] { "00:00" } : new[] { "00:00 AM", "00:00 PM" };
     public static string WallName(string mode) => mode == "day" ? "Day" : mode == "night" ? "Night" : "Follows sunset";
 
     // Watch / Play: dir +1 cycles Automatic -> HDMI 1..4 -> Automatic (dir -1 backwards), skipping the other one's input

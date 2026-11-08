@@ -8,8 +8,9 @@ using System.Text.Json;
 public static class Shared
 {
     // the one version of the whole thing: Info, the bridge (Home Assistant sw_version), the release and install.sh
-    public const string Version = "1.3.1";
-    public const string Self = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", SamsungHome = "com.samsung.tv.csfs", Art = "org.tizen.art-app";
+    public const string Version = "1.3.2";
+    public const string Self = "com.samsung.tv.bixby-promotion", Viewer = "org.tizen.tv-viewer", SamsungHome = "com.samsung.tv.csfs", Art = "org.tizen.art-app",
+        SamsungApps = "org.volt.apps";  // Samsung's Apps panel: 1 2 3 4 5 there opens Developer Mode (the Host PC IP)
     public static bool IsAmbient(string id) => id is Art or "com.samsung.tv.home.art" or "com.samsung.tv.ambientfte";
 
     // launch extras: from the bridge (show a notification / switch input), any caller (open one part), our own relaunch

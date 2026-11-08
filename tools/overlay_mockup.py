@@ -74,8 +74,10 @@ def sym(n):
     return uri(A / f"sym-{n}.svg")
 
 
-def bar(focus):
+def bar(focus, clock="4:52 PM"):
     out = []
+    if clock:  # the time first, then a separator; not focusable (none over the wallpaper: its own clock shows)
+        out.append(f'<div class="item" style="font-weight:500">{clock}</div><div class="sep"></div>')
     for i, it in enumerate(BAR):
         if it is None:
             out.append('<div class="sep"></div>')
@@ -162,7 +164,8 @@ def controls(focus=0):
             ("v", "picture", "Picture Mode", "Movie (Calibrated)"), ("v", "waveform", "Sound Mode", "Adaptive Sound"),
             ("v", "soundbar", "Sound Output", "Soundbar"), ("v", "gamecontroller", "Game Mode", "Automatic"),
             ("v", "moon", "Sleep Timer", "Off"), ("v", "pixelshift", "Pixel Shift", "On"), "hr",
-            ("a", "artframe", "Ambient", ""), ("a", "bluetooth", "Bluetooth", ""), ("a", "network", "Network", ""), ("a", "gear", "TV Settings", "")]
+            ("a", "artframe", "Ambient", ""), ("a", "bluetooth", "Bluetooth", ""), ("a", "network", "Network", ""), ("a", "gear", "TV Settings", ""),
+            ("a", "apps", "Developer Mode", "1 2 3 4 5")]
     return panel(rows, focus)
 
 
@@ -237,8 +240,8 @@ def main():
              + notice(None, "medium", "top-right", "Washer", "The laundry is done."),
              "bar": bar(0),
              "info": bar(6) + info(5),
-             "backdrop": backdrop() + bar(0),
-             "setup": setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0)}
+             "backdrop": backdrop() + bar(0, None),
+             "setup": setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0), "controls-dev": controls(13)}
     for name, body in pages.items():
         (out / f"{name}.html").write_text(page(name, body, bg))
         subprocess.run(["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
