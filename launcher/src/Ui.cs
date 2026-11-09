@@ -58,6 +58,18 @@ public sealed partial class SilentGlass
         Corners(v, r, w, h);
         return v;
     }
+    // a dark corner fading out from the top right (the clock's backdrop): an ellipse the size of the view
+    static PropertyMap Scrim()
+    {
+        var m = new PropertyMap();
+        m.Add(Visual.Property.Type, new PropertyValue((int)Visual.Type.Gradient));
+        m.Add(GradientVisualProperty.Center, new PropertyValue(new Vector2(.5f, -.5f)));
+        m.Add(GradientVisualProperty.Radius, new PropertyValue(1f));
+        var o = new PropertyArray(); o.PushBack(new PropertyValue(0f)); o.PushBack(new PropertyValue(.7f));
+        var s = new PropertyArray(); s.PushBack(new PropertyValue(new Vector4(0, 0, 0, .42f))); s.PushBack(new PropertyValue(new Vector4(0, 0, 0, 0)));
+        m.Add(GradientVisualProperty.StopOffset, new PropertyValue(o)); m.Add(GradientVisualProperty.StopColor, new PropertyValue(s));
+        return m;
+    }
     // soft dimming behind the glass (from transparent to `max` black)
     static View Dimming(bool horizontal, int x, int y, int w, int h, float max) =>
         new() { Position2D = new Position2D(x, y), Size2D = new Size2D(w, h), Background = Gradient(horizontal, 0, (0f, Clear), (1f, new Color(0, 0, 0, max))) };

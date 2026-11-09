@@ -24,9 +24,9 @@ Everything is an overlay over the TV's own viewer, so the picture keeps playing 
 |---|---|
 | **Bar** | up to 4 shortcuts (your inputs, named by you), Inputs, Controls, Apps, Info. Home toggles it, and it hides after 20 s idle. |
 | **Inputs** | the inputs in use, by the TV's names; shown only when something is plugged in that has no shortcut. A green dot means its device is on (picture or HDMI-CEC). |
-| **Controls** | brightness, contrast, volume; picture, sound and Game Mode; sleep timer, pixel shift; Ambient, Bluetooth, settings |
+| **Controls** | brightness, volume; picture, sound and Game Mode; sleep timer; Ambient; **More**: contrast, pixel shift, Bluetooth, network, settings, Developer Mode |
 | **Apps** | the TV's apps as artwork (backups; the SHIELD has the real ones) |
-| **Info** | privacy, network, Thread and Home Assistant status, settings, and Advanced settings (phone) |
+| **Info** | one status line (a row only for what needs a look; all of it in Status details), Shortcuts, settings, and Advanced settings (phone) |
 | **Wallpaper** | shown only when there's no picture, with a clock; dims after 5 min for the OLED |
 | **Banners** | Home Assistant notifications and input alerts, in their own window, which never takes the remote |
 

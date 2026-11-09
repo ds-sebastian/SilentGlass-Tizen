@@ -16,6 +16,15 @@ records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries
     HDMI 1). A new install starts with Watch and Play named but hidden.
   - **Inputs** lists only inputs in use (plugged in, on, or on screen; Live TV only while on screen), and the bar
     shows it only when it offers an input no shortcut opens.
+  - **Clock** in the top-right corner (where the wallpaper's is, over a faint dark corner), no longer inside the bar.
+    The bar's window is full height while it's up.
+  - **Controls** keeps what's used while watching (Brightness, Volume, Picture/Sound Mode, Sound Output, Game Mode,
+    Sleep Timer, Ambient); Contrast, Pixel Shift, Bluetooth, Network, TV Settings and Developer Mode moved to **More**.
+  - **Sleep Timer** shows "None", or the time left when started from SilentGlass (the TV reports only the length).
+  - **Info** opens with one line ("Everything is fine · Wired · home network only · up 2 h") and a row only for what
+    needs a look; the full list is in **Status details**.
+  - Fixes from a code review: Controls reads only the setting a key changes; leaked timers and animations; the
+    settings file is written whole (SilentGlass and the bridge); the bridge log is capped in RAM.
   - One settings model (`launcher/src/Prefs.cs`) is compiled into SilentGlass and the bridge: the defaults, allowed
     values, checks and the old-file handling exist once (the bridge had its own copies). Saves keep unknown keys.
 - **SilentGlass 1.3.4** (2026-11-08): no black flash on the first Home after an update. `install.sh` stops the

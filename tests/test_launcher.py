@@ -203,14 +203,37 @@ class LauncherSource(unittest.TestCase):
         deploy = ROOT / "devices/s90d/device/launcher-deploy"
         self.assertEqual(sorted(p.name for p in deploy.glob("*.sh")), ["restore-stock-home.sh"])  # updates are install.sh
 
-class BarClockAndDeveloperMode(unittest.TestCase):
-    def test_clock_comes_first_and_is_not_focusable(self):
+class CornerClockAndPanels(unittest.TestCase):
+    def test_clock_is_in_the_corner_not_the_bar(self):
+        # the owner: the clock inside the bar read as a dead button. It sits top right where the wallpaper's is, in the
+        # same window (a new window flashes over the picture), which is full height while the bar is up
         src = launcher(); ob = body(src, "void OpenBar(bool keepFocus)")
-        self.assertLess(ob.index("capsule.Add(barClock)"), ob.index("for (int i = 0; i < items.Count; i++)"))
-        self.assertNotIn("barClock", ob[ob.index("bar.Add(new BarItem"):ob.index("bar.Add(new BarItem") + 120])
-        self.assertIn('string BarClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);', src)
-        self.assertIn("UpdateBarClock(); if (overlayShown", src)  # the idle timer ticks it every second
-        self.assertIn("barClock = null;", body(src, "void ClearOverlay()"))
+        self.assertIn("Place(0, 0, 1920, 1080);", ob)
+        self.assertIn("CornerClock();", ob)
+        self.assertNotIn("Clock", ob[ob.index("capsule = Glass"):ob.index("FocusBar(false);")])  # nothing clock-like inside the capsule
+        self.assertIn('string CornerClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);', src)
+        self.assertIn('Label(ct, 1420 - 1160, 40, 420, 64, 40, White, "Display")', src)  # = Backdrop.cs's clock at 1420,40
+        self.assertIn('Label("", 1420, 40, 420, 64, 40, White, "Display")', (SRC / "Backdrop.cs").read_text())
+        self.assertIn("UpdateCornerClock(); if (overlayShown", src)  # the idle timer ticks it every second
+        self.assertIn("cornerClock = null;", body(src, "void ClearOverlay()"))
+        self.assertEqual(src.count("new Window("), 2)  # overlay and notice (+ Window.Default): no window of its own
+
+    def test_controls_keeps_the_watching_rows_and_more_holds_the_rest(self):
+        src = launcher(); oc = body(src, "void OpenControls()"); om = body(src, "void OpenMore()")
+        for row in ('"Brightness"', '"Volume"', '"Picture Mode"', '"Sound Mode"', '"Sound Output"', '"Game Mode"', '"Sleep Timer"', '"Ambient"', '"More"'):
+            self.assertIn(row, oc)
+        for row in ('"Contrast"', '"Pixel Shift"', '"Bluetooth"', '"Network"', '"TV Settings"', '"Developer Mode"'):
+            self.assertIn(row, om); self.assertNotIn(row, oc)
+        self.assertIn('Choice("moon", "Sleep Timer", SleepValue,', oc)  # "None" or the time left, never the TV's "Off"
+
+    def test_info_opens_with_one_summary_line(self):
+        src = launcher(); oi = body(src, "void OpenInfo()")
+        self.assertIn("Kind = RowKind.Summary", oi)
+        self.assertIn("foreach (var s in issues) list.Add(Status(s.name, s.read));", oi)  # only what needs a look
+        self.assertIn('Open("info", "Status details", OpenStatus)', oi)
+        self.assertIn('"Everything is fine"', src); self.assertIn('"One thing to check"', src)
+        # privacy is still read (its gaps go to the state file for the drift check)
+        self.assertIn('("Privacy", PrivacyStatus)', body(src, "StatusList()"))
 
     def test_developer_mode_opens_samsungs_apps(self):
         src = launcher()

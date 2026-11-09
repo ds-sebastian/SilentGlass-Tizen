@@ -11,8 +11,8 @@ using Tizen.NUI.BaseComponents;
 // Info replace it with a panel on the right (the picture stays visible on the left); the setup sheet is centred.
 public sealed partial class SilentGlass
 {
-    enum Mode { Bar, Inputs, Apps, Controls, Info, Shortcuts, Setup }
-    bool InPanel => mode is Mode.Controls or Mode.Info or Mode.Shortcuts;
+    enum Mode { Bar, Inputs, Apps, Controls, More, Info, Status, Shortcuts, Setup }
+    bool InPanel => mode is Mode.Controls or Mode.More or Mode.Info or Mode.Status or Mode.Shortcuts;
     Window ow; View oRoot, oDim, oLayer, capsule, highlight, currentMark;
     Mode mode; bool overlayShown; Tizen.NUI.Timer overlayIdle;
     const int BandTop = 240, BarH = 104, BarBottom = 52, ItemH = 80, ItemPad = 30, GlyphS = 40, GlyphGap = 14, PopGap = 18;
@@ -41,7 +41,7 @@ public sealed partial class SilentGlass
     void ClearOverlay()
     {
         StopOverlayAnimations();
-        bar.Clear(); rows.Clear(); menu.Clear(); tiles.Clear(); highlight = null; capsule = null; setupSheet = null; popover = null; barClock = null;
+        bar.Clear(); rows.Clear(); menu.Clear(); tiles.Clear(); highlight = null; capsule = null; setupSheet = null; popover = null; cornerClock = null;
         while (oRoot != null && oRoot.ChildCount > 0) { var v = oRoot.GetChildAt(0); oRoot.Remove(v); v.Dispose(); }
         oLayer = new View { Size2D = new Size2D(1920, 1080) }; oDim = null;
     }
@@ -98,7 +98,7 @@ public sealed partial class SilentGlass
     {
         lastActivity = Environment.TickCount64;
         if (backdropShown) return;
-        if (overlayIdle == null) { overlayIdle = new Tizen.NUI.Timer(1000); overlayIdle.Tick += (s, e) => { UpdateBarClock(); if (overlayShown && !backdropShown && mode != Mode.Setup && prefs.Close > 0 && Environment.TickCount64 - lastActivity >= prefs.Close * 1000L) { CloseOverlay("idle"); return false; } return overlayShown; }; }
+        if (overlayIdle == null) { overlayIdle = new Tizen.NUI.Timer(1000); overlayIdle.Tick += (s, e) => { UpdateCornerClock(); if (overlayShown && !backdropShown && mode != Mode.Setup && prefs.Close > 0 && Environment.TickCount64 - lastActivity >= prefs.Close * 1000L) { CloseOverlay("idle"); return false; } return overlayShown; }; }
         if (!overlayIdle.IsRunning()) overlayIdle.Start();
     }
 
@@ -128,7 +128,8 @@ public sealed partial class SilentGlass
     {
         EnsureOverlay();
         string keep = keepFocus && barSel >= 0 && barSel < bar.Count ? bar[barSel].Action : null;
-        ClearOverlay(); mode = Mode.Bar; Place(0, BandTop, 1920, 1080 - BandTop);
+        // full height: the clock is in the top-right corner (the window was only the bottom band before 1.4)
+        ClearOverlay(); mode = Mode.Bar; Place(0, 0, 1920, 1080);
         RefreshInputs(); var items = BarItems(); barSig = BarSignature(items);
         oDim = Dimming(false, 0, BandTop + 180, 1920, 1080 - BandTop - 180, .5f); oRoot.Add(oDim); oRoot.Add(oLayer);
         // measure, then centre the capsule
@@ -140,23 +141,12 @@ public sealed partial class SilentGlass
             int w = Math.Max(TextWidth(t), s == null ? 0 : TextWidth(s) + (LiveDot(it.action) ? 22 : 0));
             labels.Add((t, s, w)); total += 2 * ItemPad + GlyphS + GlyphGap + w;
         }
-        // the time first, then a separator (not focusable); over the wallpaper its own clock shows it instead
-        string ct = BarClockText(); int cw = 0;
-        if (ct.Length > 0) {
-            barClock = Label(ct, 0, 0, 10, ItemH, 30, White, "Medium"); barClock.HorizontalAlignment = HorizontalAlignment.Center;
-            foreach (var widest in Logic.ClockWidest(prefs.Clock)) { barClock.Text = widest; cw = Math.Max(cw, TextWidth(barClock)); }  // a fixed width as the minutes tick
-            barClock.Text = ct; total += 22 + 2 * ItemPad + cw;
-        }
+        CornerClock();
         capsule = Glass(960 - total / 2, BarTop, total, BarH, BarH / 2); oLayer.Add(capsule);
         // the input on screen keeps a soft pill (where the focus goes is the white one; the green dot = its device is on)
         currentMark = new View { Size2D = new Size2D(10, ItemH), BackgroundColor = CurrentFill, CornerRadius = Round(ItemH / 2f), Opacity = 0 }; capsule.Add(currentMark);
         highlight = new View { Size2D = new Size2D(10, ItemH), BackgroundColor = FocusFill, CornerRadius = Round(ItemH / 2f) }; capsule.Add(highlight);
         int ix = 12;
-        if (barClock != null) {  // first, then a separator
-            barClock.Position2D = new Position2D(ix + ItemPad, (BarH - ItemH) / 2); barClock.Size2D = new Size2D(cw + 4, ItemH); capsule.Add(barClock);
-            ix += 2 * ItemPad + cw;
-            capsule.Add(new View { Position2D = new Position2D(ix + 10, (BarH - 40) / 2), Size2D = new Size2D(2, 40), BackgroundColor = new Color(1, 1, 1, .22f) }); ix += 22;
-        }
         for (int i = 0; i < items.Count; i++) {
             var it = items[i];
             if (it.glyph == null) { capsule.Add(new View { Position2D = new Position2D(ix + 10, (BarH - 40) / 2), Size2D = new Size2D(2, 40), BackgroundColor = new Color(1, 1, 1, .22f) }); ix += 22; continue; }
@@ -178,13 +168,22 @@ public sealed partial class SilentGlass
         FocusBar(false);
         bool fresh = !overlayShown; Note(fresh ? "bar:open" : "bar:rebuild");
         ShowOverlay(); OverlayActivity();
-        if (fresh) FadeIn(capsule, oDim);
+        if (fresh) FadeIn(capsule, oDim, cornerClock?.GetParent() as View);
         RefreshDevices();
     }
     // the focused item is a white capsule; while one of its menus is open it stays marked in faint white
-    TextLabel barClock;
-    string BarClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);
-    void UpdateBarClock() { if (barClock == null) return; string t = BarClockText(); if (t.Length > 0 && barClock.Text != t) barClock.Text = t; }
+    // ---- the clock: top right, where the wallpaper's clock is (Backdrop.cs: 1420,40, Display 40), over a faint dark
+    // corner so it reads on a bright sky. Over the wallpaper that clock shows it instead; clock=off hides both. ----
+    TextLabel cornerClock;
+    string CornerClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);
+    void CornerClock()
+    {
+        string ct = CornerClockText(); if (ct.Length == 0) return;
+        var corner = new View { Position2D = new Position2D(1160, 0), Size2D = new Size2D(760, 240), Background = Scrim() };
+        cornerClock = Label(ct, 1420 - 1160, 40, 420, 64, 40, White, "Display"); cornerClock.HorizontalAlignment = HorizontalAlignment.End;
+        corner.Add(cornerClock); oRoot.Add(corner);
+    }
+    void UpdateCornerClock() { if (cornerClock == null) return; string t = CornerClockText(); if (t.Length > 0 && cornerClock.Text != t) cornerClock.Text = t; }
     void FocusBar(bool animate)
     {
         for (int i = 0; i < bar.Count; i++) {

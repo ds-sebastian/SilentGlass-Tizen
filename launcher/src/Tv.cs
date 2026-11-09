@@ -46,6 +46,7 @@ public sealed partial class SilentGlass
     readonly Dictionary<string, bool> settingEnabled = new();
     readonly Dictionary<string, (double min, double max, double step)> ranges = new();
     int volume = -1, mute = -1;
+    (string value, long at) sleepSet = ("", 0);  // the Sleep Timer length set from SilentGlass, and when
     // everything: on open, every 3 s while Controls is up, and after a change that moves other settings (a picture mode
     // brings its own brightness); the option lists are read again too
     void RefreshSettings()
@@ -94,6 +95,7 @@ public sealed partial class SilentGlass
         // a level moves only itself; a mode or output can change the others (and their option lists)
         if (id is "brightness" or "contrast") ReadSetting(id); else RefreshSettings();
         ok &= Setting(id) == value;
+        if (ok && id == "sleeptimer") sleepSet = (value, Environment.TickCount64);  // the countdown starts now
         Note("setting:" + id + ":" + value + ":" + ok); return ok;
     }
     // Left / Right step through the TV's own option list; Game Mode's item is marked hidden here though all its values apply

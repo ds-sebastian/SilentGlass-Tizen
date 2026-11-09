@@ -10,18 +10,20 @@ using Tizen.NUI.BaseComponents;
 // One row model for both: Up/Down move, Left/Right adjust or cycle, Select steps, toggles or opens, Back -> bar.
 public sealed partial class SilentGlass
 {
-    enum RowKind { Status, Level, Value, Switch, Action }
+    enum RowKind { Summary, Status, Level, Value, Switch, Action }
+    static bool Passive(Row r) => r.Kind is RowKind.Status or RowKind.Summary;  // shown, never focused
     sealed class Row
     {
         public RowKind Kind; public string Name, Glyph;
-        public Func<string> Value; public Func<float> Amount; public Func<bool> On; public Func<(string text, Color tone)> Read;
+        public Func<string> Value; public Func<float> Amount; public Func<bool> On; public Func<(string text, Color tone)> Read; public Func<(string title, string sub)> Sum;
         public Action<int> Adjust; public Action Select;
-        public View Box, Track, Fill, Light; public ImageView Icon; public TextLabel Label, Val; public Switch Sw;
+        public View Box, Track, Fill, Light; public ImageView Icon; public TextLabel Label, Val; public Switch Sw; public Color Tone;
     }
     readonly List<Row> rows = new();
     int rowSel;
     Tizen.NUI.Timer panelTimer;
-    const int CcX = 1236, CcW = 624, CcR = 44, SliderH = 88, ValueH = 64, StatusH = 56, RuleH = 25, HeadH = 70;
+    const int CcX = 1236, CcW = 624, CcR = 44, SliderH = 88, ValueH = 64, StatusH = 56, SummaryH = 84, RuleH = 25, HeadH = 70;
+    int RowH(Row r) => r == null ? RuleH : r.Kind switch { RowKind.Level => SliderH, RowKind.Status => StatusH, RowKind.Summary => SummaryH, _ => ValueH };
 
     static Row Level(string glyph, string name, Func<string> value, Func<float> amount, Action<int> adjust, Action select = null) =>
         new() { Kind = RowKind.Level, Glyph = glyph, Name = name, Value = value, Amount = amount, Adjust = adjust, Select = select };
@@ -33,41 +35,63 @@ public sealed partial class SilentGlass
         new() { Kind = RowKind.Action, Glyph = glyph, Name = name, Select = select, Value = value };
     static Row Status(string name, Func<(string text, Color tone)> read) => new() { Kind = RowKind.Status, Name = name, Read = read };
 
-    // ---- Controls ----
+    // ---- Controls: what's used while watching. Contrast, Pixel Shift and the TV's own menus are one level down, in
+    // More (Back returns to Controls). ----
     void OpenControls()
     {
         RefreshSettings();
         string Output() => Setting("soundoutput") == "2" ? "Soundbar" : Setting("soundoutput") == "0" ? "TV Speaker" : SettingName("soundoutput");
         BuildPanel(Mode.Controls, null, false, new List<Row> {
             Level("sun", "Brightness", () => Setting("brightness"), () => Level("brightness"), d => ChangeLevel("brightness", d)),
-            Level("contrast", "Contrast", () => Setting("contrast"), () => Level("contrast"), d => ChangeLevel("contrast", d)),
             Level("speaker", "Volume", () => mute == 1 ? "Muted" : volume < 0 ? "–" : volume.ToString(), () => volume < 0 ? -1 : volume / 100f, ChangeVolume, ToggleMute),
             null,
             Choice("picture", "Picture Mode", () => SettingName("picturemode"), d => CycleSetting("picturemode", d)),
             Choice("waveform", "Sound Mode", () => SettingName("external-sound-mode"), d => CycleSetting("external-sound-mode", d)),
             Choice("soundbar", "Sound Output", Output, d => SetSetting("soundoutput", Setting("soundoutput") == "0" ? "2" : "0")),
             Choice("gamecontroller", "Game Mode", () => Shared.GameName(SettingName("game-mode-auto")), d => CycleSetting("game-mode-auto", d)),
-            Choice("moon", "Sleep Timer", () => SettingName("sleeptimer"), d => CycleSetting("sleeptimer", d)),
-            Toggle("pixelshift", "Pixel Shift", () => Setting("pixel-shift-menu") == "1", on => SetSetting("pixel-shift-menu", on ? "1" : "0")),
+            Choice("moon", "Sleep Timer", SleepValue, d => CycleSetting("sleeptimer", d)),
             null,
             Open("artframe", "Ambient", () => OpenApp(Shared.Art)),
+            Open("slidersmore", "More", OpenMore),
+        });
+    }
+    void OpenMore()
+    {
+        BuildPanel(Mode.More, "More", false, new List<Row> {
+            Level("contrast", "Contrast", () => Setting("contrast"), () => Level("contrast"), d => ChangeLevel("contrast", d)),
+            Toggle("pixelshift", "Pixel Shift", () => Setting("pixel-shift-menu") == "1", on => SetSetting("pixel-shift-menu", on ? "1" : "0")),
+            null,
             Open("bluetooth", "Bluetooth", () => OpenTvMenu("add-bluetooth-keyboard")),
             Open("network", "Network", () => OpenTvMenu("networksettings")),
             Open("gear", "TV Settings", () => OpenTvMenu(null)),
             Open("apps", "Developer Mode", () => OpenApp(Shared.SamsungApps), () => "1 2 3 4 5"),
         });
     }
+    // the TV reports only the length the timer was set to; started from here, the time left
+    string SleepValue() => Logic.SleepText(Setting("sleeptimer"), SettingName("sleeptimer"),
+        sleepSet.value == Setting("sleeptimer") ? (Environment.TickCount64 - sleepSet.at) / 60000.0 : -1);
 
-    // ---- Info ----
+    // ---- Info: one line for how the TV is doing (a row for each thing that needs a look; the full list is in Status
+    // details), then SilentGlass's own settings ----
+    List<(string name, Func<(string text, Color tone)> read)> StatusList()
+    {
+        var list = new List<(string, Func<(string, Color)>)> { ("Privacy", PrivacyStatus), ("Network", NetworkStatus) };
+        if (File.Exists(Shared.BridgeUnit)) list.Add(("Internet", InternetStatus));
+        if (ThreadInstalled) list.Add(("Thread", ThreadStatus));
+        list.Add(("Home Assistant", BridgeStatus));
+        list.Add(("This TV", TvStatus));
+        return list;
+    }
+    (string, Color) InternetStatus() => Shared.InternetStatus(DataDir) switch {
+        "Blocked" => ("Blocked · home network only", Live), "Allowed" => ("Connected", Live), var s => (s, Amber) };
+    string infoIssues = "";
     void OpenInfo()
     {
-        var list = new List<Row> {
-            Status("Privacy", PrivacyStatus), Status("Network", NetworkStatus) };
-        if (File.Exists(Shared.BridgeUnit)) list.Add(Status("Internet", () => Shared.InternetStatus(DataDir) switch {
-            "Blocked" => ("Blocked · home network only", Live), "Allowed" => ("Connected", Live), var s => (s, Amber) }));
-        if (ThreadInstalled) list.Add(Status("Thread", ThreadStatus));
-        list.Add(Status("Home Assistant", BridgeStatus));
-        list.Add(Status("This TV", TvStatus));
+        var status = StatusList().Select(s => (s.name, s.read, now: s.read())).ToList();
+        var issues = status.Where(s => s.now.Item2 == Amber).ToList();
+        infoIssues = string.Join(",", issues.Select(s => s.name));
+        var list = new List<Row> { new() { Kind = RowKind.Summary, Name = "Summary", Sum = Summary, Tone = issues.Count == 0 ? Live : Amber } };
+        foreach (var s in issues) list.Add(Status(s.name, s.read));
         list.Add(null);
         list.Add(Open("tv", "Shortcuts", OpenShortcuts, () => Shortcuts.Count() is int n && n > 0 ? n + " on the bar" : "None"));
         list.Add(Toggle("apps", "Apps in the bar", () => !prefs.HideApps, on => { prefs.HideApps = !on; SavePrefs(); }));
@@ -76,9 +100,32 @@ public sealed partial class SilentGlass
         list.Add(Toggle("bell", "Notifications", () => NoticesOn, SetNotices));
         if (File.Exists(Shared.BridgeUnit)) list.Add(Toggle("network", "Home network only", () => !Shared.InternetWanted(DataDir), on => Shared.SetInternet(DataDir, !on)));
         list.Add(null);
+        list.Add(Open("info", "Status details", OpenStatus));
         // everything else (Home Assistant, the Thread border router, the wallpaper's location) is set from a phone
         list.Add(Open("gear", "Advanced settings", OpenSetup));
         BuildPanel(Mode.Info, "SilentGlass " + ModVersion, true, list);
+    }
+    // "Everything is fine" + how it's connected and how long it's been up; or how many things need a look
+    (string, string) Summary()
+    {
+        var status = StatusList().Select(s => (s.name, now: s.read())).ToList();
+        int issues = status.Count(s => s.now.Item2 == Amber);
+        string Text(string name) => status.Find(s => s.name == name).now.Item1 ?? "";
+        var up = InfoStats.Uptime(); string upText = up.HasValue ? "up " + InfoStats.Duration(up.Value) : "";
+        if (issues > 0) {
+            int? temp = InfoStats.ChipTemperature();
+            return (issues == 1 ? "One thing to check" : issues + " things to check",
+                    string.Join(" · ", new[] { up.HasValue ? "Up " + InfoStats.Duration(up.Value) : null, temp.HasValue ? temp + " °C" : null }.Where(x => x != null)));
+        }
+        var parts = new List<string> { Text("Network").Split(" · ")[0] };
+        if (Text("Internet").EndsWith("home network only")) parts.Add("home network only");
+        if (upText.Length > 0) parts.Add(upText);
+        return ("Everything is fine", string.Join(" · ", parts.Where(x => x.Length > 0)));
+    }
+    void OpenStatus()
+    {
+        BuildPanel(Mode.Status, "Status", true, StatusList().Select(s => Status(s.name, s.read)).ToList());
+        rowSel = -1;  // nothing to focus: Back returns to Info
     }
 
     // ---- Info > Shortcuts: the input each shortcut opens (Left / Right; Hidden leaves it off the bar). Names and icons
@@ -150,26 +197,33 @@ public sealed partial class SilentGlass
         ClearOverlay(); mode = m; int wx = CcX - 60; Place(wx, 0, 1920 - wx, 1080);
         oDim = Dimming(true, wx, 0, 1920 - wx, 1080, .45f); oRoot.Add(oDim); oRoot.Add(oLayer);
         int h = 32 + (title != null ? HeadH : 0);
-        foreach (var r in list) h += r == null ? RuleH : r.Kind == RowKind.Level ? SliderH : r.Kind == RowKind.Status ? StatusH : ValueH;
-        var panel = Glass(CcX, Math.Max(16, (1080 - h) / 2), CcW, h, CcR, solid); oLayer.Add(panel);
+        foreach (var r in list) h += RowH(r);
+        int top = Math.Max(16, (1080 - h) / 2);
+        var panel = Glass(CcX, top, CcW, h, CcR, solid); oLayer.Add(panel);
+        if (top >= 120) CornerClock();  // above the panel when it leaves room
         int y = 16;
         if (title != null) {
             var t = Label(title, 24, y + 8, CcW - 48, 52, 34, White, "Display"); panel.Add(t); y += HeadH;
         }
         foreach (var r in list) {
             if (r == null) { panel.Add(Rule(24, y + 12, CcW - 48)); y += RuleH; continue; }
-            int rh = r.Kind == RowKind.Level ? SliderH : r.Kind == RowKind.Status ? StatusH : ValueH, top = r.Kind == RowKind.Level ? 12 : (rh - 42) / 2;
+            int rh = RowH(r), rt = r.Kind == RowKind.Level ? 12 : (rh - 42) / 2;
             r.Box = new View { Position2D = new Position2D(16, y), Size2D = new Size2D(CcW - 32, rh), CornerRadius = Round(28) };
-            if (r.Kind == RowKind.Status) {
+            if (r.Kind == RowKind.Summary) {
+                var disc = new View { Position2D = new Position2D(24, (rh - 52) / 2), Size2D = new Size2D(52, 52), CornerRadius = Round(26), BackgroundColor = r.Tone };
+                disc.Add(Sym(r.Tone == Live ? "check" : "info", 11, 11, 30)); r.Box.Add(disc);
+                r.Label = Label("", 94, 6, CcW - 32 - 94 - 24, 40, 30, White, "Semibold"); r.Box.Add(r.Label);
+                r.Val = Label("", 94, 46, CcW - 32 - 94 - 24, 30, 23, Faint); r.Box.Add(r.Val);
+            } else if (r.Kind == RowKind.Status) {
                 r.Light = Dot(34, (rh - 14) / 2, 14, Grey); r.Box.Add(r.Light);
-                r.Label = Label(r.Name, 82, top, 220, 42, 26, White, "Semibold"); r.Box.Add(r.Label);
-                r.Val = Label("", CcW - 32 - 24 - 360, top, 360, 42, 25, Faint); r.Val.HorizontalAlignment = HorizontalAlignment.End; r.Box.Add(r.Val);
+                r.Label = Label(r.Name, 82, rt, 220, 42, 26, White, "Semibold"); r.Box.Add(r.Label);
+                r.Val = Label("", CcW - 32 - 24 - 360, rt, 360, 42, 25, Faint); r.Val.HorizontalAlignment = HorizontalAlignment.End; r.Box.Add(r.Val);
             } else {
                 r.Icon = Sym(r.Glyph, 24, r.Kind == RowKind.Level ? 14 : (rh - 38) / 2, 38); r.Box.Add(r.Icon);
-                r.Label = Label(r.Name, 82, top - 2, 320, 42, 28, White, "Semibold"); r.Box.Add(r.Label);
+                r.Label = Label(r.Name, 82, rt - 2, 320, 42, 28, White, "Semibold"); r.Box.Add(r.Label);
                 if (r.Value != null) {
                     int vw = r.Kind == RowKind.Level ? 160 : 330, right = r.Kind == RowKind.Action ? 34 : 0;
-                    r.Val = Label("", CcW - 32 - 24 - vw - right, top - 2, vw, 42, r.Kind == RowKind.Level ? 30 : 26, Faint, r.Kind == RowKind.Level ? "Display" : "Medium");
+                    r.Val = Label("", CcW - 32 - 24 - vw - right, rt - 2, vw, 42, r.Kind == RowKind.Level ? 30 : 26, Faint, r.Kind == RowKind.Level ? "Display" : "Medium");
                     r.Val.HorizontalAlignment = HorizontalAlignment.End; r.Box.Add(r.Val);
                 }
                 if (r.Kind == RowKind.Level) {
@@ -181,7 +235,7 @@ public sealed partial class SilentGlass
             }
             panel.Add(r.Box); rows.Add(r); y += rh;
         }
-        rowSel = rows.FindIndex(r => r.Kind != RowKind.Status);
+        rowSel = rows.FindIndex(r => !Passive(r));
         UpdatePanel(true); FadeIn(panel); Note(m.ToString().ToLowerInvariant());
         // volume, mute and the sleep timer change without telling us; Info's status rows too
         panelTimer ??= new Tizen.NUI.Timer(3000);
@@ -192,9 +246,18 @@ public sealed partial class SilentGlass
     // changes, never for a focus move (each read is IPC or file I/O); a changed setting reads itself back
     void UpdatePanel(bool refresh = false)
     {
-        if (refresh && mode == Mode.Controls) RefreshSettings();
+        if (refresh && mode is Mode.Controls or Mode.More) RefreshSettings();
+        // Info: something started or stopped needing a look -> its row comes or goes
+        if (refresh && mode == Mode.Info && string.Join(",", StatusList().Where(s => s.read().Item2 == Amber).Select(s => s.name)) != infoIssues) {
+            string keep = rowSel >= 0 && rowSel < rows.Count ? rows[rowSel].Name : null;
+            OpenInfo(); rowSel = Math.Max(0, rows.FindIndex(r => r.Name == keep)); if (Passive(rows[rowSel])) rowSel = rows.FindIndex(r => !Passive(r));
+        }
         for (int i = 0; i < rows.Count; i++) {
             var r = rows[i]; bool f = i == rowSel; var ink = f ? Ink : White;
+            if (r.Kind == RowKind.Summary) {
+                if (refresh) { var (title, sub) = r.Sum(); if (r.Label.Text != title) r.Label.Text = title; if (r.Val.Text != sub) r.Val.Text = sub; }
+                continue;
+            }
             if (r.Kind == RowKind.Status) {
                 if (refresh) { var (text, tone) = r.Read(); if (r.Val.Text != text) r.Val.Text = text; r.Light.BackgroundColor = tone; }
                 continue;
@@ -211,11 +274,17 @@ public sealed partial class SilentGlass
     }
     void PanelKey(string k, bool back, bool sel)
     {
-        if (back) { if (mode == Mode.Shortcuts) BackToInfo("Shortcuts"); else BackToBar(mode == Mode.Controls ? "controls" : "info"); return; }
+        if (back) {
+            if (mode == Mode.Shortcuts) BackToInfo("Shortcuts");
+            else if (mode == Mode.Status) BackToInfo("Status details");
+            else if (mode == Mode.More) { OpenControls(); rowSel = Math.Max(0, rows.FindIndex(r => r.Name == "More")); UpdatePanel(); }
+            else BackToBar(mode == Mode.Controls ? "controls" : "info");
+            return;
+        }
         if (rowSel < 0) return;
         if (k == "Up" || k == "Down") {
             int d = k == "Up" ? -1 : 1, n = rowSel + d;
-            while (n >= 0 && n < rows.Count && rows[n].Kind == RowKind.Status) n += d;
+            while (n >= 0 && n < rows.Count && Passive(rows[n])) n += d;
             if (n >= 0 && n < rows.Count) { rowSel = n; UpdatePanel(); }
             return;
         }

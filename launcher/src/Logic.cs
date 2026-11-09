@@ -48,8 +48,18 @@ public static class Logic
     // the wallpaper clock (big = with AM / PM in 12-hour mode; the dimmed clock never shows it)
     public static string ClockText(string mode, DateTime t, bool big) =>
         mode == "off" ? "" : mode == "24" ? t.ToString("H:mm", CultureInfo.InvariantCulture) : t.ToString(big ? "h:mm tt" : "h:mm", CultureInfo.InvariantCulture);
-    // the bar clock's widest text (0 is among the widest digits), so its width stays put as the minutes tick
-    public static string[] ClockWidest(string mode) => mode == "24" ? new[] { "00:00" } : new[] { "00:00 AM", "00:00 PM" };
+    // Sleep Timer's value: "None", or the time left when SilentGlass started it (the TV reports only the length it was
+    // set to, e.g. "30 minutes"), else that length. minutesAgo < 0: not started here.
+    public static string SleepText(string value, string name, double minutesAgo)
+    {
+        if (value == "0" || value.Length == 0) return "None";
+        var m = System.Text.RegularExpressions.Regex.Match(name ?? "", @"^(\d+)\s*min");
+        if (!m.Success) return name;
+        int total = int.Parse(m.Groups[1].Value);
+        if (minutesAgo < 0 || minutesAgo >= total) return total + " min";
+        int left = (int)Math.Ceiling(total - minutesAgo);
+        return (left >= 60 ? left / 60 + " h" + (left % 60 > 0 ? " " + left % 60 + " min" : "") : left + " min") + " left";
+    }
     public static string WallName(string mode) => mode == "day" ? "Day" : mode == "night" ? "Night" : "Follows sunset";
 
     // ---- notification banner geometry (tools/overlay_mockup.py draws the same) ----
