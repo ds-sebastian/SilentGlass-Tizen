@@ -169,6 +169,9 @@ class LauncherSource(unittest.TestCase):
         self.assertNotIn("audio-format", ui)  # Pass-Through feeds Dolby Atmos to the soundbar: not one press away
         for name in ("Nintendo Switch", '"SHIELD"', "PlayStation"):  # the TV's own input names are used as they are
             self.assertNotIn(name, ui)
+        # the prefs file is only ever written whole (Prefs.Save: .new + rename), by SilentGlass and the bridge alike
+        both = launcher() + "".join(f.read_text() for f in (ROOT / "devices/s90d/device/ha-bridge/src").glob("*.cs"))
+        self.assertNotIn("WriteAllText(DataFile(Shared.PrefsFile)", both)
         # no device is known by name anywhere: a shortcut is an input the owner picked, or hidden
         code = launcher().lower()
         for word in ('"shield"', '"switch"', "portnamed", "automatic ·", '"auto · "'):

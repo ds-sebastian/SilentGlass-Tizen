@@ -39,7 +39,16 @@ static partial class Bridge
         File.WriteAllText(DataFile(Shared.ThreadSwitch), DateTime.UtcNow.ToString("o") + (on ? " on\n" : " off\n"));
     }
     static void SetMarker(string name, bool present) { if (present) File.WriteAllText(DataFile(name), ""); else File.Delete(DataFile(name)); }
-    static void Log(string s) { if (noTv) Console.WriteLine(s); try { File.AppendAllText("/run/user/5001/silentglass-ha.log", DateTime.Now.ToString("MM-dd HH:mm:ss ") + s + "\n"); } catch { } }
+    // the log is in /run (RAM): past 256 KB it keeps its newer half, like SilentGlass's event log
+    const string LogFile = "/run/user/5001/silentglass-ha.log"; static readonly object logGate = new(); static int logWrites;
+    static void Log(string s)
+    {
+        if (noTv) Console.WriteLine(s);
+        lock (logGate) try {
+            if (++logWrites % 100 == 0 && new FileInfo(LogFile) is { Exists: true, Length: > 256 * 1024 }) { var keep = File.ReadAllLines(LogFile); File.WriteAllLines(LogFile, keep[(keep.Length / 2)..]); }
+            File.AppendAllText(LogFile, DateTime.Now.ToString("MM-dd HH:mm:ss ") + s + "\n");
+        } catch { }
+    }
     // the TV's own name (TvApi TvNameKey), unless the config sets one: older installs, or the TV refused the change
     static string TvName { get { string n = conf.GetValueOrDefault("name", ""); if (n.Length == 0 && !noTv) n = VStr(TvNameKey); return n.Length > 0 ? n : "Samsung TV"; } }
     // "Living Room TV" -> "living_room_tv": the entity ids Home Assistant picks when it first sees the TV
@@ -116,7 +125,7 @@ static partial class Bridge
         string old = ReadText(DataFile(Shared.PrefsFile)); var p = Prefs.Parse(old);
         string why = change(p) ?? p.Problem();
         if (why != null) { Log("shortcut not changed: " + why); return; }
-        try { File.WriteAllText(DataFile(Shared.PrefsFile), p.Merge(old)); } catch (Exception e) { Log("prefs: " + e.Message); }
+        try { p.Save(DataFile(Shared.PrefsFile)); } catch (Exception e) { Log("prefs: " + e.Message); }
     }
     static void PublishSlow(bool force)
     {

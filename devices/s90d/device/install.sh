@@ -33,10 +33,10 @@ BK=$B/silentglass-$VER-$(date +%Y%m%dT%H%M%S)
 mkdir -p "$B"; mkdir -m 700 "$BK"; mkdir "$BK/stage"
 [ "$(stat -c %d "$A/res" 2>/dev/null || stat -c %d "$B")" = "$(stat -c %d "$B")" ] || { echo 'backup is on another filesystem; mv would not keep labels - refusing'; exit 7; }
 cat > "$BK/files.sha256" <<'SUMS'
-ce69094332efcccd34d87d870c4f77bb6a7a9438dca347896c040f89f254f7e2  BixbyPromotion.dll
+3f6723e17549b51f3e6734e6acd2f9f9b52c3e3fa3c4a6a70e60caef012d0e4b  BixbyPromotion.dll
 13e781d4e1f13494233e000124102caad8c9a5bb41bc244517f3bdcaea5ad730  Probe.dll
 530d94cae62b04c4677ff4a6549f72b84c13115b13e16283fc2197a56442a275  bridge/silentglass-ha.conf.example
-f71ff6238cc119bb2e3ebbdae49791c8fe5d762d7086a7295f7af35643a9ab89  bridge/silentglass-ha.dll
+2ff6da9b7e29297ef62d36370094caf6e6ca8418ef8c33995754e6ef4888f78c  bridge/silentglass-ha.dll
 a0882085ebc8618322fb819cc0e92bac0499419af91124d05f6d27662818ea83  bridge/silentglass-ha.runtimeconfig.json
 439b5d9d79665666e981a80dfe2450325464f996a2fddff48a9efef6627a7c42  bridge/silentglass-ha.service
 236ead33439cced94720eb7a4e89afcc2dfeecf4b72de0dae3a97b024e700538  quiet-home/apps.json

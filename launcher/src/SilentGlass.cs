@@ -86,7 +86,7 @@ public sealed partial class SilentGlass : NUIApplication
         bool arrow = k == "Up" || k == "Down" || k == "Left" || k == "Right";
         if (k == lastKey && now - lastKeyAt < (arrow ? 90 : 300)) return;  // drop auto-repeat floods only
         lastKey = k; lastKeyAt = now; lastActivity = now;
-        if (dimmed) { Wake(); return; }  // the first press only wakes
+        if (dimmed) { Wake(); Note("key " + k + " (wake)"); return; }  // the first press only wakes
         long t0 = Stopwatch.GetTimestamp();
         try { HandleKey(k, arrow); } catch (Exception ex) { Note("key-error:" + ex.GetType().Name); }
         keyCount++; keyTicksMax = Math.Max(keyTicksMax, Stopwatch.GetTimestamp() - t0);

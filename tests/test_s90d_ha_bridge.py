@@ -78,8 +78,7 @@ class HaBridgeTests(unittest.TestCase):
         # keys it doesn't know stay; a refused change writes nothing
         change = member("static void ChangePrefs(", "\n    }\n")
         self.assertIn("string why = change(p) ?? p.Problem();", change)
-        self.assertLess(change.index("if (why != null)"), change.index("File.WriteAllText"))
-        self.assertIn("p.Merge(old)", change)
+        self.assertLess(change.index("if (why != null)"), change.index("p.Save(DataFile(Shared.PrefsFile))"))
         handler = member("static void OnMessage(", "static void SetOption(")
         self.assertIn("Prefs.CleanName(payload)", handler)
         self.assertIn('payload == "Hidden" ? 0 : Inputs().Where(i => Shared.IsHdmi(i.Type) && i.Name == payload)', handler)

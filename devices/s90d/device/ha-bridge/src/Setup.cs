@@ -300,7 +300,7 @@ static partial class Bridge
         try {
             SetMarker(Shared.NotifyOff, S("notifications") != "true");
             if (lat.Length > 0 && lon.Length > 0) File.WriteAllText(DataFile(Shared.LocationFile), "lat=" + lat + "\nlon=" + lon + "\n"); else File.Delete(DataFile(Shared.LocationFile));
-            if (prefs != null) File.WriteAllText(DataFile(Shared.PrefsFile), prefs.Merge(prefsOld));  // keys it doesn't know stay
+            if (prefs != null) prefs.Save(DataFile(Shared.PrefsFile));  // keys it doesn't know stay
         } catch { }
         if (internetOn is "on" or "off") { Shared.SetInternet(Data, internetOn == "on"); netCheck.Set(); }
         bool threadStarting = false;

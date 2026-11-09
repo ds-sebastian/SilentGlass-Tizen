@@ -102,6 +102,14 @@ public sealed class Prefs
         return string.Concat(d.Select(kv => kv.Key + "=" + kv.Value + "\n"));
     }
 
+    // write the settings file whole or not at all: SilentGlass and the bridge each watch it, and a half-written file
+    // would read as defaults. The rename is the one change the watcher sees (Setup.cs WatchData: Renamed).
+    public void Save(string path)
+    {
+        string old = null; try { old = System.IO.File.ReadAllText(path); } catch { }
+        System.IO.File.WriteAllText(path + ".new", Merge(old)); System.IO.File.Move(path + ".new", path, true);
+    }
+
     // null when the shortcuts are fine, else what to fix (the phone page shows it)
     public string Problem()
     {

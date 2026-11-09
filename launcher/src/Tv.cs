@@ -208,8 +208,7 @@ public sealed partial class SilentGlass
     void SavePrefs()
     {
         try {
-            string old = File.Exists(DataFile(Shared.PrefsFile)) ? File.ReadAllText(DataFile(Shared.PrefsFile)) : "";
-            File.WriteAllText(DataFile(Shared.PrefsFile), prefs.Merge(old)); File.Delete(DataFile("quiet-home-prefs.txt"));
+            prefs.Save(DataFile(Shared.PrefsFile)); File.Delete(DataFile("quiet-home-prefs.txt"));
         } catch { }
     }
 }
