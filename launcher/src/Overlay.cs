@@ -227,8 +227,8 @@ public sealed partial class SilentGlass
                 return;
             case Mode.Inputs: InputsKey(k, back, sel); return;
             case Mode.Apps: AppsKey(k, back, sel, arrow); return;
-            case Mode.Controls: case Mode.Info: case Mode.Shortcuts: PanelKey(k, back, sel); return;
             case Mode.Setup: if (back) CloseSetup(); return;
+            default: if (InPanel) PanelKey(k, back, sel); return;  // every panel (Controls, More, Info, Status, Shortcuts)
         }
     }
     // the TV changed underneath (input, signal, names): refresh what is showing

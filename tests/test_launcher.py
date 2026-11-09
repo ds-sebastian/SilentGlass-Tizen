@@ -226,6 +226,15 @@ class CornerClockAndPanels(unittest.TestCase):
             self.assertIn(row, om); self.assertNotIn(row, oc)
         self.assertIn('Choice("moon", "Sleep Timer", SleepValue,', oc)  # "None" or the time left, never the TV's "Off"
 
+    def test_every_panel_gets_its_keys(self):
+        # 1.4.0 test build: More and Status details opened but the key switch listed panels by name and missed them,
+        # so no key (not even Back) worked there. Panels now route through InPanel, which must name every panel mode.
+        src = launcher(); panels = set(re.findall(r"BuildPanel\(Mode\.(\w+)", src))
+        in_panel = re.search(r"bool InPanel => (.*);", src).group(1)
+        self.assertEqual(panels, set(re.findall(r"Mode\.(\w+)", in_panel)))
+        self.assertIn("default: if (InPanel) PanelKey(k, back, sel); return;", src)
+        self.assertNotRegex(src, r"case Mode\.(Controls|More|Info|Status|Shortcuts):")
+
     def test_info_opens_with_one_summary_line(self):
         src = launcher(); oi = body(src, "void OpenInfo()")
         self.assertIn("Kind = RowKind.Summary", oi)
