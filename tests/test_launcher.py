@@ -214,7 +214,7 @@ class CornerClockAndPanels(unittest.TestCase):
         self.assertIn('string CornerClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);', src)
         self.assertIn('Label(ct, 1420, 40, 420, 64, 40, White, "Display")', src)  # = Backdrop.cs's clock at 1420,40
         cc = body(src, "void CornerClock()")  # a full-width band under the panels, the digits with a shadow
-        self.assertIn('Shade("top", 0, TopShadeH)', cc); self.assertIn("band.LowerToBottom();", cc); self.assertIn("cornerClock.Shadow = TextShadow();", cc)
+        self.assertIn('Shade("top", 0, 0, 1920, TopShadeH)', cc); self.assertIn('Shade("top-side", PanelWx,', cc); self.assertIn("band.LowerToBottom();", cc); self.assertIn("cornerClock.Shadow = TextShadow();", cc)
         self.assertIn('Label("", 1420, 40, 420, 64, 40, White, "Display")', (SRC / "Backdrop.cs").read_text())
         self.assertIn("UpdateCornerClock(); if (overlayShown", src)  # the idle timer ticks it every second
         self.assertIn("cornerClock = null;", body(src, "void ClearOverlay()"))

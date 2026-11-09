@@ -20,16 +20,21 @@ def bottom(t):  # 0 where the shade starts -> 1 at the screen edge: nothing, eas
     return .86 * t ** 1.7
 
 
-def png(path, h, alpha):
+def side(x):    # the top band in a panel's window (744 wide, from x 1176): fades in from its left edge, no line there
+    t = min(1, x / 360)
+    return t * t * (3 - 2 * t)
+
+
+def png(path, h, alpha, w=W, across=lambda x: 1):
     rows = bytearray()
     for y in range(h):
         a = alpha(y / (h - 1)) * 255
         rows.append(0)
-        for x in range(W):
-            v = int(a + (BAYER[y % 4][x % 4] + .5) / 16)   # ordered dither between the two nearest levels
+        for x in range(w):
+            v = int(a * across(x) + (BAYER[y % 4][x % 4] + .5) / 16)   # ordered dither between the two nearest levels
             rows += bytes((0, 0, 0, max(0, min(255, v))))
     chunk = lambda k, d: struct.pack(">I", len(d)) + k + d + struct.pack(">I", zlib.crc32(k + d) & 0xffffffff)
-    data = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, h, 8, 6, 0, 0, 0)) + \
+    data = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + \
         chunk(b"IDAT", zlib.compress(bytes(rows), 9)) + chunk(b"IEND", b"")
     path.write_bytes(data)
     return len(data)
@@ -38,4 +43,5 @@ def png(path, h, alpha):
 if __name__ == "__main__":
     A = Path(__file__).resolve().parent.parent / "launcher/assets"
     print("shade-top.png", png(A / "shade-top.png", 260, top), "bytes")
+    print("shade-top-side.png", png(A / "shade-top-side.png", 260, top, 744, side), "bytes")
     print("shade-bottom.png", png(A / "shade-bottom.png", 660, bottom), "bytes")

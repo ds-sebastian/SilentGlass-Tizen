@@ -22,6 +22,7 @@ public sealed partial class SilentGlass
     readonly List<Row> rows = new();
     int rowSel;
     Tizen.NUI.Timer panelTimer;
+    const int PanelWx = 1176;  // the panel window's left edge (CcX - 60)
     const int CcX = 1236, CcW = 624, CcR = 44, SliderH = 88, ValueH = 64, StatusH = 56, SummaryH = 84, RuleH = 25, HeadH = 70;
     int RowH(Row r) => r == null ? RuleH : r.Kind switch { RowKind.Level => SliderH, RowKind.Status => StatusH, RowKind.Summary => SummaryH, _ => ValueH };
 
@@ -194,7 +195,7 @@ public sealed partial class SilentGlass
     void BuildPanel(Mode m, string title, bool solid, List<Row> list)
     {
         if (!overlayShown) OpenBar(false);
-        ClearOverlay(); mode = m; int wx = CcX - 60; Place(wx, 0, 1920 - wx, 1080);
+        ClearOverlay(); mode = m; int wx = PanelWx; Place(wx, 0, 1920 - wx, 1080);
         oDim = Dimming(true, wx, 0, 1920 - wx, 1080, .45f); oRoot.Add(oDim); oRoot.Add(oLayer);
         int h = 32 + (title != null ? HeadH : 0);
         foreach (var r in list) h += RowH(r);

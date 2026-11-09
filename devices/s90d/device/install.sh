@@ -33,7 +33,7 @@ BK=$B/silentglass-$VER-$(date +%Y%m%dT%H%M%S)
 mkdir -p "$B"; mkdir -m 700 "$BK"; mkdir "$BK/stage"
 [ "$(stat -c %d "$A/res" 2>/dev/null || stat -c %d "$B")" = "$(stat -c %d "$B")" ] || { echo 'backup is on another filesystem; mv would not keep labels - refusing'; exit 7; }
 cat > "$BK/files.sha256" <<'SUMS'
-fe3feafd980bd5ac1902ba07e217e1428ddc11e8f31d427c9707643211b19ac2  BixbyPromotion.dll
+5c3d682b94154b4e00915b988da98ea3923b0f29d4547d2c2b12a45f96b62e64  BixbyPromotion.dll
 13e781d4e1f13494233e000124102caad8c9a5bb41bc244517f3bdcaea5ad730  Probe.dll
 530d94cae62b04c4677ff4a6549f72b84c13115b13e16283fc2197a56442a275  bridge/silentglass-ha.conf.example
 79e781941472cca69e35930eadfbb3f73e5354db7d19db028b3850e19786b1ac  bridge/silentglass-ha.dll
@@ -56,6 +56,7 @@ b76a005407bc718831e51d2e66c55e8aac44cc92bcccd506bbe98d27574fb8a0  quiet-home/pla
 697923cdae0ebb490eda557ade98a08426a3f14bcafee7132f486f06c2952484  quiet-home/placeholders/card-8.svg
 1fb61ee0e765bcc00b2601f76e9b499dff38299fbc89b9b1cbc6363788790b30  quiet-home/placeholders/card-9.svg
 2a6b2d2d7147442dae5711ecd92810f5c73d80a0c4e1da705e760a5cb2bf9141  quiet-home/shade-bottom.png
+9a8ad29df2158acd56637687c07af591043295ec506171da566157753b96f89c  quiet-home/shade-top-side.png
 95a669bb6b90e062490d8f550d6d59a9f3300c78706557f9c13b2e5417465756  quiet-home/shade-top.png
 86f95aa0f22fbf5e15e37e9c715070928c6ff79f50f11caf00768919ecee06db  quiet-home/sym-antenna.svg
 9975bde49b6d24453c1778426378200d34428ad0f551f872efcd05caaf12215a  quiet-home/sym-apps.svg
