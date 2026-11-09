@@ -211,6 +211,16 @@ class BarClockAndDeveloperMode(unittest.TestCase):
 
 
 class DeviceRecord(unittest.TestCase):
+    def test_hidden_main_window_sits_under_the_picture(self):
+        # the TV's launch screen for the first Home after the boot preload attaches just below our main window: hidden,
+        # that window must sit under the picture or the launch screen blacks it out (and the input drops)
+        back = (SRC / "Backdrop.cs").read_text()
+        app = (SRC / "SilentGlass.cs").read_text()
+        self.assertIn("Window.Default.Hide(); Window.Default.Lower();", back)
+        self.assertIn("Window.Default.Show(); Window.Default.Raise();", back)
+        self.assertIn('x.TryGet("__K_BG_LAUNCH", out string _)) { Preloaded(); return; }', app)
+        self.assertIn("HideMainNow(); }", back[back.index("void Preloaded()"):])
+
     def test_catalog_only_has_installed_enabled_apps(self):
         if not INVENTORY.is_file():
             self.skipTest("private device inventory is not included in a clean checkout")

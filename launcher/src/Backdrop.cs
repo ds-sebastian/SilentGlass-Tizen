@@ -54,7 +54,15 @@ public sealed partial class SilentGlass
         mainHide ??= ClearThenHide(HideMainNow);
         mainHide.Stop(); mainHide.Start();
     }
-    void HideMainNow() { if (backdropShown) return; try { Window.Default.Hide(); } catch { } backdrop.Hide(); }
+    // The TV preloads the Home app at boot, in the background. On the first Home press after that, the TV attaches its
+    // launch screen, an opaque black window, just below the app's main window. With the hidden main window over the
+    // picture, so was the launch screen: the picture went black and the TV dropped the input for seconds (the black
+    // flash on the first Home after a restart). So the hidden main window sits under the picture and takes the launch
+    // screen down with it; ShowBackdrop raises it. (A cold launch maps the window on top before this can apply:
+    // PlaceholderGuard below still handles that one.)
+    void HideMainNow() { if (backdropShown) return; try { Window.Default.Hide(); Window.Default.Lower(); } catch { } backdrop.Hide(); }
+    // the TV preloads the Home app at boot with a background launch: nothing to show yet
+    void Preloaded() { Note("preload fg=" + Foreground()); if (backdropShown) return; mainUp = false; HideMainNow(); }
     // A cold launch (the first Home after SilentGlass restarted) makes it the TV's front app, and the TV keeps it
     // there with a near-black launch placeholder under its hidden main window - over the picture, holding the remote.
     // Whenever SilentGlass is the front app with nothing of its own full screen, the viewer is brought back; an open

@@ -64,6 +64,8 @@ public sealed partial class SilentGlass : NUIApplication
         Note("request from " + (string.IsNullOrEmpty(caller) ? "system" : caller) + " t=" + stamp + (keys.Length > 0 ? " [" + keys + "]" : ""));
         // from the Home Assistant bridge: a notification is waiting / switch input like a press on its bar item
         if (x.TryGet(Shared.ExtraNotice, out string _)) { TakeNotice("launch"); return; }
+        // the TV preloads the Home app at boot (and after it was closed) with a background launch: not a Home press
+        if (x.TryGet("__K_BG_LAUNCH", out string _)) { Preloaded(); return; }
         if (x.TryGet(Shared.ExtraSource, out string src) && int.TryParse(src, out int t) && inputs.Exists(i => i.Type == t)) { SelectSource(t); return; }
         // the Home button (or anyone opening one part directly): Screen.cs decides - the bar over the picture, the
         // wallpaper behind it, or the picture first from Ambient

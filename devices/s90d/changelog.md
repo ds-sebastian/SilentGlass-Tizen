@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.3.3** (2026-11-08): no black flash on the first Home after a restart. At boot the TV preloads
+  the Home app in the background. On the first Home press after that, the TV attaches its launch screen (an opaque
+  black window) just below the app's main window, which SilentGlass keeps hidden but which sat above the picture:
+  the launch screen covered the picture and the TV dropped the input for 3-11 s. The hidden main window now sits
+  under the picture (lowered when hidden, raised with the wallpaper), so the launch screen lands under the picture
+  too and the first Home only opens the bar. A cold launch (after an install) still briefly shows it, as before.
 - **SilentGlass 1.3.2** (2026-11-08): the time is the first thing on the bar (not focusable, then a separator;
   hidden over the wallpaper, which shows its own clock; follows the 12 / 24 / off clock setting). Controls ends with
   **Developer Mode**: it opens Samsung's Apps screen, where 1 2 3 4 5 on the remote opens the Developer Mode box
