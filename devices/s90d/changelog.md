@@ -6,7 +6,7 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
-- **SilentGlass 1.4.0** (unreleased): **shortcuts** replace Watch / Play.
+- **SilentGlass 1.4.0** (2026-11-09): **shortcuts** replace Watch / Play, and a visual refresh.
   - Up to four, each a name (up to 14 characters), an icon (TV, game controller, desktop, laptop, disc, HDMI) and an
     HDMI input. Hidden ones aren't on the bar. The line under a name is the TV's own name for the input; an unnamed
     shortcut shows that name alone. Set inputs in **Info › Shortcuts** (Left / Right) and everything on the phone
