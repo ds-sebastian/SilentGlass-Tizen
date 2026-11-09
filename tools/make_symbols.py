@@ -50,6 +50,9 @@ SYMBOLS = {
     "antenna": f'<path d="M24 22v20"/><path d="M14 12a14 14 0 0 0 0 20M34 12a14 14 0 0 1 0 20M19 17a7 7 0 0 0 0 10M29 17a7 7 0 0 1 0 10"/>'
                + fill(circle(24, 22, 3.4), "nonzero"),
     "hdmi": f'<path d="M8 14h32v9l-5 7H13l-5-7z"/><path d="M17 30v5h14v-5"/><path d="M15 20h18"/>',
+    "desktop": f'<path d="{rrect(4, 6, 40, 27, 4)}"/><path d="M21 33l-1.5 8M27 33l1.5 8M15 41h18"/>',
+    "laptop": f'<path d="{rrect(9, 9, 30, 21, 3)}"/>' + fill("M4 34h40l-2.6 4.4a3 3 0 0 1-2.6 1.6H9.2a3 3 0 0 1-2.6-1.6z", "nonzero"),
+    "disc": '<circle cx="24" cy="24" r="19"/>' + fill(circle(24, 24, 6.5) + circle(24, 24, 2.6)) + '<path d="M24 11a13 13 0 0 1 13 13" stroke-width="2.6"/>',
     # bar
     "inputs": f'<path d="M20 9h17a6 6 0 0 1 6 6v18a6 6 0 0 1-6 6H20"/><path d="M4 24h22M18 15l9 9-9 9"/>',
     "controls": ('<path d="M6 12h22M38 12h4M6 24h6M22 24h20M6 36h18M34 36h8"/>'

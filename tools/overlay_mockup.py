@@ -61,6 +61,13 @@ body{{margin:0;width:1920px;height:1080px;overflow:hidden;background:#000 center
 .hr{{height:1px;background:rgba(255,255,255,.14);margin:12px 8px}}
 .sw{{width:64px;height:36px;border-radius:18px;background:#30d158;position:relative}} .sw b{{position:absolute;right:3px;top:3px;width:30px;height:30px;border-radius:15px;background:#fff}}
 .sw.off{{background:rgba(120,120,128,.5)}} .sw.off b{{left:3px}}
+.clk{{position:absolute;right:80px;top:40px;height:64px;line-height:64px;font-family:QID;font-size:40px;white-space:nowrap}}
+.clkpill{{position:absolute;right:52px;top:36px;height:72px;border-radius:36px;padding:0 28px;display:flex;align-items:center;font-family:QID;font-size:40px;white-space:nowrap}}
+.scrimtr{{position:absolute;right:0;top:0;width:760px;height:240px;background:radial-gradient(ellipse 100% 100% at 100% 0%,rgba(0,0,0,.42),rgba(0,0,0,0) 70%)}}
+.clkbar{{position:absolute;font-family:QID;font-size:34px;opacity:.92;text-shadow:0 2px 12px rgba(0,0,0,.55);white-space:nowrap}}
+.sum{{display:flex;align-items:center;gap:18px;padding:12px 24px;border-radius:28px}}
+.disc{{width:52px;height:52px;border-radius:26px;display:flex;align-items:center;justify-content:center}}
+.disc img{{width:30px;height:30px}}
 .tile{{position:absolute;width:{APP_W}px;height:{APP_H}px;border-radius:20px;background:#333 center/cover}}
 .tname{{position:absolute;width:{APP_W}px;text-align:center;font-weight:600;font-size:22px;opacity:.8}}
 .tile.f{{transform:scale(1.07);box-shadow:0 0 0 4px #fff,0 18px 40px rgba(0,0,0,.45)}}
@@ -74,11 +81,11 @@ def sym(n):
     return uri(A / f"sym-{n}.svg")
 
 
-def bar(focus, clock="4:52 PM"):
+def bar(focus, clock=None, above=None, items=None):
     out = []
     if clock:  # the time first, then a separator; not focusable (none over the wallpaper: its own clock shows)
         out.append(f'<div class="item" style="font-weight:500">{clock}</div><div class="sep"></div>')
-    for i, it in enumerate(BAR):
+    for i, it in enumerate(items or BAR):
         if it is None:
             out.append('<div class="sep"></div>')
             continue
@@ -86,7 +93,30 @@ def bar(focus, clock="4:52 PM"):
         text = (f'<span class="two">{label}<small>{sub}{"<span class=dot></span>" if live else ""}</small></span>'
                 if sub else label)
         out.append(f'<div class="item{" f" if i == focus else ""}"><img src="{sym(g)}">{text}</div>')
-    return f'<div class="dim"></div><div class="glass bar" id="bar">{"".join(out)}</div>'
+    above_html = f'<div class="clkbar" id="clkbar">{above}</div>' if above else ""
+    # position the floating clock over the bar's right end once the bar is laid out
+    js = ("<script>window.onload=()=>{const b=document.getElementById('bar').getBoundingClientRect(),c=document.getElementById('clkbar');"
+          "c.style.left=(b.right-c.offsetWidth-34)+'px';c.style.top=(b.top-c.offsetHeight-14)+'px'}</script>") if above else ""
+    return f'<div class="dim"></div><div class="glass bar" id="bar">{"".join(out)}</div>{above_html}{js}'
+
+
+def corner_clock(t="4:52 PM", style="plain"):
+    # the same spot and type as the wallpaper clock (Backdrop.cs: 1420,40 420x64, Display 40, right-aligned)
+    if style == "pill":
+        return f'<div class="glass clkpill">{t}</div>'
+    return f'<div class="scrimtr"></div><div class="clk">{t}</div>'
+
+
+SHORTCUTS3 = [("tv", "Watch", "SHIELD", True), ("gamecontroller", "Play", "Nintendo Switch", False),
+              ("desktop", "Work", "Gaming PC", False), None,
+              ("controls", "Controls", None, False), ("apps", "Apps", None, False), ("info", "Info", None, False)]
+
+
+def shortcuts_panel(focus=0):
+    rows = [("v", "tv", "Watch", "HDMI 3 · SHIELD"), ("v", "gamecontroller", "Play", "HDMI 1 · Nintendo Switch"),
+            ("v", "desktop", "Work", "HDMI 2 · Gaming PC"), ("v", "hdmi", "Shortcut 4", "Hidden"), "hr",
+            ("a", "gear", "Names and icons", "On your phone")]
+    return panel(rows, focus, title=("Shortcuts", ""), opaque=True)
 
 
 def page(name, body, bg):
@@ -94,9 +124,11 @@ def page(name, body, bg):
             f'<body style="background-image:url({uri(bg)})">{body}</body></html>')
 
 
-def inputs_pop():
+def inputs_pop(trim=False):
     rows = [("tv", "SHIELD", "HDMI 3", True, True), ("gamecontroller", "Nintendo Switch", "HDMI 1", False, False),
             ("hdmi", "HDMI 2", None, False, False), ("hdmi", "HDMI 4", None, False, False), ("antenna", "Live TV", None, False, False)]
+    if trim:
+        rows = rows[:2]
     h = 24 + len(rows) * ROW_H
     rs = []
     for i, (g, n, p, cur, live) in enumerate(rows):
@@ -152,7 +184,7 @@ def panel_rows(rows, focus):
 
 def panel(rows, focus, title=None, opaque=False):
     body = panel_rows(rows, focus)
-    head = (f'<div style="padding:14px 24px 6px;display:flex;align-items:baseline;gap:14px"><span style="font-family:QID;font-size:34px">{title[0]}</span>'
+    head = (f'<div style="padding:14px 24px 18px;display:flex;align-items:baseline;gap:14px"><span style="font-family:QID;font-size:34px">{title[0]}</span>'
             f'<span style="font-size:22px;opacity:.5">{title[1]}</span></div>') if title else ""
     bg = "background:rgba(22,22,26,.95)" if opaque else ""
     return (f'<div class="dimr"></div><div class="glass cc" style="left:{CC_X}px;top:50%;transform:translateY(-50%);width:{CC_W}px;{bg}">'
@@ -179,6 +211,46 @@ def info(focus=0):
             ("t", "bell", "Notifications", True), "hr",
             ("a", "gear", "Advanced settings", "")]
     return panel(rows, focus, title=("SilentGlass", "v42e · nothing sent anywhere"), opaque=True)
+
+
+def info_summary(focus=0, issue=False):
+    green, amber = "#30d158", "#ff9f0a"
+    if issue:
+        head = (f'<div class="sum"><div class="disc" style="background:{amber}"><img src="{sym("info")}"></div>'
+                f'<div><div style="font-weight:600;font-size:30px">One thing to check</div>'
+                f'<div style="font-weight:500;font-size:23px;opacity:.6;margin-top:2px">Up 2 h 54 min · 41 °C</div></div></div>')
+        extra = [("d", "", "Thread", "Starting…", amber)]
+    else:
+        head = (f'<div class="sum"><div class="disc" style="background:{green}"><img src="{sym("check")}"></div>'
+                f'<div><div style="font-weight:600;font-size:30px">Everything is fine</div>'
+                f'<div style="font-weight:500;font-size:23px;opacity:.6;margin-top:2px">Wired · home network only · up 2 h 54 min</div></div></div>')
+        extra = []
+    rows = extra + ["hr",
+            ("v", "tv", "Watch", "Auto · SHIELD"), ("v", "gamecontroller", "Play", "Auto · Nintendo Switch"),
+            ("t", "apps", "Apps in the bar", True), ("v", "moon", "Dim after", "5 min"), ("v", "picture", "Wallpaper", "Follows sunset"),
+            ("t", "bell", "Notifications", True), ("t", "network", "Home network only", True), "hr",
+            ("a", "info", "Status details", ""), ("a", "gear", "Advanced settings", "")]
+    body = panel_rows(rows, focus)
+    title = (f'<div style="padding:14px 24px 6px;display:flex;align-items:baseline;gap:14px"><span style="font-family:QID;font-size:34px">SilentGlass</span>'
+             f'<span style="font-size:22px;opacity:.5">1.3.4</span></div>')
+    return (f'<div class="dimr"></div><div class="glass cc" style="left:{CC_X}px;top:50%;transform:translateY(-50%);width:{CC_W}px;background:rgba(22,22,26,.95)">'
+            f'{title}{head}{body}</div>')
+
+
+def controls_trim(focus=0, sleep="None"):
+    rows = [("s", "sun", "Brightness", "50", .99), ("s", "speaker", "Volume", "18", .18), "hr",
+            ("v", "picture", "Picture Mode", "Movie (Calibrated)"), ("v", "waveform", "Sound Mode", "Adaptive Sound"),
+            ("v", "soundbar", "Sound Output", "Soundbar"), ("v", "gamecontroller", "Game Mode", "Automatic"),
+            ("v", "moon", "Sleep Timer", sleep), "hr",
+            ("a", "artframe", "Ambient", ""), ("a", "slidersmore", "More", "")]
+    return panel(rows, focus)
+
+
+def controls_more(focus=0):
+    rows = [("s", "contrast", "Contrast", "45", .9), ("t", "pixelshift", "Pixel Shift", True), "hr",
+            ("a", "bluetooth", "Bluetooth", ""), ("a", "network", "Network", ""), ("a", "gear", "TV Settings", ""),
+            ("a", "apps", "Developer Mode", "1 2 3 4 5")]
+    return panel(rows, focus, title=("More", ""))
 
 
 def setup_sheet(qr):
@@ -242,6 +314,21 @@ def main():
              "info": bar(6) + info(5),
              "backdrop": backdrop() + bar(0, None),
              "setup": setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0), "controls-dev": controls(13)}
+    if len(sys.argv) > 3 and sys.argv[3] == "v2":
+        pages = {"bar-now": bar(0, None, None, [("clock",)] if False else None).replace('<div class="glass bar" id="bar">', '<div class="glass bar" id="bar"><div class="item" style="font-weight:500">4:52 PM</div><div class="sep"></div>'),
+                 "a1-bar-corner-plain": corner_clock() + bar(0),
+                 "a2-bar-corner-pill": corner_clock(style="pill") + bar(0),
+                 "b-bar-clock-above": bar(0, above="4:52 PM"),
+                 "a1-wallpaper": backdrop() + bar(0),
+                 "c-controls-trim": controls_trim(0) + corner_clock(),
+                 "c-controls-sleep": controls_trim(6, "45 min left") + corner_clock(),
+                 "c-controls-more": controls_more(5) + corner_clock(),
+                 "d-inputs-trim": corner_clock() + bar(3) + inputs_pop(trim=True),
+                 "e-info-fine": info_summary(1),
+                 "e-info-issue": info_summary(1, issue=True),
+                 "f-bar-3shortcuts": corner_clock() + bar(2, items=SHORTCUTS3),
+                 "f-bar-1shortcut": corner_clock() + bar(0, items=[SHORTCUTS3[0], None] + [("inputs", "Inputs", None, False)] + SHORTCUTS3[4:]),
+                 "f-shortcuts-panel": shortcuts_panel(2)}
     for name, body in pages.items():
         (out / f"{name}.html").write_text(page(name, body, bg))
         subprocess.run(["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
