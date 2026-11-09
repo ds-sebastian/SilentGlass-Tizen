@@ -6,12 +6,15 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
-- **SilentGlass 1.4.1** (unreleased): darker shades so the clock and the bar read over bright scenes. The clock's
-  shade is a band across the whole top (darkest at the edge, fading out over 260 px) instead of a patch in the
-  corner, and the digits have a soft shadow; the bar's shade goes to 86 % black at the bottom edge (was 50 %) while
-  the middle of the picture stays about as it was. Both shades are pre-rendered images (`tools/make_shades.py`:
-  one alpha level per row, ordered dither) because the TV's gradient visual held each colour stop flat for ~27 rows
-  and the slope changes showed as stripes over the picture.
+- **SilentGlass 1.4.1** (2026-11-09): darker shades so the clock and the bar read over bright scenes.
+  - The clock's shade is a band across the whole top (84 % black at the edge, fading out over 260 px) instead of a
+    patch in the corner, and the digits have a soft shadow. The bar's shade goes to 86 % black at the bottom edge
+    (was 50 %); the middle of the picture stays about as it was.
+  - The shades are pre-rendered images (`tools/make_shades.py`: one alpha level per row, ordered dither). The TV's
+    gradient visual held each colour stop flat for ~27 rows and the slope changes showed as stripes.
+  - Controls, More and Info use the full-screen overlay like the bar (they had the right 744 px), so the clock's shade
+    runs across the top there too instead of ending in a line.
+  - Info's summary line gives the uptime in one unit ("up 21 h") so it fits.
 - **SilentGlass 1.4.0** (2026-11-09): **shortcuts** replace Watch / Play, and a visual refresh.
   - Up to four, each a name (up to 14 characters), an icon (TV, game controller, desktop, laptop, disc, HDMI) and an
     HDMI input. Hidden ones aren't on the bar. The line under a name is the TV's own name for the input; an unnamed

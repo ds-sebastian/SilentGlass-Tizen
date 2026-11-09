@@ -15,7 +15,7 @@ Tested on one TV: Samsung **QN65S90D** (2024 OLED), firmware `T-PTMDAKUC-0090-RE
 - **Home as an overlay.** A glass bar fades in over whatever is playing. Up to four shortcuts (named by you, e.g.
   Watch and Play) jump straight to an input. The picture never stops.
 - **Controls without menus.** Brightness, volume, picture and sound modes, Game Mode and the sleep timer in a side
-  panel.
+  panel; contrast, pixel shift and the TV's own menus one level down in More.
 - **Home Assistant.** Power, inputs, volume and picture settings, plus camera and doorbell notifications over any
   input. Never wakes the TV.
 - **Thread border router.** The TV's built-in radio joins your existing Thread network and keeps running in
@@ -28,7 +28,7 @@ Tested on one TV: Samsung **QN65S90D** (2024 OLED), firmware `T-PTMDAKUC-0090-RE
 
 ![Controls over the picture](docs/screenshots/s90d-overlay-controls.jpg)
 
-<p><img src="docs/screenshots/s90d-overlay-inputs.jpg" width="49%" alt="Inputs, with a green dot on every device that is on">
+<p><img src="docs/screenshots/s90d-info.jpg" width="49%" alt="Info: one status line, shortcuts and settings">
 <img src="docs/screenshots/s90d-notice.jpg" width="49%" alt="A doorbell notification over the picture"></p>
 
 ![Advanced settings on a phone](docs/screenshots/s90d-phone-settings.jpg)

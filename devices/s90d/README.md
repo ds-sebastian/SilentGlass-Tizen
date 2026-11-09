@@ -30,7 +30,7 @@ Everything is an overlay over the TV's own viewer, so the picture keeps playing 
 | **Wallpaper** | shown only when there's no picture, with a clock; dims after 5 min for the OLED |
 | **Banners** | Home Assistant notifications and input alerts, in their own window, which never takes the remote |
 
-<p><img src="../../docs/screenshots/s90d-overlay-inputs.jpg" width="49%" alt="Inputs">
+<p><img src="../../docs/screenshots/s90d-overlay-more.jpg" width="49%" alt="Controls › More">
 <img src="../../docs/screenshots/s90d-info.jpg" width="49%" alt="Info"></p>
 
 ### Settings
