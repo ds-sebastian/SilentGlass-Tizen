@@ -40,6 +40,7 @@ public sealed partial class SilentGlass
     void Place(int x, int y, int w, int h) { try { ow.WindowPositionSize = new Rectangle(x, y, w, h); } catch { } oRoot.Position2D = new Position2D(-x, -y); }
     void ClearOverlay()
     {
+        StopOverlayAnimations();
         bar.Clear(); rows.Clear(); menu.Clear(); tiles.Clear(); highlight = null; capsule = null; setupSheet = null; popover = null; barClock = null;
         while (oRoot != null && oRoot.ChildCount > 0) { var v = oRoot.GetChildAt(0); oRoot.Remove(v); v.Dispose(); }
         oLayer = new View { Size2D = new Size2D(1920, 1080) }; oDim = null;
@@ -177,7 +178,7 @@ public sealed partial class SilentGlass
         FocusBar(false);
         bool fresh = !overlayShown; Note(fresh ? "bar:open" : "bar:rebuild");
         ShowOverlay(); OverlayActivity();
-        if (fresh) { FadeIn(capsule); FadeIn(oDim); }
+        if (fresh) FadeIn(capsule, oDim);
         RefreshDevices();
     }
     // the focused item is a white capsule; while one of its menus is open it stays marked in faint white
@@ -193,7 +194,7 @@ public sealed partial class SilentGlass
         }
         if (highlight == null || barSel < 0 || barSel >= bar.Count) return;
         var b = bar[barSel]; highlight.BackgroundColor = mode == Mode.Bar ? FocusFill : new Color(1, 1, 1, .18f);
-        if (animate) { var a = new Animation(150) { DefaultAlphaFunction = Ease() }; a.AnimateTo(highlight, "PositionX", (float)b.X); a.AnimateTo(highlight, "SizeWidth", (float)b.W); Play(a); }
+        if (animate) { StopAnimation(ref barAnim); barAnim = new Animation(150) { DefaultAlphaFunction = Ease() }; barAnim.AnimateTo(highlight, "PositionX", (float)b.X); barAnim.AnimateTo(highlight, "SizeWidth", (float)b.W); barAnim.Play(); }
         else { highlight.Position2D = new Position2D(b.X, (BarH - ItemH) / 2); highlight.Size2D = new Size2D(b.W, ItemH); }
     }
     int BarItemCentre(string action) { var b = bar.Find(i => i.Action == action); return b == null ? 960 : capsule.Position2D.X + b.X + b.W / 2; }

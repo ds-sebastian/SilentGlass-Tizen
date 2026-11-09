@@ -89,8 +89,9 @@ public sealed partial class SilentGlass
             nAnimation.AnimateTo(nCard, "Opacity", alpha); nAnimation.AnimateTo(nCard, "PositionY", 0f);
             nw.Show(); nw.Raise(); nAnimation.Play();
         }
-        nTimer?.Stop(); nTimer = new Tizen.NUI.Timer((uint)(Math.Clamp(seconds <= 0 ? 5 : seconds, 3, 60) * 1000));
-        nTimer.Tick += (s, e) => { HideNotice(); return false; }; nTimer.Start();
+        uint ms = (uint)(Math.Clamp(seconds <= 0 ? 5 : seconds, 3, 60) * 1000);  // one timer, reused for every banner
+        if (nTimer == null) { nTimer = new Tizen.NUI.Timer(ms); nTimer.Tick += (s, e) => { HideNotice(); return false; }; } else { nTimer.Stop(); nTimer.Interval = ms; }
+        nTimer.Start();
     }
     void HideNotice()
     {

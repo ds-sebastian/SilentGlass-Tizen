@@ -46,27 +46,38 @@ public sealed partial class SilentGlass
     readonly Dictionary<string, bool> settingEnabled = new();
     readonly Dictionary<string, (double min, double max, double step)> ranges = new();
     int volume = -1, mute = -1;
+    // everything: on open, every 3 s while Controls is up, and after a change that moves other settings (a picture mode
+    // brings its own brightness); the option lists are read again too
     void RefreshSettings()
     {
-        volume = sound_manager_get_master_volume(out var v) == 0 ? v : -1;
-        mute = sound_manager_get_master_mute(out var m) == 0 ? m : -1;
+        ReadSound();
         foreach (var id in new[] { "brightness", "contrast" })
             try { if (CSharpGetItemMinMaxStepValue(id, out var mn, out var mx, out var st) && st > 0 && mx > mn) ranges[id] = (mn, mx, st); } catch { }
-        foreach (var id in SettingIds)
-            try {
-                if (CSharpGetItemValue(id, out var name, out var value) && !string.IsNullOrEmpty(value)) { settingValues[id] = value; settingNames[id] = name; }
-                else { settingValues.Remove(id); settingNames.Remove(id); }
-                settingEnabled[id] = CSharpGetItemEnable(id, out var enabled) && enabled;
-            } catch { settingValues.Remove(id); settingNames.Remove(id); settingEnabled[id] = false; }
+        foreach (var id in SettingIds) ReadSetting(id);
+        optionLists.Clear();
+    }
+    void ReadSound() { volume = sound_manager_get_master_volume(out var v) == 0 ? v : -1; mute = sound_manager_get_master_mute(out var m) == 0 ? m : -1; }
+    // one setting: 2 IPC calls (a Left / Right press reads only the setting it changes)
+    void ReadSetting(string id)
+    {
+        try {
+            if (CSharpGetItemValue(id, out var name, out var value) && !string.IsNullOrEmpty(value)) { settingValues[id] = value; settingNames[id] = name; }
+            else { settingValues.Remove(id); settingNames.Remove(id); }
+            settingEnabled[id] = CSharpGetItemEnable(id, out var enabled) && enabled;
+        } catch { settingValues.Remove(id); settingNames.Remove(id); settingEnabled[id] = false; }
     }
     string Setting(string id) => settingValues.TryGetValue(id, out var v) ? v : "";
     string SettingName(string id) => settingNames.TryGetValue(id, out var v) ? v : "–";
     bool CanEdit(string id) => settingEnabled.TryGetValue(id, out var e) && e && settingValues.ContainsKey(id);
     (double min, double max, double step) Range(string id) => ranges.TryGetValue(id, out var r) ? r : (0, 50, 1);
     float Level(string id) { var (mn, mx, _) = Range(id); return mx > mn && double.TryParse(Setting(id), NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? (float)((n - mn) / (mx - mn)) : -1; }
-    // options the TV offers for the current input (enabled and visible); numeric values only (the native list can end with garbage)
+    // options the TV offers for the current input (enabled and visible); numeric values only (the native list can end with
+    // garbage). 2-3 IPC calls per option, so kept until the next full read (RefreshSettings): pressing Right through
+    // the picture modes reads the list once.
+    readonly Dictionary<string, List<string>> optionLists = new();
     List<string> Options(string id, bool visibleOnly = true)
     {
+        if (optionLists.TryGetValue(id, out var known)) return known;
         var result = new List<string>(); var sb = new System.Text.StringBuilder(32768);
         try { if (!CSharpGetItemDataList(id, sb)) return result; } catch { return result; }
         foreach (var entry in sb.ToString().Split(';')) {
@@ -74,29 +85,31 @@ public sealed partial class SilentGlass
             if (v.Length == 0 || v.Length > 9 || !int.TryParse(v, NumberStyles.None, CultureInfo.InvariantCulture, out _)) continue;
             try { if (CSharpGetItemDataListEnable(id, v, out var en) && en && (!visibleOnly || CSharpGetItemDataListVisible(id, v, out var vis) && vis) && !result.Contains(v)) result.Add(v); } catch { }
         }
-        return result;
+        return optionLists[id] = result;
     }
     bool SetSetting(string id, string value)
     {
         if (!CanEdit(id)) { Note("setting:" + id + ":unavailable"); return false; }
         bool ok = false; try { ok = CSharpSetItemValue(id, value); } catch { }
-        RefreshSettings(); ok &= Setting(id) == value;
+        // a level moves only itself; a mode or output can change the others (and their option lists)
+        if (id is "brightness" or "contrast") ReadSetting(id); else RefreshSettings();
+        ok &= Setting(id) == value;
         Note("setting:" + id + ":" + value + ":" + ok); return ok;
     }
     // Left / Right step through the TV's own option list; Game Mode's item is marked hidden here though all its values apply
     void CycleSetting(string id, int dir)
     {
-        RefreshSettings(); var options = Options(id, id != "game-mode-auto");
+        ReadSetting(id); var options = Options(id, id != "game-mode-auto");
         if (options.Count < 2) return;
         int i = options.IndexOf(Setting(id)); SetSetting(id, options[((i < 0 ? 0 : i) + dir + options.Count) % options.Count]);
     }
     void ChangeLevel(string id, int dir)
     {
-        RefreshSettings(); var (mn, mx, st) = Range(id);
+        ReadSetting(id); var (mn, mx, st) = Range(id);  // the value now: the remote or Home Assistant may have moved it
         if (double.TryParse(Setting(id), NumberStyles.Float, CultureInfo.InvariantCulture, out double n)) SetSetting(id, Math.Clamp(n + dir * st, mn, mx).ToString(CultureInfo.InvariantCulture));
     }
-    void ChangeVolume(int dir) { if (sound_manager_get_master_volume(out int n) == 0) sound_manager_set_master_volume(Math.Clamp(n + dir, 0, 100)); RefreshSettings(); }
-    void ToggleMute() { if (sound_manager_get_master_mute(out int n) == 0) sound_manager_set_master_mute(n == 1 ? 0 : 1); RefreshSettings(); }
+    void ChangeVolume(int dir) { if (sound_manager_get_master_volume(out int n) == 0) sound_manager_set_master_volume(Math.Clamp(n + dir, 0, 100)); ReadSound(); }
+    void ToggleMute() { if (sound_manager_get_master_mute(out int n) == 0) sound_manager_set_master_mute(n == 1 ? 0 : 1); ReadSound(); }
 
     // ---- inputs: Samsung's source list (Shared.ParseInputs) and the current source, pushed by the TV. A device is on
     // when the input on screen has a picture (memory/tv-viewer/mainscreen_signal_state) or HDMI-CEC lists it
@@ -244,12 +257,17 @@ public sealed partial class SilentGlass : IScreen
     void IScreen.TvChanged() => OnTvChanged();
     void IScreen.After(int ms, Action action) => After(ms, action);
     void IScreen.Note(string what) => Note(what);
-    // a one-shot timer, referenced until it fires (an unreferenced NUI timer can be collected before it does)
+    // a one-shot timer, referenced until it fires (an unreferenced NUI timer can be collected before it does). A fired
+    // timer is disposed by the next After call, never inside its own tick: the wallpaper's 1 s poll alone makes 3,600
+    // an hour, and each holds a native handle until disposed.
     readonly HashSet<Tizen.NUI.Timer> afterTimers = new();
+    readonly List<Tizen.NUI.Timer> firedTimers = new();
     void After(int ms, Action action)
     {
+        foreach (var f in firedTimers) f.Dispose();
+        firedTimers.Clear();
         var t = new Tizen.NUI.Timer((uint)Math.Max(1, ms)); afterTimers.Add(t);
-        t.Tick += (s, e) => { afterTimers.Remove(t); try { action(); } catch (Exception ex) { Note("after-error:" + ex.GetType().Name); } return false; };
+        t.Tick += (s, e) => { afterTimers.Remove(t); try { action(); } catch (Exception ex) { Note("after-error:" + ex.GetType().Name); } firedTimers.Add(t); return false; };  // added after the action: an After() inside it must not dispose t
         t.Start();
     }
 }

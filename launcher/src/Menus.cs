@@ -82,13 +82,16 @@ public sealed partial class SilentGlass
     }
     void FocusApps(bool animate)
     {
+        // one animation per press for all the tiles, stopping the last one (a fast press doesn't start a dozen)
+        if (animate) { StopAnimation(ref appsAnim); appsAnim = new Animation(150) { DefaultAlphaFunction = Ease() }; }
         for (int i = 0; i < tiles.Count; i++) {
             var (card, name, _) = tiles[i]; bool f = i == menuSel;
             card.BorderlineWidth = f ? 4 : 0; name.TextColor = f ? White : new Color(1, 1, 1, .8f);
             var sc = f ? new Vector3(1.07f, 1.07f, 1) : new Vector3(1, 1, 1);
-            if (animate) { var a = new Animation(150) { DefaultAlphaFunction = Ease() }; a.AnimateTo(card, "Scale", sc); Play(a); } else card.Scale = sc;
+            if (animate) appsAnim.AnimateTo(card, "Scale", sc); else card.Scale = sc;
             if (f) card.RaiseToTop();
         }
+        if (animate) appsAnim.Play();
     }
     void AppsKey(string k, bool back, bool sel, bool arrow)
     {

@@ -71,11 +71,16 @@ public sealed partial class SilentGlass
     }
     static void SetSwitch(Switch s, bool on) { s.Track.BackgroundColor = on ? Live : new Color(.47f, .47f, .5f, .5f); s.Knob.Position2D = new Position2D(on ? 31 : 3, 3); }
     // things appear by fading in where they stay (no slide: on the TV a slide read as a bounce)
-    static void FadeIn(View v, int ms = 180)
+    // overlay animations live in fields: each new one stops the last (no two fight over a view), and ClearOverlay stops
+    // them before it disposes their views (a fade cut short would never finish, so never dispose itself)
+    Animation fadeAnim, barAnim, appsAnim;
+    void StopOverlayAnimations() { StopAnimation(ref fadeAnim); StopAnimation(ref barAnim); StopAnimation(ref appsAnim); }
+    void FadeIn(params View[] views)
     {
-        v.Opacity = 0;
-        var a = new Animation(ms) { DefaultAlphaFunction = Ease() };
-        a.AnimateTo(v, "Opacity", 1f); Play(a);
+        StopAnimation(ref fadeAnim);
+        fadeAnim = new Animation(180) { DefaultAlphaFunction = Ease() };
+        foreach (var v in views) if (v != null) { v.Opacity = 0; fadeAnim.AnimateTo(v, "Opacity", 1f); }
+        fadeAnim.Play();
     }
     static Color HexColor(string hex)
     {
