@@ -53,7 +53,8 @@ static partial class Bridge
     public static int UpdateSeconds(Dictionary<string, string> c) => int.TryParse(c.GetValueOrDefault("update", ""), out int s) && UpdateChoices.Contains(s) ? s : DefaultUpdate;
 
     // ---- config: key=value lines; the file is the owner's alone (it holds the broker password) ----
-    static Dictionary<string, string> ReadConf(string path) { try { return Shared.ParseConf(File.ReadAllText(path)); } catch { return new(); } }
+    static string ReadText(string path) { try { return File.ReadAllText(path); } catch { return null; } }
+    static Dictionary<string, string> ReadConf(string path) => Shared.ParseConf(ReadText(path));
     static Dictionary<string, string> LoadConf() => ReadConf(ConfPath);
     static void SaveConf(Dictionary<string, string> c)
     {
@@ -101,6 +102,21 @@ static partial class Bridge
         Pub("notifications", NoticesOn ? "ON" : "OFF", force);
         Pub("home_network_only", Shared.InternetWanted(Data) ? "OFF" : "ON", force);
         Pub("internet_status", Shared.InternetStatus(Data), force);
+        var prefs = Prefs.Parse(ReadText(DataFile(Shared.PrefsFile)));
+        for (int n = 0; n < Prefs.Slots; n++) {
+            var s = prefs.Shortcuts[n];
+            Pub(Prefs.Key(n, "name"), s.Name, force);
+            Pub(Prefs.Key(n, "input"), s.Shown ? ins.Find(i => i.Type == s.Port)?.Name ?? "Hidden" : "Hidden", force);
+        }
+    }
+    // SilentGlass's settings file, changed from Home Assistant (SilentGlass reloads it when it changes); change returns
+    // why not, or null
+    static void ChangePrefs(Func<Prefs, string> change)
+    {
+        string old = ReadText(DataFile(Shared.PrefsFile)); var p = Prefs.Parse(old);
+        string why = change(p) ?? p.Problem();
+        if (why != null) { Log("shortcut not changed: " + why); return; }
+        try { File.WriteAllText(DataFile(Shared.PrefsFile), p.Merge(old)); } catch (Exception e) { Log("prefs: " + e.Message); }
     }
     static void PublishSlow(bool force)
     {
@@ -153,6 +169,13 @@ static partial class Bridge
         for (int p = 1; p <= 4; p++)
             cfg("text", "hdmi" + p + "_name", common("hdmi" + p + "_name", "HDMI " + p + " name", "mdi:rename", config: true) + st("hdmi" + p + "_name") +
                 ",\"max\":30,\"json_attributes_topic\":\"" + Base + "/hdmi" + p + "_attr\"");
+        // the bar's shortcuts (Prefs.cs): a name and an input each; the icon is picked on the phone page
+        string shortcutInputs = List(ins.Where(i => Shared.IsHdmi(i.Type)).Select(i => i.Name).Prepend("Hidden"));
+        for (int n = 0; n < Prefs.Slots; n++) {
+            string nm = Prefs.Key(n, "name"), inp = Prefs.Key(n, "input");
+            cfg("text", nm, common(nm, "Shortcut " + (n + 1) + " name", "mdi:form-textbox", config: true) + st(nm) + ",\"max\":" + Prefs.NameMax);
+            cfg("select", inp, common(inp, "Shortcut " + (n + 1) + " input", "mdi:video-input-hdmi", config: true) + st(inp) + ",\"options\":" + shortcutInputs);
+        }
         cfg("sensor", "temperature", common("temperature", "Chip temperature", "mdi:thermometer", diag: true) + st("temperature", false) + ",\"device_class\":\"temperature\",\"unit_of_measurement\":\"°C\",\"state_class\":\"measurement\"");
         cfg("sensor", "memory", common("memory", "Free memory", "mdi:memory", diag: true) + st("memory", false) + ",\"device_class\":\"data_size\",\"unit_of_measurement\":\"MB\",\"state_class\":\"measurement\"");
         cfg("switch", "internet_access", null);  // 1.3.0 test builds: replaced by home_network_only (reversed)
@@ -204,6 +227,16 @@ static partial class Bridge
             case "notifications/set" when payload == "ON" || payload == "OFF":
                 SetMarker(Shared.NotifyOff, payload == "OFF"); slow = false; break;
             default: {
+                var sc = Regex.Match(cmd, "^shortcut([1-4])_(name|input)/set$");
+                if (sc.Success) {
+                    int slot = int.Parse(sc.Groups[1].Value) - 1;
+                    if (sc.Groups[2].Value == "name") ChangePrefs(p => { p.Shortcuts[slot].Name = Prefs.CleanName(payload); return null; });
+                    else {
+                        int port = payload == "Hidden" ? 0 : Inputs().Where(i => Shared.IsHdmi(i.Type) && i.Name == payload).Select(i => i.Type).FirstOrDefault(-1);
+                        ChangePrefs(p => { if (port < 0) return "no input called " + payload; p.Shortcuts[slot].Port = port; return null; });
+                    }
+                    slow = false; break;
+                }
                 var m = Regex.Match(cmd, "^hdmi([1-4])_name/set$");
                 if (m.Success) {
                     var name = Regex.Replace(payload, @"[\x00-\x1f]", "").Trim(); if (name.Length > 30) name = name.Substring(0, 30);

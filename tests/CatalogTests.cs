@@ -85,29 +85,46 @@ static class CatalogTests
     }
     static void HomeLogicTests()
     {
-        // preferences: round trip, junk rejected, older files load
-        var saved = new Logic.Prefs { Watch = 15, HideApps = true, Dim = 0, Wall = "night", Lat = 51.5, Lon = -0.1, Close = 0, Clock = "24", InputAlerts = false };
-        var back = Logic.ParsePrefs(Logic.FormatPrefs(saved));
-        True(back.Watch == 15 && back.Play == 0 && back.HideApps && back.Dim == 0 && back.Clock == "24" && !back.InputAlerts && back.Wall == "night" && back.Lat == 51.5 && back.Lon == -0.1 && back.Close == 0, "prefs round trip");
-        var junk = Logic.ParsePrefs("watch=99\nplay=14\nwall=sepia\nlat=400\nlon=abc\nclose=7\ndim=7\nclock=13\n");
-        True(junk.Watch == 0 && junk.Play == 14 && junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == Logic.DefaultLon && junk.Close == 20 && junk.Dim == 5 && junk.Clock == "12", "prefs reject junk");
-        var old = Logic.ParsePrefs("watch=0\nplay=0\nhideapps=1\nlive=0\noverlay=1\n");
+        // preferences (Prefs.cs, shared with the bridge): round trip, junk rejected, older files load
+        var saved = new Prefs { HideApps = true, Dim = 0, Wall = "night", Lat = 51.5, Lon = -0.1, Close = 0, Clock = "24", InputAlerts = false };
+        saved.Shortcuts[0].Port = 15; saved.Shortcuts[2] = new Prefs.Shortcut { Name = "Work", Icon = "desktop", Port = 14 };
+        var back = Prefs.Parse(saved.Format());
+        True(back.Format() == saved.Format() && back.HideApps && back.Dim == 0 && back.Clock == "24" && !back.InputAlerts && back.Wall == "night" && back.Lat == 51.5 && back.Lon == -0.1 && back.Close == 0, "prefs round trip");
+        True(back.Shortcuts[0].Name == "Watch" && back.Shortcuts[0].Port == 15 && !back.Shortcuts[1].Shown && back.Shortcuts[2].Icon == "desktop" && back.For(14).Name == "Work", "shortcuts round trip");
+        var junk = Prefs.Parse("shortcut1_port=99\nshortcut2_port=14\nshortcut2_icon=rocket\nshortcut3_name=A very long name indeed\nshortcut4_port=14\nwall=sepia\nlat=400\nlon=abc\nclose=7\ndim=7\nclock=13\n");
+        True(!junk.Shortcuts[0].Shown && junk.Shortcuts[1].Port == 14 && junk.Shortcuts[1].Icon == "gamecontroller" && junk.Shortcuts[2].Name.Length == Prefs.NameMax && !junk.Shortcuts[3].Shown, "shortcuts reject junk; one input, one shortcut");
+        True(junk.Wall == "auto" && junk.Lat == 90 && junk.Lon == Prefs.DefaultLon && junk.Close == 20 && junk.Dim == 5 && junk.Clock == "12", "prefs reject junk");
+        // 1.3: watch / play, 0 = automatic (fallback HDMI 3 / HDMI 1): the same inputs as shortcuts, the old keys dropped on save
+        var v13 = Prefs.Parse("watch=0\nplay=0\nhideapps=1\ndim=5\n");
+        True(v13.Shortcuts[0].Port == 15 && v13.Shortcuts[1].Port == 13 && v13.Shortcuts[0].Name == "Watch" && v13.Shortcuts[1].Icon == "gamecontroller" && v13.HideApps, "1.3 prefs keep Watch / Play");
+        True(Prefs.Parse("watch=14\nplay=16\n").Shortcuts[0].Port == 14 && Prefs.Parse("watch=14\nplay=16\n").Shortcuts[1].Port == 16, "1.3 chosen inputs kept");
+        True(Prefs.Parse("watch=13\nplay=0\n").Shortcuts[1].Port == 0, "1.3 automatic Play on Watch's input is hidden");
+        string merged = v13.Merge("watch=0\nplay=0\nfuture=7\n");
+        True(!merged.Contains("watch=") && !merged.Contains("play=") && merged.Contains("future=7\n") && merged.Contains("shortcut1_port=15\n"), "save drops retired keys, keeps unknown ones");
+        var old = Prefs.Parse("watch=0\nplay=0\nhideapps=1\nlive=0\noverlay=1\n");
         True(old.HideApps && old.Dim == 5 && old.Close == 20 && old.Clock == "12" && old.InputAlerts, "pre-v40 prefs load");
-        True(Logic.ParsePrefs("dim=1\n").Dim == 5 && Logic.ParsePrefs("dim=0\n").Dim == 0, "pre-v43c dim switch loads");
+        True(Prefs.Parse("dim=1\n").Dim == 5 && Prefs.Parse("dim=0\n").Dim == 0, "pre-v43c dim switch loads");
+        var fresh = Prefs.Parse(null);
+        True(!fresh.HideApps && fresh.Dim == 5 && fresh.Shortcuts.All(s => !s.Shown) && fresh.Shortcuts[0].Name == "Watch" && fresh.Shortcuts[1].Name == "Play", "no prefs file = defaults, no shortcut shown");
         True(Logic.NextDim(5) == 10 && Logic.NextDim(0) == 2 && Logic.NextDim(2, -1) == 0 && Logic.DimName(0) == "Never", "dim cycle");
         var t = new DateTime(2026, 1, 1, 21, 5, 0);
         True(Logic.ClockText("12", t, true) == "9:05 PM" && Logic.ClockText("12", t, false) == "9:05" && Logic.ClockText("24", t, true) == "21:05" && Logic.ClockText("off", t, true) == "", "clock formats");
-        True(!Logic.ParsePrefs(null).HideApps && Logic.ParsePrefs(null).Dim == 5, "no prefs file = defaults");
         True(Logic.NextWall("auto") == "day" && Logic.NextWall("day") == "night" && Logic.NextWall("night") == "auto" && Logic.NextWall("auto", -1) == "night", "wallpaper cycle");
-        // Watch / Play inputs
-        True(Logic.NextPort(0, 15) == 13 && Logic.NextPort(16, 15) == 0, "port cycle wraps through Automatic");
-        True(Logic.NextPort(0, 13) == 14 && Logic.NextPort(14, 15) == 16, "port cycle skips the other one's input");
-        True(Logic.NextPort(0, 15, -1) == 16 && Logic.NextPort(13, 15, -1) == 0 && Logic.NextPort(16, 15, -1) == 14, "port cycle backwards (Left)");
-        for (int cur = 0; cur <= 16; cur = cur == 0 ? 13 : cur + 1)
-            for (int other = 13; other <= 16; other++) {
-                int n = Logic.NextPort(cur, other);
-                True(n != other && (n == 0 || Shared.IsHdmi(n)), "port cycle never collides");
+        // shortcut inputs from the remote: hidden -> HDMI 1..4 -> hidden, skipping inputs other shortcuts use
+        var cyc = Prefs.Parse("shortcut1_port=15\nshortcut2_port=13\n");
+        True(cyc.NextPort(0) == 16 && cyc.NextPort(1) == 14 && cyc.NextPort(1, -1) == 0 && cyc.NextPort(2) == 14 && cyc.NextPort(2, -1) == 16, "port cycle skips the other shortcuts' inputs");
+        cyc.Shortcuts[0].Port = 16; True(cyc.NextPort(0) == 0 && cyc.NextPort(0, -1) == 15, "port cycle wraps through hidden");
+        for (int a = 0; a <= 16; a = a == 0 ? 13 : a + 1)
+            for (int b = 0; b <= 16; b = b == 0 ? 13 : b + 1) {
+                var pp = new Prefs(); pp.Shortcuts[0].Port = a; pp.Shortcuts[1].Port = b == a ? 0 : b;
+                for (int dir = -1; dir <= 1; dir += 2) { int n = pp.NextPort(2, dir); True(n == 0 || Prefs.IsPort(n) && n != pp.Shortcuts[0].Port && n != pp.Shortcuts[1].Port, "port cycle never collides"); }
             }
+        True(new Prefs().Problem() == null && Prefs.Parse("shortcut1_port=13\nshortcut2_port=14\n").Problem() == null, "valid shortcuts");
+        var dup = new Prefs(); dup.Shortcuts[0].Port = 13; dup.Shortcuts[3].Port = 13; True(dup.Problem() != null, "two shortcuts, one input: refused");
+        var bad = new Prefs(); bad.Shortcuts[2].Name = "two\nlines"; True(bad.Problem() != null, "a name with a line break: refused");
+        bad = new Prefs(); bad.Shortcuts[2].Icon = "rocket"; True(bad.Problem() != null, "an unknown icon: refused");
+        bad = new Prefs(); bad.Shortcuts[2].Port = 12; True(bad.Problem() != null, "not an HDMI input: refused");
+        True(Prefs.CleanName("  Gaming\tPC  ") == "GamingPC" && Prefs.CleanName(new string('x', 30)).Length == Prefs.NameMax, "names cleaned");
         // notification banner geometry stays on screen
         foreach (var size in new[] { "small", "medium", "large", "max", "?" })
             foreach (var pos in new[] { "bottom-right", "bottom-left", "top-right", "top-left", "center", "?" }) {

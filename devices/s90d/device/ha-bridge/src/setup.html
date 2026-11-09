@@ -37,6 +37,8 @@ label.row{cursor:pointer}
 .dot{width:10px;height:10px;border-radius:5px;background:var(--sub);flex:0 0 10px}
 .dot.ok{background:var(--green)}.dot.bad{background:var(--red)}
 textarea{width:100%;border:0;background:transparent;color:var(--text);font:13px ui-monospace,Menlo,monospace;padding:12px 16px;min-height:84px;outline:0;resize:vertical}
+.sc{gap:10px}.ic{flex:0 0 38px;height:38px;border:0;border-radius:10px;background:rgba(118,118,128,.14);color:var(--text);display:flex;align-items:center;justify-content:center;padding:0}
+.row input.nm{flex:0 0 104px;min-width:0;text-align:left;font-weight:600}.row.sc select{flex:1;min-width:0}
 .hidden,#gate.hidden{display:none}
 body.locked main,body.locked #save{display:none}
 .row select{flex:1;min-width:0;border:0;background:transparent;color:var(--sub);font:inherit;text-align:right;text-align-last:right;padding:11px 0;outline:0;-webkit-appearance:none;appearance:none}
@@ -61,10 +63,12 @@ body.locked main,body.locked #save{display:none}
 <main>
 <header><h1>Advanced settings</h1><p id="tvname">Living Room TV</p></header>
 
+<h2>Shortcuts</h2>
+<div class="group" id="shortcuts"></div>
+<p class="foot">The inputs on the bar, in this order. Tap an icon to change it. A shortcut set to Hidden isn't on the bar; under each name the TV shows the input's own name.</p>
+
 <h2>Home screen</h2>
 <div class="group">
-  <div class="row"><label for="watch">Watch</label><select id="watch"></select></div>
-  <div class="row"><label for="play">Play</label><select id="play"></select></div>
   <div class="row"><label for="close">Menu closes after</label><select id="close"><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="0">Never</option></select></div>
   <label class="row"><span>Apps in the bar</span><span class="switch"><input type="checkbox" id="apps"><span></span></span></label>
   <div class="row"><label for="dim">Dim after</label><select id="dim"><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30">30 minutes</option><option value="0">Never</option></select></div>
@@ -73,7 +77,7 @@ body.locked main,body.locked #save{display:none}
   <div class="row"><label for="lat">Latitude</label><input id="lat" inputmode="decimal" placeholder="from the time zone"></div>
   <div class="row"><label for="lon">Longitude</label><input id="lon" inputmode="decimal" placeholder="from the time zone"></div>
 </div>
-<p class="foot">Watch and Play are the two inputs on the bar. The wallpaper follows sunset at this location (city level is plenty; without one, the TV's time zone is used). Over a picture the menu closes by itself after this long without a key press; over the wallpaper it stays, and the wallpaper dims (OLED care).</p>
+<p class="foot">The wallpaper follows sunset at this location (city level is plenty; without one, the TV's time zone is used). Over a picture the menu closes by itself after this long without a key press; over the wallpaper it stays, and the wallpaper dims (OLED care).</p>
 
 <h2>Notifications</h2>
 <div class="group">
@@ -175,7 +179,7 @@ function show(s) {
   if (q.length === 2) { $('nqfrom').value = q[0]; $('nqto').value = q[1]; }
   $('nquietrows').classList.toggle('hidden', !$('nquiet').checked);
   $('lat').value = s.lat ?? ''; $('lon').value = s.lon ?? '';
-  fillInputs($('watch'), s.inputs || [], s.watch); fillInputs($('play'), s.inputs || [], s.play);
+  drawShortcuts(s);
   $('apps').checked = !s.hideapps; $('dim').value = s.dim || '5'; $('clock').value = s.clock || '12'; $('inputalerts').checked = s.inputalerts !== false; $('close').value = s.close || '20'; setWall(s.wall || 'auto'); setUpdate(s.update || 10);
   $('thon').checked = s.thread_on;
   $('internetsec').classList.toggle('hidden', !s.internet_installed);
@@ -198,10 +202,40 @@ function setUpdate(u) { update = u; pick('#updseg', x => +x.dataset.u === u); }
 document.querySelectorAll('#updseg button').forEach(b => b.onclick = () => setUpdate(+b.dataset.u));
 function setWall(w) { wall = w; pick('#wallseg', x => x.dataset.w === w); }
 document.querySelectorAll('#wallseg button').forEach(b => b.onclick = () => setWall(b.dataset.w));
+// the bar's icons: launcher/assets/sym-*.svg in the text colour (tests/test_s90d_setup.py keeps them the same)
+const ICONS = {
+  tv: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" aria-hidden="true" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h30a5 5 0 0 1 5 5v18a5 5 0 0 1 -5 5h-30a5 5 0 0 1 -5 -5v-18a5 5 0 0 1 5 -5z"/><path d="M17 42h14"/><path d="M21 15.5v11l9-5.5z" fill="currentColor" stroke="none" fill-rule="nonzero"/></g></svg>',
+  gamecontroller: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" aria-hidden="true" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12h18c6 0 9.6 3.4 11 9.6l2 9.2c1.2 5.4-4.6 8.8-8.6 5.4L33 32H15l-4.4 4.2c-4 3.4-9.8 0-8.6-5.4l2-9.2C5.4 15.4 9 12 15 12zM12.4 18.6h3.2v3.6h3.6v3.2h-3.6V29h-3.2v-3.6H8.8v-3.2h3.6zM31.3 20.5a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0zM35.3 25.5a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0z" fill="currentColor" stroke="none" fill-rule="evenodd"/></g></svg>',
+  desktop: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" aria-hidden="true" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h32a4 4 0 0 1 4 4v19a4 4 0 0 1 -4 4h-32a4 4 0 0 1 -4 -4v-19a4 4 0 0 1 4 -4z"/><path d="M21 33l-1.5 8M27 33l1.5 8M15 41h18"/></g></svg>',
+  laptop: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" aria-hidden="true" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9h24a3 3 0 0 1 3 3v15a3 3 0 0 1 -3 3h-24a3 3 0 0 1 -3 -3v-15a3 3 0 0 1 3 -3z"/><path d="M4 34h40l-2.6 4.4a3 3 0 0 1-2.6 1.6H9.2a3 3 0 0 1-2.6-1.6z" fill="currentColor" stroke="none" fill-rule="nonzero"/></g></svg>',
+  disc: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" aria-hidden="true" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="19"/><path d="M17.5 24a6.5 6.5 0 1 0 13.0 0a6.5 6.5 0 1 0 -13.0 0zM21.4 24a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0z" fill="currentColor" stroke="none" fill-rule="evenodd"/><path d="M24 11a13 13 0 0 1 13 13" stroke-width="2.6"/></g></svg>',
+  hdmi: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" aria-hidden="true" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14h32v9l-5 7H13l-5-7z"/><path d="M17 30v5h14v-5"/><path d="M15 20h18"/></g></svg>'
+};
+let shortcuts = [];
 function fillInputs(sel, list, value) {
   sel.innerHTML = '';
-  [{ type: 0, name: 'Automatic' }].concat(list).forEach(i => { const o = document.createElement('option'); o.value = i.type; o.textContent = i.name; sel.appendChild(o); });
+  [{ type: 0, name: 'Hidden' }].concat(list).forEach(i => { const o = document.createElement('option'); o.value = i.type; o.textContent = i.name; sel.appendChild(o); });
   sel.value = value;
+}
+function drawShortcuts(s) {
+  const g = $('shortcuts'), icons = s.icons || Object.keys(ICONS); g.innerHTML = '';
+  shortcuts = (s.shortcuts || []).map(x => Object.assign({}, x));
+  shortcuts.forEach((x, i) => {
+    const row = document.createElement('div'); row.className = 'row sc';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ic'; b.setAttribute('aria-label', 'Shortcut ' + (i + 1) + ' icon');
+    b.innerHTML = ICONS[x.icon] || ICONS.hdmi;
+    b.onclick = () => { x.icon = icons[(icons.indexOf(x.icon) + 1) % icons.length]; b.innerHTML = ICONS[x.icon]; };
+    const n = document.createElement('input'); n.className = 'nm'; n.maxLength = s.name_max || 14; n.placeholder = 'Name'; n.value = x.name;
+    n.setAttribute('aria-label', 'Shortcut ' + (i + 1) + ' name'); n.oninput = () => x.name = n.value;
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Shortcut ' + (i + 1) + ' input');
+    fillInputs(sel, s.inputs || [], x.port); sel.onchange = () => x.port = +sel.value;
+    row.append(b, n, sel); g.appendChild(row);
+  });
+}
+function shortcutBody() {
+  const body = {};
+  shortcuts.forEach((x, i) => { const k = 'shortcut' + (i + 1) + '_'; body[k + 'name'] = x.name.trim(); body[k + 'icon'] = x.icon; body[k + 'port'] = String(x.port); });
+  return body;
 }
 
 document.querySelectorAll('#thseg button').forEach(b => b.onclick = () => {
@@ -237,10 +271,11 @@ async function fetchHa() {
 }
 async function save() {
   if (threadMode === 'ha' && !haReady) { toast('Get Home Assistant\'s network first, or choose Keep network.'); return; }
-  if ($('watch').value !== '0' && $('watch').value === $('play').value) { toast('Watch and Play need different inputs.'); return; }
-  const body = Object.assign(mqttBody(), noticeBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
+  const used = shortcuts.filter(x => x.port).map(x => x.port);
+  if (new Set(used).size !== used.length) { toast('Two shortcuts can\'t use the same input.'); return; }
+  const body = Object.assign(mqttBody(), noticeBody(), shortcutBody(), { name: $('name').value.trim(), notifications: $('notify').checked, notify_from: $('from').value.trim(), update: String(update),
     internet_on: $('ineton').checked ? 'off' : 'on', lat: $('lat').value.trim(), lon: $('lon').value.trim(), thread: threadMode, tlv: $('tlv').value.replace(/\s/g, ''),
-    watch: $('watch').value, play: $('play').value, hideapps: $('apps').checked ? '0' : '1', dim: $('dim').value, close: $('close').value, clock: $('clock').value, inputalerts: $('inputalerts').checked ? '1' : '0', wall,
+    hideapps: $('apps').checked ? '0' : '1', dim: $('dim').value, close: $('close').value, clock: $('clock').value, inputalerts: $('inputalerts').checked ? '1' : '0', wall,
     thread_on: $('thon').checked ? 'on' : 'off' });
   $('save').disabled = true; $('save').textContent = 'Saving…';
   try { const r = await api('/api/save', body); toast(r.message, 8000); $('password').value = ''; await load(); } catch (e) {}

@@ -16,7 +16,7 @@ ASSETS = ROOT / "launcher/assets"
 BRIDGE = ROOT / "devices/s90d/device/ha-bridge/src"
 INVENTORY = ROOT / ".local/device-inventory/catalog-apps.csv"
 DOTNET = os.environ.get("DOTNET") or shutil.which("dotnet")
-NUI_FREE = ("Shared.cs", "Logic.cs", "Qr.cs", "InfoStats.cs", "Screen.cs", "AppLibrary.cs")  # also built off the TV
+NUI_FREE = ("Shared.cs", "Logic.cs", "Prefs.cs", "Qr.cs", "InfoStats.cs", "Screen.cs", "AppLibrary.cs")  # also built off the TV
 
 
 def launcher():
@@ -169,12 +169,17 @@ class LauncherSource(unittest.TestCase):
         self.assertNotIn("audio-format", ui)  # Pass-Through feeds Dolby Atmos to the soundbar: not one press away
         for name in ("Nintendo Switch", '"SHIELD"', "PlayStation"):  # the TV's own input names are used as they are
             self.assertNotIn(name, ui)
+        # no device is known by name anywhere: a shortcut is an input the owner picked, or hidden
+        code = launcher().lower()
+        for word in ('"shield"', '"switch"', "portnamed", "automatic ·", '"auto · "'):
+            self.assertNotIn(word, code)
 
     def test_every_symbol_and_backdrop_asset_is_local_svg(self):
         src = launcher()
         names = set(re.findall(r'Sym\("([a-z]+)"', src)) | set(re.findall(r'(?<![\w.])(?:Level|Choice|Toggle|Open)\("([a-z]+)", "', src))
-        names |= set(re.findall(r'\("([a-z]+)", "[A-Z]\w+", ', body(src, "void OpenBar(")))  # the bar's glyphs
-        names |= {"tv", "gamecontroller", "antenna", "hdmi"}  # PortGlyph
+        names |= set(re.findall(r'\("([a-z]+)", "[A-Z]\w+", ', body(src, "BarItems()\n")))  # the bar's glyphs
+        names |= {"antenna", "hdmi"}  # PortGlyph
+        names |= set(re.findall(r'"([a-z]+)"', re.search(r"Icons = \{([^}]*)\}", (SRC / "Prefs.cs").read_text()).group(1)))  # shortcut icons
         self.assertGreater(len(names), 20)
         files = [ASSETS / f"sym-{n}.svg" for n in names] + [ASSETS / "tile-samsung-home.svg", ASSETS / "free-background.svg"]
         for path in files:

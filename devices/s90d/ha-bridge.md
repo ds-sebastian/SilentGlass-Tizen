@@ -11,6 +11,7 @@ TV. It's a small .NET service (about 20 MB of memory) that runs as the TV's norm
 | `select.<tv>_input` | the input on screen, by the TV's names; pick one to switch |
 | `text.<tv>_hdmi_N_name` | rename an input everywhere (TV menu, SilentGlass, Home Assistant) |
 | `button.<tv>_resync_input_names` | fix stale HDMI-CEC device names |
+| `text.<tv>_shortcutN_name`, `select.<tv>_shortcutN_input` | the bar's shortcuts (N = 1-4): name, and input or Hidden |
 | `number.<tv>_volume`, `switch.<tv>_mute` | volume (also drives the soundbar) |
 | `number.<tv>_brightness`, `_contrast` | picture (0-50) |
 | `select.<tv>_picture_mode`, `_sound_mode`, `_sound_output` | only the modes the TV offers right now |
@@ -59,7 +60,8 @@ notify group.
 On the TV, open **Info › Advanced settings**. Scan the QR code and enter the 6-digit code; the QR never carries the
 code. The page has:
 
-- **Home screen:** Watch/Play inputs, menu close time, Apps in the bar, wallpaper dim and clock, wallpaper and its
+- **Shortcuts:** up to four, each a name, an icon and an input (or Hidden);
+- **Home screen:** menu close time, Apps in the bar, wallpaper dim and clock, wallpaper and its
   location;
 - **Notifications:** on/off, input alerts, position, size, time, transparency, pictures, quiet hours, a test button;
 - **Thread border router:** on/off, and its network: keep it, import Home Assistant's, or paste a dataset;

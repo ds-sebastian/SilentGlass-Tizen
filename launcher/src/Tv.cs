@@ -104,7 +104,6 @@ public sealed partial class SilentGlass
     const string SignalKey = "memory/tv-viewer/mainscreen_signal_state", SourceKey = "memory/system/source_type", ForegroundKey = "memory/appfw/current_fullscreen_appid";
     const string PmKey = "memory/pm/state";  // 1 on, 2 dim, 3 screen off, 4 standby
     List<Shared.Input> inputs = new(); bool inputsKnown;
-    int watchPort = 15, playPort = 13;
     // what is on screen (wallpaper / bar / nothing) is decided in Screen.cs; it keeps the current input and the
     // settled signal flag
     Screen screen;
@@ -122,7 +121,7 @@ public sealed partial class SilentGlass
             pmCallback = (n, d) => OnUi(() => { if (vconf_get_int(PmKey, out int v) == 0 && v >= 3) { screen.Standby(); HideParked("standby"); devicesOn = new(); cecSig = ""; } });
             vconf_notify_key_changed(PmKey, pmCallback, IntPtr.Zero);
         } catch { }
-        RefreshInputs(); screen.Start(); ResolvePorts();
+        RefreshInputs(); screen.Start();
     }
     void RefreshInputs() => inputs = InfoStats.Inputs(out inputsKnown);
     // devices that are on (input types), from CEC; refreshed off the UI thread, at most every 1.5 s
@@ -148,7 +147,7 @@ public sealed partial class SilentGlass
     }
     void OnInputsChanged(bool announce)
     {
-        var before = inputs; bool knew = inputsKnown; RefreshInputs(); ResolvePorts();
+        var before = inputs; bool knew = inputsKnown; RefreshInputs();
         if (announce && knew && inputsKnown)
             foreach (var now in inputs) {
                 var was = before.Find(i => i.Type == now.Type);
@@ -156,20 +155,17 @@ public sealed partial class SilentGlass
             }
         OnTvChanged();
     }
-    // Watch / Play: the input chosen in Info, or (Automatic) the input the TV calls "Shield" / "Switch", else HDMI 3 / HDMI 1
-    void ResolvePorts()
-    {
-        watchPort = prefs.Watch != 0 ? prefs.Watch : PortNamed("shield", 15);
-        playPort = prefs.Play != 0 ? prefs.Play : PortNamed("switch", 13);
-    }
-    int PortNamed(string word, int fallback) => inputs.Find(i => Shared.IsHdmi(i.Type) && i.Name.Contains(word, StringComparison.OrdinalIgnoreCase))?.Type ?? fallback;
     string InputName(int type) => inputs.Find(i => i.Type == type)?.Name ?? (type == 0 ? "Live TV" : "HDMI " + (type - 12));
-    string PortChoice(int chosen, int resolved) => chosen == 0 ? "Auto · " + InputName(resolved) : InputName(chosen);
-    void CyclePort(bool watch, int dir)
-    {
-        if (watch) prefs.Watch = Logic.NextPort(prefs.Watch, playPort, dir); else prefs.Play = Logic.NextPort(prefs.Play, watchPort, dir);
-        SavePrefs(); ResolvePorts();
-    }
+    // ---- the bar's shortcuts (Prefs.Shortcut): an input each, picked in Info > Shortcuts, on the phone page or from
+    // Home Assistant; named on the phone. Hidden ones are left out everywhere. ----
+    IEnumerable<Prefs.Shortcut> Shortcuts => prefs.Shortcuts.Where(s => s.Shown);
+    string ShortcutValue(int slot) => prefs.Shortcuts[slot].Shown ? InputName(prefs.Shortcuts[slot].Port) : "Hidden";
+    void CycleShortcut(int slot, int dir) { prefs.Shortcuts[slot].Port = prefs.NextPort(slot, dir); SavePrefs(); }
+    // the inputs worth listing: something is plugged in or on, or it is on screen (Live TV only then). When the TV
+    // can't say what is plugged in, every HDMI input.
+    List<Shared.Input> InUse() => inputs.FindAll(i => i.Type == lastSource || Shared.IsHdmi(i.Type) && (!inputsKnown || i.Connected || DeviceOn(i.Type)));
+    // the Inputs button: only when it offers an input the shortcuts don't
+    bool InputsButton() => InUse().Exists(i => prefs.For(i.Type) == null);
     void SelectSource(int type) => screen.SelectSource(type);
     string Foreground() { try { return vconf_get_str(ForegroundKey) ?? ""; } catch { return ""; } }
 
@@ -200,16 +196,22 @@ public sealed partial class SilentGlass
     void SetNotices(bool on) { try { if (on) File.Delete(DataFile(Shared.NotifyOff)); else File.WriteAllText(DataFile(Shared.NotifyOff), ""); } catch { } }
 
     // ---- preferences ----
-    Logic.Prefs prefs = new();
+    Prefs prefs = new();
     void LoadPrefs()
     {
         string text = null;
         foreach (var f in new[] { Shared.PrefsFile, "quiet-home-prefs.txt" }) try { text = File.ReadAllText(DataFile(f)); break; } catch { }  // the pre-v40 name
-        prefs = Logic.ParsePrefs(text);
+        prefs = Prefs.Parse(text);
         // the wallpaper's location comes from the phone setup page (written by the bridge)
         try { var c = Shared.ParseConf(File.ReadAllText(DataFile(Shared.LocationFile))); prefs.Lat = Logic.Num(c, "lat", prefs.Lat); prefs.Lon = Logic.Num(c, "lon", prefs.Lon); } catch { }
     }
-    void SavePrefs() { try { File.WriteAllText(DataFile(Shared.PrefsFile), Logic.FormatPrefs(prefs)); File.Delete(DataFile("quiet-home-prefs.txt")); } catch { } }
+    void SavePrefs()
+    {
+        try {
+            string old = File.Exists(DataFile(Shared.PrefsFile)) ? File.ReadAllText(DataFile(Shared.PrefsFile)) : "";
+            File.WriteAllText(DataFile(Shared.PrefsFile), prefs.Merge(old)); File.Delete(DataFile("quiet-home-prefs.txt"));
+        } catch { }
+    }
 }
 
 // Screen.cs talks to the windows through this

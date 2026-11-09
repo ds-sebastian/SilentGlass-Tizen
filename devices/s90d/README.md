@@ -22,8 +22,8 @@ Everything is an overlay over the TV's own viewer, so the picture keeps playing 
 
 | Part | What it does |
 |---|---|
-| **Bar** | Watch and Play (your two main inputs), Inputs, Controls, Apps, Info. Home toggles it, and it hides after 20 s idle. |
-| **Inputs** | every input by the TV's name. A green dot means its device is on (picture or HDMI-CEC). |
+| **Bar** | up to 4 shortcuts (your inputs, named by you), Inputs, Controls, Apps, Info. Home toggles it, and it hides after 20 s idle. |
+| **Inputs** | the inputs in use, by the TV's names; shown only when something is plugged in that has no shortcut. A green dot means its device is on (picture or HDMI-CEC). |
 | **Controls** | brightness, contrast, volume; picture, sound and Game Mode; sleep timer, pixel shift; Ambient, Bluetooth, settings |
 | **Apps** | the TV's apps as artwork (backups; the SHIELD has the real ones) |
 | **Info** | privacy, network, Thread and Home Assistant status, settings, and Advanced settings (phone) |
@@ -39,7 +39,7 @@ These are on Info or the phone page, and stored in `silentglass-prefs.txt`.
 
 | Setting | Default | Options |
 |---|---|---|
-| Watch / Play | Automatic | the inputs named `Shield` / `Switch` (else HDMI 3 / 1), or any HDMI port |
+| Shortcuts | Watch, Play: hidden | 4 slots: a name (phone, HA), an icon (phone) and an HDMI input or Hidden (Info › Shortcuts, phone, HA) |
 | Apps in the bar | on | off hides Apps |
 | Menu closes after | 20 s | 10 s, 20 s, 30 s, 1 min, never |
 | Dim after | 5 min | 2, 5, 10, 30 min, never |

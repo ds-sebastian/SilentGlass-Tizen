@@ -14,6 +14,7 @@
     <Compile Include="Harness.cs" />
     <Compile Include="../../devices/s90d/device/ha-bridge/src/*.cs" />
     <Compile Include="../../launcher/src/Shared.cs" />
+    <Compile Include="../../launcher/src/Prefs.cs" />
     <EmbeddedResource Include="../../devices/s90d/device/ha-bridge/src/setup.html" LogicalName="setup.html" />
   </ItemGroup>
 </Project>

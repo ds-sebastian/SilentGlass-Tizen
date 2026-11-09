@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
@@ -10,7 +11,8 @@ using Tizen.NUI.BaseComponents;
 // Info replace it with a panel on the right (the picture stays visible on the left); the setup sheet is centred.
 public sealed partial class SilentGlass
 {
-    enum Mode { Bar, Inputs, Apps, Controls, Info, Setup }
+    enum Mode { Bar, Inputs, Apps, Controls, Info, Shortcuts, Setup }
+    bool InPanel => mode is Mode.Controls or Mode.Info or Mode.Shortcuts;
     Window ow; View oRoot, oDim, oLayer, capsule, highlight, currentMark;
     Mode mode; bool overlayShown; Tizen.NUI.Timer overlayIdle;
     const int BandTop = 240, BarH = 104, BarBottom = 52, ItemH = 80, ItemPad = 30, GlyphS = 40, GlyphGap = 14, PopGap = 18;
@@ -100,8 +102,25 @@ public sealed partial class SilentGlass
     }
 
     // ---- the bar ----
-    string BarSignature() => InputName(watchPort) + "|" + InputName(playPort) + "|" + lastSource + "|" + screen.Signal + "|" + prefs.HideApps + "|" + cecSig;
-    bool PortsChanged() { RefreshInputs(); ResolvePorts(); return BarSignature() != barSig; }
+    // the shortcuts (the name, with the TV's name for the input underneath; unnamed, the input's name), then Inputs
+    // if it offers more, Controls, Apps and Info
+    List<(string glyph, string title, string sub, string action)> BarItems()
+    {
+        var items = new List<(string glyph, string title, string sub, string action)>();
+        foreach (var s in Shortcuts) {
+            var input = inputs.Find(i => i.Type == s.Port); string name = input?.Name ?? InputName(s.Port), port = input?.Port ?? name;
+            items.Add(s.Name.Length > 0 ? (s.Icon, s.Name, name, "hdmi:" + s.Port) : (s.Icon, name, port != name ? port : null, "hdmi:" + s.Port));
+        }
+        if (items.Count > 0) items.Add((null, null, null, null));
+        if (InputsButton()) items.Add(("inputs", "Inputs", null, "inputs"));
+        items.Add(("controls", "Controls", null, "controls"));
+        if (!prefs.HideApps && library.Count > 0) items.Add(("apps", "Apps", null, "apps"));
+        items.Add(("info", "Info", null, "info"));
+        return items;
+    }
+    string BarSignature(List<(string glyph, string title, string sub, string action)> items) =>
+        string.Join(";", items.Select(i => i.glyph + "," + i.title + "," + i.sub)) + "|" + lastSource + "|" + screen.Signal + "|" + cecSig;
+    bool PortsChanged() { RefreshInputs(); return BarSignature(BarItems()) != barSig; }
     // the green dot: the device on that input is on (Tv.cs DeviceOn)
     bool LiveDot(string action) => action.StartsWith("hdmi:") && int.TryParse(action.AsSpan(5), out int t) && DeviceOn(t);
     void OpenBar(bool keepFocus)
@@ -109,14 +128,8 @@ public sealed partial class SilentGlass
         EnsureOverlay();
         string keep = keepFocus && barSel >= 0 && barSel < bar.Count ? bar[barSel].Action : null;
         ClearOverlay(); mode = Mode.Bar; Place(0, BandTop, 1920, 1080 - BandTop);
-        RefreshInputs(); ResolvePorts(); barSig = BarSignature();
+        RefreshInputs(); var items = BarItems(); barSig = BarSignature(items);
         oDim = Dimming(false, 0, BandTop + 180, 1920, 1080 - BandTop - 180, .5f); oRoot.Add(oDim); oRoot.Add(oLayer);
-        // Watch / Play keep their names; the device each opens (the TV's input name) is the line underneath
-        var items = new List<(string glyph, string title, string sub, string action)> {
-            ("tv", "Watch", InputName(watchPort), "hdmi:" + watchPort), ("gamecontroller", "Play", InputName(playPort), "hdmi:" + playPort),
-            (null, null, null, null), ("inputs", "Inputs", null, "inputs"), ("controls", "Controls", null, "controls") };
-        if (!prefs.HideApps && library.Count > 0) items.Add(("apps", "Apps", null, "apps"));
-        items.Add(("info", "Info", null, "info"));
         // measure, then centre the capsule
         var labels = new List<(TextLabel t, TextLabel s, int w)>(); int total = 24;
         foreach (var it in items) {
@@ -214,7 +227,7 @@ public sealed partial class SilentGlass
                 return;
             case Mode.Inputs: InputsKey(k, back, sel); return;
             case Mode.Apps: AppsKey(k, back, sel, arrow); return;
-            case Mode.Controls: case Mode.Info: PanelKey(k, back, sel); return;
+            case Mode.Controls: case Mode.Info: case Mode.Shortcuts: PanelKey(k, back, sel); return;
             case Mode.Setup: if (back) CloseSetup(); return;
         }
     }
@@ -223,10 +236,10 @@ public sealed partial class SilentGlass
     {
         Note("tv_changed");
         if (!overlayShown) return;
-        if (mode == Mode.Bar && BarSignature() != barSig) OpenBar(true);
+        if (mode == Mode.Bar && BarSignature(BarItems()) != barSig) OpenBar(true);
         else if (mode == Mode.Inputs && InputsSignature() != inputsSig) OpenInputs();
-        else if (mode == Mode.Controls || mode == Mode.Info) UpdatePanel(true);
+        else if (InPanel) UpdatePanel(true);
     }
     string FocusName() => !overlayShown ? "" : mode == Mode.Bar && barSel >= 0 && barSel < bar.Count ? bar[barSel].Action :
-        (mode == Mode.Controls || mode == Mode.Info) && rowSel >= 0 && rowSel < rows.Count ? rows[rowSel].Name : mode.ToString();
+        InPanel && rowSel >= 0 && rowSel < rows.Count ? rows[rowSel].Name : mode.ToString();
 }

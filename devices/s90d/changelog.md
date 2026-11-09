@@ -6,6 +6,18 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.4.0** (unreleased): **shortcuts** replace Watch / Play.
+  - Up to four, each a name (up to 14 characters), an icon (TV, game controller, desktop, laptop, disc, HDMI) and an
+    HDMI input. Hidden ones aren't on the bar. The line under a name is the TV's own name for the input; an unnamed
+    shortcut shows that name alone. Set inputs in **Info › Shortcuts** (Left / Right) and everything on the phone
+    page; Home Assistant gets `text` + `select` entities for each name and input.
+  - **No device is known by name any more.** "Automatic" (the input called Shield / Switch) is gone. An existing
+    `watch=` / `play=` file becomes shortcuts 1 and 2 with the same inputs ("Automatic" = its fallback, HDMI 3 /
+    HDMI 1). A new install starts with Watch and Play named but hidden.
+  - **Inputs** lists only inputs in use (plugged in, on, or on screen; Live TV only while on screen), and the bar
+    shows it only when it offers an input no shortcut opens.
+  - One settings model (`launcher/src/Prefs.cs`) is compiled into SilentGlass and the bridge: the defaults, allowed
+    values, checks and the old-file handling exist once (the bridge had its own copies). Saves keep unknown keys.
 - **SilentGlass 1.3.4** (2026-11-08): no black flash on the first Home after an update. `install.sh` stops the
   launcher to replace it, which left the next Home a cold start: the TV maps the new window on top and shows its
   black launch screen over the picture for a moment. `install.sh` and `undo.sh` now start it again in the background

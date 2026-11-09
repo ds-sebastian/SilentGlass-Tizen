@@ -8,7 +8,7 @@
 # /opt/usr/share/quiet-tizen-backups/silentglass-<version>-<time>/. Undo: /bin/sh -s -- <that folder's name> < undo.sh
 # The bridge's settings (silentglass-ha.conf) are never touched.
 set -eu
-VER=1.3.4
+VER=1.4.0
 P=${SILENTGLASS_TEST_ROOT:-}   # tests only: a fake TV under this folder; empty on the TV
 S=$P/home/owner/share/tmp/sdk_tools/quiet-tizen
 A=$P/opt/usr/apps/com.samsung.tv.bixby-promotion; LBL=User::Pkg::com.samsung.tv.bixby-promotion::RO
@@ -33,10 +33,10 @@ BK=$B/silentglass-$VER-$(date +%Y%m%dT%H%M%S)
 mkdir -p "$B"; mkdir -m 700 "$BK"; mkdir "$BK/stage"
 [ "$(stat -c %d "$A/res" 2>/dev/null || stat -c %d "$B")" = "$(stat -c %d "$B")" ] || { echo 'backup is on another filesystem; mv would not keep labels - refusing'; exit 7; }
 cat > "$BK/files.sha256" <<'SUMS'
-9564d4f419e16c79afb6dc43da8408168e3ea7114c0e78ee4d97331af0e91e5b  BixbyPromotion.dll
+ce69094332efcccd34d87d870c4f77bb6a7a9438dca347896c040f89f254f7e2  BixbyPromotion.dll
 13e781d4e1f13494233e000124102caad8c9a5bb41bc244517f3bdcaea5ad730  Probe.dll
 530d94cae62b04c4677ff4a6549f72b84c13115b13e16283fc2197a56442a275  bridge/silentglass-ha.conf.example
-fca339bfea56502b68f2cdc6416783bc9b3bfe99b3457655cf6e2d331ba14385  bridge/silentglass-ha.dll
+f71ff6238cc119bb2e3ebbdae49791c8fe5d762d7086a7295f7af35643a9ab89  bridge/silentglass-ha.dll
 a0882085ebc8618322fb819cc0e92bac0499419af91124d05f6d27662818ea83  bridge/silentglass-ha.runtimeconfig.json
 439b5d9d79665666e981a80dfe2450325464f996a2fddff48a9efef6627a7c42  bridge/silentglass-ha.service
 236ead33439cced94720eb7a4e89afcc2dfeecf4b72de0dae3a97b024e700538  quiet-home/apps.json
@@ -64,12 +64,15 @@ daddd56d4fbd52364bfc0caa84c2124a04338d168ce2eabee255f9134d49f1d7  quiet-home/sym
 3d5247a8fe4eb2c92be96f193d44b4ea26e6274c9d265d1367795b57587e8091  quiet-home/sym-chevron.svg
 6b4dd1727197dbb2005ac65e42bf51d6fd4bb122f352309c936794f5c8b0e948  quiet-home/sym-contrast.svg
 a2e10b4c2576e054ed97a5c2c85170e133f424d7adf2050a4517910b66a086ce  quiet-home/sym-controls.svg
+99c38c59d5ea45c2aef62aa3d4158ed4b68a0900bbba0b778732a296b5a70a7a  quiet-home/sym-desktop.svg
+7105d17f8928e180619ab841015f8b2a21142ebaa0211680479d897f59feb60a  quiet-home/sym-disc.svg
 b9580cdf968a2b6cb5291590d3730147161131ce3426b34aab5497e5a6d3c328  quiet-home/sym-gamecontroller.svg
 2f74997d13e7a1403090f571d29746a87cadfb71ca49b2a3576adadc73523ada  quiet-home/sym-gear.svg
 7aa22a2755bef6574599368cebad1bbcfc6f56874630690dedc503bb333d230b  quiet-home/sym-hdmi.svg
 3baae4d8ac8301ee29ed08dcaede4448ede48a8d980c2377e9fa00c0d56a6aaa  quiet-home/sym-homeassistant.svg
 e9edd3ce1cf8f506c2f5a34eef781a3541a7ea988550f50e8e22673e02748aa5  quiet-home/sym-info.svg
 25fe4cf17e0b620322e4c95b38114b78acb6d99aa1161be12d5d47554a782994  quiet-home/sym-inputs.svg
+af1380fdc735cdeebc196297e73ff23ce59e1a1e4a8935a5ef35f4e97206e695  quiet-home/sym-laptop.svg
 78718ffcea7026869de7799c128cd8f602a46c9c2dceed235b726713165ea59e  quiet-home/sym-moon.svg
 b987b27be9be7d49e92fc9cd9e7a8dcfa9f4316f6a556eed4732354400e53295  quiet-home/sym-mute.svg
 7b40fbabe11d52042f3c87898fd9f753bc0eaea9dca206f928e61312ec4660d8  quiet-home/sym-network.svg

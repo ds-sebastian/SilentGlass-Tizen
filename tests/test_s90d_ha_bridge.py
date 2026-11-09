@@ -20,7 +20,8 @@ class HaBridgeTests(unittest.TestCase):
         self.assertEqual(cases, {"input/set", "home/press", "ambient/press", "resync/press", "thread_switch/set", "volume/set", "mute/set",
                                  "brightness/set", "contrast/set", "power/set", "picture_mode/set", "sound_mode/set", "sleep_timer/set",
                                  "sound_output/set", "game_mode/set", "notifications/set", "home_network_only/set"})
-        self.assertIn('Regex.Match(cmd, "^hdmi([1-4])_name/set$")', handler)  # the only other command: renaming a port
+        self.assertIn('Regex.Match(cmd, "^hdmi([1-4])_name/set$")', handler)  # renaming a port
+        self.assertIn('Regex.Match(cmd, "^shortcut([1-4])_(name|input)/set$")', handler)  # and the bar's shortcuts
         self.assertNotIn("/bin/sh", SRC)  # no shell: launch_app, dbus-send and ot-ctl run directly
         # inputs only by exact name from the TV's list; options only from the TV's own lists
         self.assertIn("Inputs().Where(i => i.Name == payload)", handler)
@@ -71,6 +72,19 @@ class HaBridgeTests(unittest.TestCase):
         example = (DIR / "silentglass-ha.conf.example").read_text()
         self.assertIn("password=change-me", example)
         self.assertFalse(re.search(r"10\.3\.26\.", (ROOT / "devices/s90d/device/install.sh").read_text() + example))
+
+    def test_shortcuts_change_through_the_shared_settings(self):
+        # Home Assistant changes SilentGlass's prefs file only through Prefs.cs: the same checks as the phone page, and
+        # keys it doesn't know stay; a refused change writes nothing
+        change = member("static void ChangePrefs(", "\n    }\n")
+        self.assertIn("string why = change(p) ?? p.Problem();", change)
+        self.assertLess(change.index("if (why != null)"), change.index("File.WriteAllText"))
+        self.assertIn("p.Merge(old)", change)
+        handler = member("static void OnMessage(", "static void SetOption(")
+        self.assertIn("Prefs.CleanName(payload)", handler)
+        self.assertIn('payload == "Hidden" ? 0 : Inputs().Where(i => Shared.IsHdmi(i.Type) && i.Name == payload)', handler)
+        self.assertIn('Prepend("Hidden")', SRC)  # the input select's options: Hidden, then the TV's own input names
+        self.assertNotIn('"watch"', SRC); self.assertNotIn('"play"', SRC)
 
     def test_thread_switch_is_the_file_the_path_unit_watches(self):
         watched = (ROOT / "devices/s90d/device/thread-border-router/quiet-otbr-switch.path").read_text()

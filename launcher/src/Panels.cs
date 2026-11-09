@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 
@@ -68,8 +69,7 @@ public sealed partial class SilentGlass
         list.Add(Status("Home Assistant", BridgeStatus));
         list.Add(Status("This TV", TvStatus));
         list.Add(null);
-        list.Add(Choice("tv", "Watch", () => PortChoice(prefs.Watch, watchPort), d => CyclePort(true, d)));
-        list.Add(Choice("gamecontroller", "Play", () => PortChoice(prefs.Play, playPort), d => CyclePort(false, d)));
+        list.Add(Open("tv", "Shortcuts", OpenShortcuts, () => Shortcuts.Count() is int n && n > 0 ? n + " on the bar" : "None"));
         list.Add(Toggle("apps", "Apps in the bar", () => !prefs.HideApps, on => { prefs.HideApps = !on; SavePrefs(); }));
         list.Add(Choice("moon", "Dim after", () => Logic.DimName(prefs.Dim), d => { prefs.Dim = Logic.NextDim(prefs.Dim, d); SavePrefs(); }));
         if (PhotoWall) list.Add(Choice("picture", "Wallpaper", () => Logic.WallName(prefs.Wall), d => { prefs.Wall = Logic.NextWall(prefs.Wall, d); SavePrefs(); CheckWallpaper(); }));
@@ -80,6 +80,21 @@ public sealed partial class SilentGlass
         list.Add(Open("gear", "Advanced settings", OpenSetup));
         BuildPanel(Mode.Info, "SilentGlass " + ModVersion, true, list);
     }
+
+    // ---- Info > Shortcuts: the input each shortcut opens (Left / Right; Hidden leaves it off the bar). Names and icons
+    // are typed on the phone. ----
+    void OpenShortcuts()
+    {
+        var list = new List<Row>();
+        for (int i = 0; i < Prefs.Slots; i++) {
+            int slot = i; var s = prefs.Shortcuts[i];
+            list.Add(Choice(s.Icon, s.Name.Length > 0 ? s.Name : "Shortcut " + (i + 1), () => ShortcutValue(slot), d => CycleShortcut(slot, d)));
+        }
+        list.Add(null);
+        list.Add(Open("gear", "Names and icons", OpenSetup, () => "On your phone"));
+        BuildPanel(Mode.Shortcuts, "Shortcuts", true, list);
+    }
+    void BackToInfo(string row) { OpenInfo(); rowSel = Math.Max(0, rows.FindIndex(r => r.Name == row)); UpdatePanel(); }
 
     // ~45 app-framework calls: read at most every 30 s
     (string, Color) privacy; long privacyAt = long.MinValue / 2; string privacyGaps = "";
@@ -172,7 +187,7 @@ public sealed partial class SilentGlass
         panelTimer ??= new Tizen.NUI.Timer(3000);
         panelTimer.Tick -= PanelTick; panelTimer.Tick += PanelTick; panelTimer.Start();
     }
-    bool PanelTick(object s, Tizen.NUI.Timer.TickEventArgs e) { if (!overlayShown || mode != Mode.Info && mode != Mode.Controls) return false; UpdatePanel(true); return true; }
+    bool PanelTick(object s, Tizen.NUI.Timer.TickEventArgs e) { if (!overlayShown || !InPanel) return false; UpdatePanel(true); return true; }
     // refresh: read the TV again (settings for Controls, the status rows for Info) - on open, every 3 s and when the TV
     // changes, never for a focus move (each read is IPC or file I/O); a changed setting reads itself back
     void UpdatePanel(bool refresh = false)
@@ -196,7 +211,7 @@ public sealed partial class SilentGlass
     }
     void PanelKey(string k, bool back, bool sel)
     {
-        if (back) { BackToBar(mode == Mode.Controls ? "controls" : "info"); return; }
+        if (back) { if (mode == Mode.Shortcuts) BackToInfo("Shortcuts"); else BackToBar(mode == Mode.Controls ? "controls" : "info"); return; }
         if (rowSel < 0) return;
         if (k == "Up" || k == "Down") {
             int d = k == "Up" ? -1 : 1, n = rowSel + d;

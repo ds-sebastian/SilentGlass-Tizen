@@ -41,7 +41,7 @@ Builds are reproducible: the same commit gives the same bytes as the release.
 This puts SilentGlass inside Samsung's *Bixby promotion* app, with the original backed up to
 `/opt/usr/share/quiet-tizen-backups/home-01/`. Home doesn't change yet.
 
-**Check:** the app opens with the bar, Watch/Play/Inputs switch inputs, and Controls and Info work.
+**Check:** the app opens with the bar, Inputs switches inputs (add shortcuts in Info › Shortcuts), and Controls and Info work.
 
 ## 3. Make it Home
 

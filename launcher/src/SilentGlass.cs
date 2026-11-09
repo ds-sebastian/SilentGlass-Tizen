@@ -167,9 +167,9 @@ public sealed partial class SilentGlass : NUIApplication
         Put("ui", overlayShown ? mode.ToString().ToLowerInvariant() : "none"); Put("backdrop", backdropShown ? "shown" : "hidden"); Put("fg", screen.LastOther);
         Put("focus", FocusName()); Put("key", lastKey); Put("key_count", keyCount);
         Put("key_ms_max", (keyTicksMax * 1000.0 / Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
-        Put("source", lastSource); Put("signal", screen.Signal); Put("ports", watchPort + "," + playPort + "(" + prefs.Watch + "," + prefs.Play + ")");
+        Put("source", lastSource); Put("signal", screen.Signal); Put("ports", string.Join(",", Shortcuts.Select(s => s.Port)));
         Put("inputs", string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + (inputsKnown ? i.Connected ? "1" : "0" : "?"))));
-        Put("prefs", Logic.FormatPrefs(prefs).Trim().Replace('\n', ','));
+        Put("prefs", prefs.Format().Trim().Replace('\n', ','));
         Put("brightness", Setting("brightness")); Put("contrast", Setting("contrast")); Put("picturemode", Setting("picturemode"));
         Put("game", Setting("game-mode-auto")); Put("volume", volume);
         Put("trail", string.Join(" | ", trail));

@@ -162,7 +162,7 @@ static partial class Bridge
 
     static object SetupState()
     {
-        var c = LoadConf(); var loc = ReadConf(DataFile(Shared.LocationFile)); var p = ReadConf(DataFile(Shared.PrefsFile));
+        var c = LoadConf(); var loc = ReadConf(DataFile(Shared.LocationFile)); var p = Prefs.Parse(ReadText(DataFile(Shared.PrefsFile)));
         return new {
             name = TvName, host = c.GetValueOrDefault("host", ""), port = c.GetValueOrDefault("port", ""), user = c.GetValueOrDefault("user", ""),
             has_password = c.GetValueOrDefault("password", "").Length > 0, notify_from = c.GetValueOrDefault("notify_from", ""), update = UpdateSeconds(c),
@@ -173,9 +173,8 @@ static partial class Bridge
             mqtt = mqttState, mqtt_error = mqttError, thread_installed = ThreadInstalled, thread_role = ThreadInstalled ? ThreadRole() : "",
             thread_on = ThreadWanted, internet_installed = true, internet_on = Shared.InternetWanted(Data), internet_status = Shared.InternetStatus(Data),
             // SilentGlass's own settings (the launcher reloads its prefs file when it changes)
-            watch = p.GetValueOrDefault("watch", "0"), play = p.GetValueOrDefault("play", "0"), wall = p.GetValueOrDefault("wall", "auto"),
-            hideapps = p.GetValueOrDefault("hideapps", "0") == "1", dim = p.GetValueOrDefault("dim", "5") switch { "1" => "5", var d => d }, close = p.GetValueOrDefault("close", "20"),  // dim before v43c: 1 / 0
-            clock = p.GetValueOrDefault("clock", "12"), inputalerts = p.GetValueOrDefault("inputalerts", "1") != "0",
+            shortcuts = p.Shortcuts.Select(s => new { name = s.Name, icon = s.Icon, port = s.Port }).ToList(), icons = Prefs.Icons, name_max = Prefs.NameMax,
+            wall = p.Wall, hideapps = p.HideApps, dim = p.Dim.ToString(), close = p.Close.ToString(), clock = p.Clock, inputalerts = p.InputAlerts,
             inputs = Inputs().Where(i => i.Type != 0).Select(i => new { type = i.Type, name = i.Name == i.Port ? i.Port : i.Name + " · " + i.Port }).ToList(),
         };
     }
@@ -262,16 +261,27 @@ static partial class Bridge
         string dataset = threadMode == "ha" ? haTlv : threadMode == "tlv" ? tlv : "";
         if (threadMode == "ha" && dataset.Length == 0) return (false, "Get Home Assistant's network first.");
         if (threadMode == "tlv" && !ValidDataset(dataset)) return (false, "That doesn't look like a Thread dataset (hex).");
-        string watch = S("watch"), play = S("play"), wall = S("wall"), threadOn = S("thread_on");
-        static bool Port(string v) => v is "0" or "13" or "14" or "15" or "16";
-        if (watch.Length > 0 && (!Port(watch) || !Port(play))) return (false, "Pick an input for Watch and Play.");
-        if (watch.Length > 0 && watch != "0" && watch == play) return (false, "Watch and Play need different inputs.");
-        if (wall.Length > 0 && wall is not ("auto" or "day" or "night")) return (false, "Pick a wallpaper.");
-        string close = S("close");
-        if (close.Length > 0 && close is not ("10" or "20" or "30" or "60" or "0")) return (false, "Pick when the menu closes.");
-        string dim = S("dim"), clock = S("clock");
-        if (dim.Length > 0 && dim is not ("2" or "5" or "10" or "30" or "0")) return (false, "Pick when the wallpaper dims.");
-        if (clock.Length > 0 && clock is not ("12" or "24" or "off")) return (false, "Pick a clock.");
+        string threadOn = S("thread_on");
+        // SilentGlass's own settings (Prefs.cs, shared with SilentGlass): sent together, as the page's Home screen part
+        string prefsOld = ReadText(DataFile(Shared.PrefsFile)); Prefs prefs = null;
+        if (S(Prefs.Key(0, "port")).Length > 0) {
+            prefs = Prefs.Parse(prefsOld);
+            for (int i = 0; i < Prefs.Slots; i++) {
+                var s = prefs.Shortcuts[i];
+                s.Name = S(Prefs.Key(i, "name")).Trim(); s.Icon = S(Prefs.Key(i, "icon")); s.Port = int.TryParse(S(Prefs.Key(i, "port")), out int n) ? n : -1;
+            }
+            if (prefs.Problem() is string why) return (false, why);
+            string wall = S("wall"), close = S("close"), dim = S("dim"), clock = S("clock");
+            if (wall.Length > 0 && !Prefs.WallModes.Contains(wall)) return (false, "Pick a wallpaper.");
+            if (close.Length > 0 && !Prefs.CloseTimes.Contains(close)) return (false, "Pick when the menu closes.");
+            if (dim.Length > 0 && !Prefs.DimTimes.Contains(dim)) return (false, "Pick when the wallpaper dims.");
+            if (clock.Length > 0 && !Prefs.ClockModes.Contains(clock)) return (false, "Pick a clock.");
+            if (wall.Length > 0) prefs.Wall = wall;
+            if (close.Length > 0) prefs.Close = int.Parse(close);
+            if (dim.Length > 0) prefs.Dim = int.Parse(dim);
+            if (clock.Length > 0) prefs.Clock = clock;
+            prefs.HideApps = S("hideapps") == "1"; prefs.InputAlerts = S("inputalerts") != "0";
+        }
 
         string internetOn = S("internet_on");
         if (internetOn.Length > 0 && internetOn is not ("on" or "off")) return (false, "Pick Internet access on or off.");
@@ -290,15 +300,7 @@ static partial class Bridge
         try {
             SetMarker(Shared.NotifyOff, S("notifications") != "true");
             if (lat.Length > 0 && lon.Length > 0) File.WriteAllText(DataFile(Shared.LocationFile), "lat=" + lat + "\nlon=" + lon + "\n"); else File.Delete(DataFile(Shared.LocationFile));
-            if (watch.Length > 0) {  // SilentGlass's own file: these keys change, the rest stays
-                var p = ReadConf(DataFile(Shared.PrefsFile));
-                p["watch"] = watch; p["play"] = play; p["wall"] = wall.Length > 0 ? wall : "auto";
-                p["hideapps"] = S("hideapps") == "1" ? "1" : "0"; if (dim.Length > 0) p["dim"] = dim;
-                if (close.Length > 0) p["close"] = close;
-                if (clock.Length > 0) p["clock"] = clock;
-                p["inputalerts"] = S("inputalerts") == "0" ? "0" : "1";
-                File.WriteAllText(DataFile(Shared.PrefsFile), string.Concat(p.Select(kv => kv.Key + "=" + kv.Value + "\n")));
-            }
+            if (prefs != null) File.WriteAllText(DataFile(Shared.PrefsFile), prefs.Merge(prefsOld));  // keys it doesn't know stay
         } catch { }
         if (internetOn is "on" or "off") { Shared.SetInternet(Data, internetOn == "on"); netCheck.Set(); }
         bool threadStarting = false;

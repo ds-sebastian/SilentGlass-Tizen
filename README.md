@@ -12,8 +12,8 @@ Tested on one TV: Samsung **QN65S90D** (2024 OLED), firmware `T-PTMDAKUC-0090-RE
 
 ## Features
 
-- **Home as an overlay.** A glass bar fades in over whatever is playing. Watch and Play jump to your streaming box
-  and console. The picture never stops.
+- **Home as an overlay.** A glass bar fades in over whatever is playing. Up to four shortcuts (named by you, e.g.
+  Watch and Play) jump straight to an input. The picture never stops.
 - **Controls without menus.** Brightness, volume, picture and sound modes, Game Mode and the sleep timer in a side
   panel.
 - **Home Assistant.** Power, inputs, volume and picture settings, plus camera and doorbell notifications over any

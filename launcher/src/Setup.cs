@@ -93,15 +93,17 @@ public sealed partial class SilentGlass
         setupState = "closed"; setupUrl = setupSeen = ""; setupGen++;
         try { File.WriteAllText(DataFile(Shared.SetupClose), DateTime.UtcNow.ToString("o") + "\n"); } catch { }
     }
-    void CloseSetup() { CloseSetupServer(); OpenInfo(); rowSel = rows.FindIndex(r => r.Name == "Advanced settings"); UpdatePanel(); }
+    void CloseSetup() { CloseSetupServer(); BackToInfo("Advanced settings"); }
     // the phone saved SilentGlass's settings (or the location); our own saves land here too and change nothing
     void PrefsChanged()
     {
-        string before = Logic.FormatPrefs(prefs);
+        string before = prefs.Format();
         LoadPrefs();
-        if (Logic.FormatPrefs(prefs) == before) return;
-        ResolvePorts(); CheckWallpaper();
+        if (prefs.Format() == before) return;
+        CheckWallpaper();
         if (!overlayShown) return;
-        if (mode == Mode.Bar) OpenBar(true); else if (mode == Mode.Info) UpdatePanel();
+        if (mode == Mode.Bar) OpenBar(true);
+        else if (mode == Mode.Info) UpdatePanel();
+        else if (mode == Mode.Shortcuts) { int keep = rowSel; OpenShortcuts(); rowSel = keep; UpdatePanel(); }  // new names
     }
 }

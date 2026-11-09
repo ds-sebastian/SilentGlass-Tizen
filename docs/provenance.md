@@ -19,7 +19,7 @@ tested TV and compiled against assemblies from that TV. The UI was designed with
 ## What local validation establishes
 
 - The launcher, bridge and Probe compile against the matching locally held references.
-- C# tests cover the NUI-free logic: preferences, Watch/Play cycling, banner geometry, sun times, QR encoding.
+- C# tests cover the NUI-free logic: preferences and shortcuts (Prefs.cs, shared with the bridge), banner geometry, sun times, QR encoding.
   The QR encoder's output is also decoded with OpenCV on the Pi.
 - The Home Assistant bridge's notification parser is driven by Home Assistant's own client library, and its phone
   setup page runs end to end against a fake MQTT broker (code gate, validation, saved config, reconnect).

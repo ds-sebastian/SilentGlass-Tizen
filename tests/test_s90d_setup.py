@@ -1,7 +1,7 @@
 """The bridge's phone setup page, run off the TV: `silentglass-ha.dll --no-tv` with a temporary data directory and
 config, against a fake MQTT broker. Covers the code gate, the 10-minute page lifecycle files, validation, saving
 (the password is never echoed and blank keeps it), the reconnect with the new settings, and wrong credentials."""
-import json, os, shutil, socket, subprocess, tempfile, threading, time, unittest, urllib.request, urllib.error
+import json, os, re, shutil, socket, subprocess, tempfile, threading, time, unittest, urllib.request, urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -142,27 +142,55 @@ class SetupPageTests(unittest.TestCase):
 
     def test_home_screen_settings_go_to_silentglass_prefs(self):
         # SilentGlass's own prefs file: the page changes its keys and keeps the rest
-        (self.data / "silentglass-prefs.txt").write_text("watch=0\nplay=0\nhideapps=0\ndim=1\nwall=auto\nlat=40.7\nlon=-74.0\n")
+        # a 1.3 file (watch / play, 0 = automatic): the page shows them as the first two shortcuts
+        (self.data / "silentglass-prefs.txt").write_text("watch=0\nplay=0\nhideapps=0\ndim=1\nwall=auto\nlat=40.7\nlon=-74.0\nfuture=7\n")
         code = self.open_page()
         state = json.loads(self.api("/api/state", code=code)[1])
-        self.assertEqual((state["watch"], state["play"], state["hideapps"], state["dim"], state["wall"]), ("0", "0", False, "5", "auto"))
-        self.assertEqual((state["clock"], state["inputalerts"]), ("12", True))
+        self.assertEqual(state["shortcuts"], [{"name": "Watch", "icon": "tv", "port": 15}, {"name": "Play", "icon": "gamecontroller", "port": 13},
+                                              {"name": "", "icon": "hdmi", "port": 0}, {"name": "", "icon": "hdmi", "port": 0}])
+        self.assertEqual((state["icons"], state["name_max"]), (["tv", "gamecontroller", "desktop", "laptop", "disc", "hdmi"], 14))
+        self.assertEqual((state["hideapps"], state["dim"], state["wall"], state["clock"], state["inputalerts"], state["close"]), (False, "5", "auto", "12", True, "20"))
         self.assertEqual([i["type"] for i in state["inputs"]], [13, 14, 15, 16])
-        self.assertEqual(state["close"], "20")
-        for bad in ({"watch": "15", "play": "15"}, {"watch": "12", "play": "13"}, {"watch": "15", "play": "13", "wall": "dusk"},
-                    {"watch": "15", "play": "13", "close": "7"}, {"watch": "15", "play": "13", "dim": "1"},
-                    {"watch": "15", "play": "13", "clock": "13"}):
+
+        def shortcuts(*slots):
+            body = {}
+            for n, (name, icon, port) in enumerate(slots, 1):
+                body.update({f"shortcut{n}_name": name, f"shortcut{n}_icon": icon, f"shortcut{n}_port": str(port)})
+            return body
+        good = shortcuts(("Watch", "tv", 15), ("Play", "gamecontroller", 13), ("Work", "desktop", 14), ("", "hdmi", 0))
+        for bad in (shortcuts(("Watch", "tv", 15), ("Play", "gamecontroller", 15), ("", "hdmi", 0), ("", "hdmi", 0)),  # one input twice
+                    shortcuts(("Watch", "tv", 12), ("", "hdmi", 0), ("", "hdmi", 0), ("", "hdmi", 0)),  # not HDMI
+                    shortcuts(("Watch", "rocket", 15), ("", "hdmi", 0), ("", "hdmi", 0), ("", "hdmi", 0)),  # unknown icon
+                    shortcuts(("A name far too long", "tv", 15), ("", "hdmi", 0), ("", "hdmi", 0), ("", "hdmi", 0)),
+                    shortcuts(("two\nlines", "tv", 15), ("", "hdmi", 0), ("", "hdmi", 0), ("", "hdmi", 0)),
+                    dict(good, wall="dusk"), dict(good, close="7"), dict(good, dim="1"), dict(good, clock="13")):
             self.assertFalse(json.loads(self.api("/api/save", dict(bad, thread="keep"), code)[1])["ok"], bad)
-        r = json.loads(self.api("/api/save", {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "close": "0", "clock": "24", "inputalerts": "0", "thread": "keep", "notifications": True}, code)[1])
+        self.assertEqual((self.data / "silentglass-prefs.txt").read_text().split("\n")[0], "watch=0")  # a refused save writes nothing
+        r = json.loads(self.api("/api/save", dict(good, hideapps="1", dim="0", wall="night", close="0", clock="24", inputalerts="0", thread="keep", notifications=True), code)[1])
         self.assertTrue(r["ok"], r)
-        prefs = dict(l.split("=", 1) for l in (self.data / "silentglass-prefs.txt").read_text().split())
-        self.assertEqual(prefs, {"watch": "15", "play": "13", "hideapps": "1", "dim": "0", "wall": "night", "lat": "40.7", "lon": "-74.0", "close": "0", "clock": "24", "inputalerts": "0"})
+        prefs = dict(l.split("=", 1) for l in (self.data / "silentglass-prefs.txt").read_text().splitlines())
+        self.assertEqual(prefs, {"shortcut1_name": "Watch", "shortcut1_icon": "tv", "shortcut1_port": "15", "shortcut2_name": "Play", "shortcut2_icon": "gamecontroller",
+                                 "shortcut2_port": "13", "shortcut3_name": "Work", "shortcut3_icon": "desktop", "shortcut3_port": "14", "shortcut4_name": "",
+                                 "shortcut4_icon": "hdmi", "shortcut4_port": "0", "hideapps": "1", "dim": "0", "wall": "night", "lat": "40.7", "lon": "-74",
+                                 "close": "0", "clock": "24", "inputalerts": "0", "future": "7"})  # watch / play gone, an unknown key kept
         state = json.loads(self.api("/api/state", code=code)[1])
-        self.assertEqual((state["watch"], state["hideapps"], state["dim"], state["wall"], state["clock"], state["inputalerts"]), ("15", True, "0", "night", "24", False))
+        self.assertEqual(state["shortcuts"][2], {"name": "Work", "icon": "desktop", "port": 14})
+        self.assertEqual((state["hideapps"], state["dim"], state["wall"], state["clock"], state["inputalerts"]), (True, "0", "night", "24", False))
         # the page never carries the code in its address: the QR is the address only, the code is typed
         st, page = self.api("/")
         self.assertIn(b"Advanced settings", page); self.assertIn(b"z-index:10", page)
         self.assertNotIn(b"location.search", page)  # the code is never read from the address
+
+    def test_page_icons_are_the_tvs(self):
+        # the phone page draws the shortcut icons from the same SVGs as the TV, in the text colour
+        page = (ROOT / "devices/s90d/device/ha-bridge/src/setup.html").read_text()
+        icons = re.findall(r'"([a-z]+)"', re.search(r"Icons = \{([^}]*)\}", (ROOT / "launcher/src/Prefs.cs").read_text()).group(1))
+        self.assertEqual(icons, ["tv", "gamecontroller", "desktop", "laptop", "disc", "hdmi"])
+        for name in icons:
+            svg = (ROOT / f"launcher/assets/sym-{name}.svg").read_text().strip().replace("#fff", "currentColor")
+            svg = svg.replace(' width="96" height="96"', ' width="24" height="24" aria-hidden="true"')
+            self.assertIn(f"  {name}: '{svg}'", page, name)
+        self.assertNotIn("Automatic", page)  # a shortcut is an input or Hidden; nothing is guessed from device names
 
     def test_internet_switch_follows_the_real_routes(self):
         # runs on the build machine, which has a default route: on = Allowed, off but still routed = Applying

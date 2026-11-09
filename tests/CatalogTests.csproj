@@ -8,6 +8,7 @@
     <Compile Include="../launcher/src/InfoStats.cs" />
     <Compile Include="../launcher/src/Shared.cs" />
     <Compile Include="../launcher/src/Logic.cs" />
+    <Compile Include="../launcher/src/Prefs.cs" />
     <Compile Include="../launcher/src/Qr.cs" />
     <Compile Include="CatalogTests.cs" />
   </ItemGroup>

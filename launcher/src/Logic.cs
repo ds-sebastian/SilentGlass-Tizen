@@ -3,15 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 
-// SilentGlass logic with no NUI types, so tests/CatalogTests.cs runs it off the TV: preferences, Watch / Play input
-// choices, which devices are on (HDMI-CEC), notification layout and sunrise / sunset for the wallpaper.
+// SilentGlass logic with no NUI types, so tests/CatalogTests.cs runs it off the TV: which devices are on (HDMI-CEC),
+// setting names and cycles, notification layout and sunrise / sunset for the wallpaper. The settings file: Prefs.cs.
 public static class Logic
 {
-    public static bool Flag(Dictionary<string, string> c, string key, bool fallback) => c.TryGetValue(key, out var v) ? v == "1" : fallback;
     public static double Num(Dictionary<string, string> c, string key, double fallback) =>
         c.TryGetValue(key, out var v) && double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double n) && double.IsFinite(n) ? n : fallback;
-    public static string Pick(Dictionary<string, string> c, string key, string fallback, params string[] allowed) =>
-        c.TryGetValue(key, out var v) && Array.IndexOf(allowed, v) >= 0 ? v : fallback;
 
     // a flat JSON object read as strings (setup.json, notice.json from the bridge); missing keys read as ""
     public sealed class Json
@@ -41,41 +38,11 @@ public static class Logic
             if (receivers.Contains(p) || power(p) is not (1 or 3)) on.Add(Shared.Hdmi1 - 1 + p);
         return on;
     }
-    // ---- preferences (silentglass-prefs.txt in the data directory, so they survive reboots); unknown keys keep their defaults ----
-    public sealed class Prefs
-    {
-        public int Watch, Play;            // 0 = Automatic (by the TV's input name)
-        public bool HideApps, InputAlerts = true;  // input alerts: the connected / unplugged toasts
-        public int Dim = 5;                // minutes without a key before the wallpaper dims; 0 = never
-        public string Clock = "12";        // the wallpaper clock: 12 | 24 | off
-        public string Wall = "auto";       // auto (sunrise / sunset) | day | night
-        public double Lat = DefaultLat, Lon = DefaultLon;
-        public int Close = 20;             // seconds of no key before the bar over a picture closes; 0 = never
-    }
-    // Until a location is set (phone page), sunrise and sunset come from the TV's time zone: its standard offset puts
-    // the longitude within a few degrees (15 per hour), and a mid-northern latitude is close enough for a wallpaper.
-    public const double DefaultLat = 40;
-    public static readonly double DefaultLon = Math.Clamp(TimeZoneInfo.Local.BaseUtcOffset.TotalHours * 15, -180, 180);
-    public static readonly string[] WallModes = { "auto", "day", "night" }, CloseTimes = { "10", "20", "30", "60", "0" },
-        DimTimes = { "2", "5", "10", "30", "0" }, ClockModes = { "12", "24", "off" };
-    public static Prefs ParsePrefs(string text)
-    {
-        var c = Shared.ParseConf(text);
-        int Port(string k) => c.TryGetValue(k, out var v) && int.TryParse(v, out int n) && (n == 0 || Shared.IsHdmi(n)) ? n : 0;
-        return new Prefs { Watch = Port("watch"), Play = Port("play"), HideApps = Flag(c, "hideapps", false), InputAlerts = Flag(c, "inputalerts", true),
-            Dim = int.Parse(c.GetValueOrDefault("dim") == "1" ? "5" : Pick(c, "dim", "5", DimTimes)),  // before v43c dim was 1 / 0
-            Clock = Pick(c, "clock", "12", ClockModes),
-            Wall = Pick(c, "wall", "auto", WallModes), Lat = Math.Clamp(Num(c, "lat", DefaultLat), -90, 90), Lon = Math.Clamp(Num(c, "lon", DefaultLon), -180, 180),
-            Close = int.Parse(Pick(c, "close", "20", CloseTimes)) };
-    }
-    public static string FormatPrefs(Prefs p) =>
-        "watch=" + p.Watch + "\nplay=" + p.Play + "\nhideapps=" + (p.HideApps ? 1 : 0) + "\ndim=" + p.Dim + "\nwall=" + p.Wall + "\nclock=" + p.Clock + "\ninputalerts=" + (p.InputAlerts ? 1 : 0) +
-        "\nlat=" + p.Lat.ToString(CultureInfo.InvariantCulture) + "\nlon=" + p.Lon.ToString(CultureInfo.InvariantCulture) + "\nclose=" + p.Close + "\n";
-    public static string NextWall(string mode, int dir = 1) => WallModes[((Array.IndexOf(WallModes, mode) + dir) % 3 + 3) % 3];
+    public static string NextWall(string mode, int dir = 1) => Prefs.WallModes[((Array.IndexOf(Prefs.WallModes, mode) + dir) % 3 + 3) % 3];
     public static int NextDim(int minutes, int dir = 1)
     {
-        int i = Array.IndexOf(DimTimes, minutes.ToString()), n = DimTimes.Length;
-        return int.Parse(DimTimes[(((i < 0 ? 1 : i) + dir) % n + n) % n]);
+        int i = Array.IndexOf(Prefs.DimTimes, minutes.ToString()), n = Prefs.DimTimes.Length;
+        return int.Parse(Prefs.DimTimes[(((i < 0 ? 1 : i) + dir) % n + n) % n]);
     }
     public static string DimName(int minutes) => minutes == 0 ? "Never" : minutes + " min";
     // the wallpaper clock (big = with AM / PM in 12-hour mode; the dimmed clock never shows it)
@@ -84,15 +51,6 @@ public static class Logic
     // the bar clock's widest text (0 is among the widest digits), so its width stays put as the minutes tick
     public static string[] ClockWidest(string mode) => mode == "24" ? new[] { "00:00" } : new[] { "00:00 AM", "00:00 PM" };
     public static string WallName(string mode) => mode == "day" ? "Day" : mode == "night" ? "Night" : "Follows sunset";
-
-    // Watch / Play: dir +1 cycles Automatic -> HDMI 1..4 -> Automatic (dir -1 backwards), skipping the other one's input
-    public static int NextPort(int current, int other, int dir = 1)
-    {
-        const int first = Shared.Hdmi1, last = Shared.Hdmi4;
-        int n = current;
-        do n = dir >= 0 ? (n == 0 ? first : n >= last ? 0 : n + 1) : (n == 0 ? last : n <= first ? 0 : n - 1); while (n != 0 && n == other);
-        return n;
-    }
 
     // ---- notification banner geometry (tools/overlay_mockup.py draws the same) ----
     public const int NoticeMargin = 56;

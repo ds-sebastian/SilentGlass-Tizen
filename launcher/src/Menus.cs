@@ -13,11 +13,12 @@ public sealed partial class SilentGlass
     readonly List<(View card, TextLabel name, LibraryApp app)> tiles = new();
     int menuSel;
     View popover;
-    static string PortGlyph(int type, int watch, int play) => type == watch ? "tv" : type == play ? "gamecontroller" : type == 0 ? "antenna" : "hdmi";
+    string PortGlyph(int type) => prefs.For(type)?.Icon ?? (type == 0 ? "antenna" : "hdmi");
     void CloseMenu() { if (popover == null) return; oLayer.Remove(popover); popover.Dispose(); popover = null; menu.Clear(); tiles.Clear(); }
 
-    // ---- Inputs: every input by the TV's name for it. The one on screen: a soft pill and a checkmark; a green dot on
-    // each input whose device is on (Tv.cs DeviceOn). The focus is the white pill. ----
+    // ---- Inputs: the inputs in use (Tv.cs InUse: plugged in, on, or on screen) by the TV's name for each, with the
+    // shortcut's icon if one opens it. The one on screen: a soft pill and a checkmark; a green dot on each input whose
+    // device is on (Tv.cs DeviceOn). The focus is the white pill. ----
     string inputsSig = "";
     string InputsSignature() => lastSource + "|" + HasPicture + "|" + cecSig + "|" + string.Join(";", inputs.ConvertAll(i => i.Type + "," + i.Name + "," + i.Connected));
     void OpenInputs()
@@ -26,12 +27,13 @@ public sealed partial class SilentGlass
         int keep = refresh && menuSel < menu.Count ? menu[menuSel].Type : lastSource;
         if (mode != Mode.Bar) OpenBar(true);
         mode = Mode.Inputs; FocusBar(false); CloseMenu(); RefreshInputs();
-        int h = 24 + inputs.Count * MenuRowH, x = Math.Clamp(BarItemCentre("inputs") - PopW / 2, 40, 1880 - PopW), y = BarTop - PopGap - h;
+        var list = InUse(); if (list.Count == 0) list = inputs;  // opened from Home Assistant with nothing plugged in
+        int h = 24 + list.Count * MenuRowH, x = Math.Clamp(BarItemCentre("inputs") - PopW / 2, 40, 1880 - PopW), y = BarTop - PopGap - h;
         popover = Glass(x, y, PopW, h, PopR); oLayer.Add(popover);
-        foreach (var s in inputs) {
-            bool cur = s.Type == lastSource, off = inputsKnown && !s.Connected && !cur && !DeviceOn(s.Type), sub = s.Name != s.Port;
-            var r = new MenuRow { Type = s.Type, Current = cur, Box = new View { Position2D = new Position2D(12, 12 + menu.Count * MenuRowH), Size2D = new Size2D(PopW - 24, MenuRowH), CornerRadius = Round(26), Opacity = off ? .45f : 1 } };
-            r.Glyph = Sym(PortGlyph(s.Type, watchPort, playPort), 22, (MenuRowH - GlyphS) / 2, GlyphS); r.Box.Add(r.Glyph);
+        foreach (var s in list) {
+            bool cur = s.Type == lastSource, sub = s.Name != s.Port;
+            var r = new MenuRow { Type = s.Type, Current = cur, Box = new View { Position2D = new Position2D(12, 12 + menu.Count * MenuRowH), Size2D = new Size2D(PopW - 24, MenuRowH), CornerRadius = Round(26) } };
+            r.Glyph = Sym(PortGlyph(s.Type), 22, (MenuRowH - GlyphS) / 2, GlyphS); r.Box.Add(r.Glyph);
             r.Name = Label(s.Name, 80, sub ? 10 : 0, PopW - 24 - 80 - 110, sub ? 44 : MenuRowH, 30, White, "Semibold"); r.Box.Add(r.Name);
             if (sub) { r.Port = Label(s.Port, 80, 50, 300, 30, 22, Faint); r.Box.Add(r.Port); }
             if (DeviceOn(s.Type)) r.Box.Add(Dot(PopW - 24 - 92, (MenuRowH - 12) / 2, 12, Live));
