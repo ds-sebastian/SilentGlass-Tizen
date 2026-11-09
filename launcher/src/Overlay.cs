@@ -180,8 +180,7 @@ public sealed partial class SilentGlass
     {
         string ct = CornerClockText(); if (ct.Length == 0) return;
         // a band across the whole top, darkest at the edge (owner: the clock was hard to read over bright scenes)
-        // a panel's window is only the right 744 px: there the band fades in from its left edge instead of ending in a line
-        var band = InPanel ? Shade("top-side", PanelWx, 0, 1920 - PanelWx, TopShadeH) : Shade("top", 0, 0, 1920, TopShadeH);
+        var band = Shade("top", 0, 0, 1920, TopShadeH);
         cornerClock = Label(ct, 1420, 40, 420, 64, 40, White, "Display"); cornerClock.HorizontalAlignment = HorizontalAlignment.End;
         cornerClock.Shadow = TextShadow(); band.Add(cornerClock);
         oRoot.Add(band); band.LowerToBottom();  // under the panels (Controls / Info can reach up into it)

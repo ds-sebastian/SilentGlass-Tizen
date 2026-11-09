@@ -20,11 +20,6 @@ def bottom(t):  # 0 where the shade starts -> 1 at the screen edge: nothing, eas
     return .86 * t ** 1.7
 
 
-def side(x):    # the top band in a panel's window (744 wide, from x 1176): fades in from its left edge, no line there
-    t = min(1, x / 360)
-    return t * t * (3 - 2 * t)
-
-
 def png(path, h, alpha, w=W, across=lambda x: 1):
     rows = bytearray()
     for y in range(h):
@@ -43,5 +38,4 @@ def png(path, h, alpha, w=W, across=lambda x: 1):
 if __name__ == "__main__":
     A = Path(__file__).resolve().parent.parent / "launcher/assets"
     print("shade-top.png", png(A / "shade-top.png", 260, top), "bytes")
-    print("shade-top-side.png", png(A / "shade-top-side.png", 260, top, 744, side), "bytes")
     print("shade-bottom.png", png(A / "shade-bottom.png", 660, bottom), "bytes")
