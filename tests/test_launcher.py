@@ -211,6 +211,16 @@ class BarClockAndDeveloperMode(unittest.TestCase):
 
 
 class DeviceRecord(unittest.TestCase):
+    def test_install_and_undo_leave_the_launcher_preloaded(self):
+        # after replacing the launcher, start it in the background like the boot does: a cold start on the next Home
+        # shows the TV's black launch screen over the picture
+        dev = ROOT / "devices/s90d/device"
+        for name in ("install.sh", "undo.sh"):
+            text = (dev / name).read_text()
+            self.assertIn("__K_BG_LAUNCH enable", text, name)
+            kill = text.index("app_launcher -u 5001 -k com.samsung.tv.bixby-promotion")
+            self.assertRegex(text[kill:], r"\n +preload\n", name)
+
     def test_hidden_main_window_sits_under_the_picture(self):
         # the TV's launch screen for the first Home after the boot preload attaches just below our main window: hidden,
         # that window must sit under the picture or the launch screen blacks it out (and the input drops)

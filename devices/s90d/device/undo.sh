@@ -17,6 +17,9 @@ case "$name" in *[!A-Za-z0-9._-]*) echo 'bad name - refusing'; exit 2;; esac
 BK=$B/$name
 [ "$(id -u)" = 0 ]
 [ -s "$BK/files.sha256" ] || { echo "$BK is not an install.sh backup - refusing"; exit 3; }
+# start it in the background, as the TV does at boot: the first Home then only resumes it (a cold start would show
+# the TV's black launch screen over the picture for a moment)
+preload(){ aul_test launch_for_uid com.samsung.tv.bixby-promotion 5001 __K_BG_LAUNCH enable >/dev/null 2>&1 || true; }
 [ ! -e "$BK/undone" ] || { echo 'this install was already undone - refusing'; exit 3; }
 
 if [ -e "$BK/launcher-previous.sha256" ]; then
@@ -33,6 +36,7 @@ if [ -e "$BK/launcher-previous.sha256" ]; then
   mv "$BK/launcher-quiet-home" "$A/res/quiet-home"
   [ "$(have_sha "$A/bin/BixbyPromotion.dll")" = "$prev" ] || { echo 'LAUNCHER RESTORE DOES NOT MATCH'; exit 9; }
   echo "launcher: restored ($(echo "$prev" | cut -c1-16)...)"
+  preload
 fi
 
 if [ -d "$BK/bridge-files" ] || [ -e "$BK/bridge-new" ]; then

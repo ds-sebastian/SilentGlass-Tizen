@@ -8,7 +8,7 @@
 # /opt/usr/share/quiet-tizen-backups/silentglass-<version>-<time>/. Undo: /bin/sh -s -- <that folder's name> < undo.sh
 # The bridge's settings (silentglass-ha.conf) are never touched.
 set -eu
-VER=1.3.3
+VER=1.3.4
 P=${SILENTGLASS_TEST_ROOT:-}   # tests only: a fake TV under this folder; empty on the TV
 S=$P/home/owner/share/tmp/sdk_tools/quiet-tizen
 A=$P/opt/usr/apps/com.samsung.tv.bixby-promotion; LBL=User::Pkg::com.samsung.tv.bixby-promotion::RO
@@ -33,10 +33,10 @@ BK=$B/silentglass-$VER-$(date +%Y%m%dT%H%M%S)
 mkdir -p "$B"; mkdir -m 700 "$BK"; mkdir "$BK/stage"
 [ "$(stat -c %d "$A/res" 2>/dev/null || stat -c %d "$B")" = "$(stat -c %d "$B")" ] || { echo 'backup is on another filesystem; mv would not keep labels - refusing'; exit 7; }
 cat > "$BK/files.sha256" <<'SUMS'
-287c2c66b19aac9fc21c6f1c00e5dc46438a1ae157c75c8e73ca091a0354b293  BixbyPromotion.dll
+9564d4f419e16c79afb6dc43da8408168e3ea7114c0e78ee4d97331af0e91e5b  BixbyPromotion.dll
 13e781d4e1f13494233e000124102caad8c9a5bb41bc244517f3bdcaea5ad730  Probe.dll
 530d94cae62b04c4677ff4a6549f72b84c13115b13e16283fc2197a56442a275  bridge/silentglass-ha.conf.example
-2987257ffc94c7a00c8b19e169791b80edc551ec0b26f0bc0f39f5e46931a4c6  bridge/silentglass-ha.dll
+fca339bfea56502b68f2cdc6416783bc9b3bfe99b3457655cf6e2d331ba14385  bridge/silentglass-ha.dll
 a0882085ebc8618322fb819cc0e92bac0499419af91124d05f6d27662818ea83  bridge/silentglass-ha.runtimeconfig.json
 439b5d9d79665666e981a80dfe2450325464f996a2fddff48a9efef6627a7c42  bridge/silentglass-ha.service
 236ead33439cced94720eb7a4e89afcc2dfeecf4b72de0dae3a97b024e700538  quiet-home/apps.json
@@ -89,6 +89,9 @@ tar -xzf "$S/package.tar.gz" -C "$BK/stage"
 [ "$(cd "$BK/stage" && find . -type f | wc -l)" = "$(wc -l < "$BK/files.sha256")" ] || { echo 'the staged bundle has extra files - refusing (nothing changed)'; rm -rf "$BK"; exit 8; }
 echo "SilentGlass $VER: bundle verified"
 want_sha(){ grep "  $1\$" "$BK/files.sha256" | cut -d' ' -f1; }
+# start it in the background, as the TV does at boot: the first Home then only resumes it (a cold start would show
+# the TV's black launch screen over the picture for a moment)
+preload(){ aul_test launch_for_uid com.samsung.tv.bixby-promotion 5001 __K_BG_LAUNCH enable >/dev/null 2>&1 || true; }
 have_sha(){ sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 
 if [ $do_launcher = 1 ]; then
@@ -115,6 +118,7 @@ if [ $do_launcher = 1 ]; then
       [ "$(have_sha "$A/bin/BixbyPromotion.dll")" = "$(want_sha BixbyPromotion.dll)" ] ||
       { echo "LAUNCHER DOES NOT MATCH - undo: /bin/sh -s -- ${BK##*/} < undo.sh"; exit 9; }
     echo "launcher: $VER installed (was $(cut -c1-16 "$BK/launcher-previous.sha256")...)"
+    preload
   fi
 fi
 

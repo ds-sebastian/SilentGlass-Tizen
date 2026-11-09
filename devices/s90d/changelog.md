@@ -6,6 +6,12 @@ entries keep that name.
 Newest first. Measurements are from the tested TV (firmware in [README.md](README.md)); `bench/` holds the raw
 records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries may since have been removed - the current list is in the README.
 
+- **SilentGlass 1.3.4** (2026-11-08): no black flash on the first Home after an update. `install.sh` stops the
+  launcher to replace it, which left the next Home a cold start: the TV maps the new window on top and shows its
+  black launch screen over the picture for a moment. `install.sh` and `undo.sh` now start it again in the background
+  (`aul_test ... __K_BG_LAUNCH enable`), as the TV does at boot, so the first Home only resumes it (1.3.3 made that
+  path clean). Also checked on the TV: the 10-minute network fail-safe fired (10 min 44 s after the router and broker
+  stopped answering it put DHCP back, same address) and the block came back 7 s after they answered again.
 - **SilentGlass 1.3.3** (2026-11-08): no black flash on the first Home after a restart. At boot the TV preloads
   the Home app in the background. On the first Home press after that, the TV attaches its launch screen (an opaque
   black window) just below the app's main window, which SilentGlass keeps hidden but which sat above the picture:

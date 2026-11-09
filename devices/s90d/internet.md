@@ -29,7 +29,10 @@ trial, CPU and memory didn't change, and Samsung's apps kept retrying about 3 ti
    again in under a second.
 6. **Fail-safe (1.3.1).** If neither the router nor the Home Assistant broker answers for 10 minutes while the link is
    up (a new router, another subnet), the bridge puts the TV's own network settings back and reports
-   **Open · home network lost**. It blocks again once the home network answers.
+   **Open · home network lost**. It blocks again once the home network answers. Tested on the TV (2026-11-08) by
+   dropping its traffic to the router and the broker: DHCP came back after 10 min 44 s (the checks run every minute),
+   and the block returned 7 s after both answered again. A switch-off record from 1.3.0 has no router address, so
+   until the switch is turned off once more (or the fail-safe has fired once), only the broker is watched.
 
 Nothing runs off the TV and nothing runs as root. No firewall rules; Thread forwarding and IPv6 are untouched.
 
