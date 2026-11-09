@@ -113,6 +113,7 @@ static class CatalogTests
         True(Logic.SleepText("1", "30 minutes", -1) == "30 min" && Logic.SleepText("3", "120 minutes", 200) == "120 min", "sleep timer: the length when the start is unknown");
         True(Logic.SleepText("1", "30 minutes", 0) == "30 min left" && Logic.SleepText("1", "30 minutes", 12.5) == "18 min left" && Logic.SleepText("3", "120 minutes", 13) == "1 h 47 min left" && Logic.SleepText("2", "60 minutes", 0) == "1 h left", "sleep timer: time left");
         True(Logic.SleepText("9", "Custom", 3) == "Custom", "sleep timer: an unknown name as it is");
+        True(Logic.Short(30) == "1 min" && Logic.Short(2700) == "45 min" && Logic.Short(75480) == "20 h" && Logic.Short(3 * 86400 + 5) == "3 days", "uptime: one unit");
         True(Logic.NextWall("auto") == "day" && Logic.NextWall("day") == "night" && Logic.NextWall("night") == "auto" && Logic.NextWall("auto", -1) == "night", "wallpaper cycle");
         // shortcut inputs from the remote: hidden -> HDMI 1..4 -> hidden, skipping inputs other shortcuts use
         var cyc = Prefs.Parse("shortcut1_port=15\nshortcut2_port=13\n");

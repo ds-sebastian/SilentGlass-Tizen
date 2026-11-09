@@ -33,7 +33,7 @@ BK=$B/silentglass-$VER-$(date +%Y%m%dT%H%M%S)
 mkdir -p "$B"; mkdir -m 700 "$BK"; mkdir "$BK/stage"
 [ "$(stat -c %d "$A/res" 2>/dev/null || stat -c %d "$B")" = "$(stat -c %d "$B")" ] || { echo 'backup is on another filesystem; mv would not keep labels - refusing'; exit 7; }
 cat > "$BK/files.sha256" <<'SUMS'
-5336d0110a3cd743322fc53abb7b895027dc12b3384b3f422dde88ca3a88e830  BixbyPromotion.dll
+cab637e128868b1cb418eae04eede101b0aa0163b33b0b53b6f7db0e7bda5059  BixbyPromotion.dll
 13e781d4e1f13494233e000124102caad8c9a5bb41bc244517f3bdcaea5ad730  Probe.dll
 530d94cae62b04c4677ff4a6549f72b84c13115b13e16283fc2197a56442a275  bridge/silentglass-ha.conf.example
 79e781941472cca69e35930eadfbb3f73e5354db7d19db028b3850e19786b1ac  bridge/silentglass-ha.dll

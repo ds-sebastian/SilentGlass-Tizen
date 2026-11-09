@@ -60,6 +60,9 @@ public static class Logic
         int left = (int)Math.Ceiling(total - minutesAgo);
         return (left >= 60 ? left / 60 + " h" + (left % 60 > 0 ? " " + left % 60 + " min" : "") : left + " min") + " left";
     }
+    // uptime on the Info summary line, one unit so the line fits: "45 min", "20 h", "3 days"
+    public static string Short(double seconds) =>
+        seconds < 3600 ? Math.Max(1, (int)(seconds / 60)) + " min" : seconds < 172800 ? (int)(seconds / 3600) + " h" : (int)(seconds / 86400) + " days";
     public static string WallName(string mode) => mode == "day" ? "Day" : mode == "night" ? "Night" : "Follows sunset";
 
     // ---- notification banner geometry (tools/overlay_mockup.py draws the same) ----

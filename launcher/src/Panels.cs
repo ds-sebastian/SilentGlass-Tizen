@@ -111,11 +111,11 @@ public sealed partial class SilentGlass
         var status = StatusList().Select(s => (s.name, now: s.read())).ToList();
         int issues = status.Count(s => s.now.Item2 == Amber);
         string Text(string name) => status.Find(s => s.name == name).now.Item1 ?? "";
-        var up = InfoStats.Uptime(); string upText = up.HasValue ? "up " + InfoStats.Duration(up.Value) : "";
+        var up = InfoStats.Uptime(); string upText = up.HasValue ? "up " + Logic.Short(up.Value) : "";
         if (issues > 0) {
             int? temp = InfoStats.ChipTemperature();
             return (issues == 1 ? "One thing to check" : issues + " things to check",
-                    string.Join(" · ", new[] { up.HasValue ? "Up " + InfoStats.Duration(up.Value) : null, temp.HasValue ? temp + " °C" : null }.Where(x => x != null)));
+                    string.Join(" · ", new[] { up.HasValue ? "Up " + Logic.Short(up.Value) : null, temp.HasValue ? temp + " °C" : null }.Where(x => x != null)));
         }
         var parts = new List<string> { Text("Network").Split(" · ")[0] };
         if (Text("Internet").EndsWith("home network only")) parts.Add("home network only");
