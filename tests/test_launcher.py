@@ -212,7 +212,9 @@ class CornerClockAndPanels(unittest.TestCase):
         self.assertIn("CornerClock();", ob)
         self.assertNotIn("Clock", ob[ob.index("capsule = Glass"):ob.index("FocusBar(false);")])  # nothing clock-like inside the capsule
         self.assertIn('string CornerClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);', src)
-        self.assertIn('Label(ct, 1420 - 1160, 40, 420, 64, 40, White, "Display")', src)  # = Backdrop.cs's clock at 1420,40
+        self.assertIn('Label(ct, 1420, 40, 420, 64, 40, White, "Display")', src)  # = Backdrop.cs's clock at 1420,40
+        cc = body(src, "void CornerClock()")  # a full-width band under the panels, the digits with a shadow
+        self.assertIn("Size2D(1920, TopShadeH)", cc); self.assertIn("band.LowerToBottom();", cc); self.assertIn("cornerClock.Shadow = TextShadow();", cc)
         self.assertIn('Label("", 1420, 40, 420, 64, 40, White, "Display")', (SRC / "Backdrop.cs").read_text())
         self.assertIn("UpdateCornerClock(); if (overlayShown", src)  # the idle timer ticks it every second
         self.assertIn("cornerClock = null;", body(src, "void ClearOverlay()"))

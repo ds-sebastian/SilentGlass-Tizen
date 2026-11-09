@@ -100,6 +100,24 @@ def bar(focus, clock=None, above=None, items=None):
     return f'<div class="dim"></div><div class="glass bar" id="bar">{"".join(out)}</div>{above_html}{js}'
 
 
+# the shading as SilentGlass draws it (Overlay.cs): "now" = 1.4.0, "new" = darker at the very top and bottom, still
+# fading out, the top one across the whole width
+SHADE_NOW = ('<div class="abs" style="left:0;top:420px;width:1920px;height:660px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.5))"></div>',
+             '<div class="scrimtr"></div>')
+SHADE_NEW = ('<div class="abs" style="left:0;top:420px;width:1920px;height:660px;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.16) 45%,rgba(0,0,0,.45) 80%,rgba(0,0,0,.72) 100%)"></div>',
+             '<div class="abs" style="left:0;top:0;width:1920px;height:300px;background:linear-gradient(180deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.30) 35%,rgba(0,0,0,0) 100%)"></div>')
+SHADE_DARK = ('<div class="abs" style="left:0;top:420px;width:1920px;height:660px;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.22) 40%,rgba(0,0,0,.6) 78%,rgba(0,0,0,.86) 100%)"></div>',
+              '<div class="abs" style="left:0;top:0;width:1920px;height:340px;background:linear-gradient(180deg,rgba(0,0,0,.84) 0%,rgba(0,0,0,.55) 35%,rgba(0,0,0,.2) 70%,rgba(0,0,0,0) 100%)"></div>')
+TV_BAR = [("tv", "Watch", "SHIELD", True), ("gamecontroller", "Play", "Switch", True), None,
+          ("controls", "Controls", None, False), ("info", "Info", None, False)]
+
+
+def shaded(shade, t="4:52 PM", glow=False):
+    bottom, top = shade
+    s = ' style="text-shadow:0 2px 12px rgba(0,0,0,.7)"' if glow else ''
+    return top + f'<div class="clk"{s}>{t}</div>' + bar(1, items=TV_BAR).replace('<div class="dim"></div>', bottom)
+
+
 def corner_clock(t="4:52 PM", style="plain"):
     # the same spot and type as the wallpaper clock (Backdrop.cs: 1420,40 420x64, Display 40, right-aligned)
     if style == "pill":
@@ -314,6 +332,8 @@ def main():
              "info": bar(6) + info(5),
              "backdrop": backdrop() + bar(0, None),
              "setup": setup_sheet(ROOT / ".local/overlay-mock/qr.svg"), "inputs": bar(3) + inputs_pop(), "apps": bar(5) + apps_pop(apps), "controls": controls(0), "controls-dev": controls(13)}
+    if len(sys.argv) > 3 and sys.argv[3] == "v5":
+        pages = {"shade-now": shaded(SHADE_NOW), "shade-new": shaded(SHADE_NEW), "shade-dark": shaded(SHADE_DARK, glow=True)}
     if len(sys.argv) > 3 and sys.argv[3] == "v2":
         pages = {"bar-now": bar(0, None, None, [("clock",)] if False else None).replace('<div class="glass bar" id="bar">', '<div class="glass bar" id="bar"><div class="item" style="font-weight:500">4:52 PM</div><div class="sep"></div>'),
                  "a1-bar-corner-plain": corner_clock() + bar(0),

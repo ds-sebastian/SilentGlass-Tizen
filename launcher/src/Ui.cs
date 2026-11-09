@@ -58,16 +58,17 @@ public sealed partial class SilentGlass
         Corners(v, r, w, h);
         return v;
     }
-    // a dark corner fading out from the top right (the clock's backdrop): an ellipse the size of the view
-    static PropertyMap Scrim()
+    // the shades behind the bar and the clock: darkest at the screen edge, fading out (no line where they end)
+    const int TopShadeH = 260;
+    static View BottomShade(int y) => new() { Position2D = new Position2D(0, y), Size2D = new Size2D(1920, 1080 - y), Background = Gradient(false, 0,
+        (0f, Clear), (.4f, new Color(0, 0, 0, .22f)), (.78f, new Color(0, 0, 0, .6f)), (1f, new Color(0, 0, 0, .86f))) };
+    // a soft dark halo behind white text over the picture
+    static PropertyMap TextShadow()
     {
         var m = new PropertyMap();
-        m.Add(Visual.Property.Type, new PropertyValue((int)Visual.Type.Gradient));
-        m.Add(GradientVisualProperty.Center, new PropertyValue(new Vector2(.5f, -.5f)));
-        m.Add(GradientVisualProperty.Radius, new PropertyValue(1f));
-        var o = new PropertyArray(); o.PushBack(new PropertyValue(0f)); o.PushBack(new PropertyValue(.7f));
-        var s = new PropertyArray(); s.PushBack(new PropertyValue(new Vector4(0, 0, 0, .42f))); s.PushBack(new PropertyValue(new Vector4(0, 0, 0, 0)));
-        m.Add(GradientVisualProperty.StopOffset, new PropertyValue(o)); m.Add(GradientVisualProperty.StopColor, new PropertyValue(s));
+        m.Add("color", new PropertyValue(new Color(0, 0, 0, .7f)));
+        m.Add("offset", new PropertyValue(new Vector2(0, 2)));
+        m.Add("blurRadius", new PropertyValue(6f));
         return m;
     }
     // soft dimming behind the glass (from transparent to `max` black)

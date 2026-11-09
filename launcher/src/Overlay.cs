@@ -131,7 +131,7 @@ public sealed partial class SilentGlass
         // full height: the clock is in the top-right corner (the window was only the bottom band before 1.4)
         ClearOverlay(); mode = Mode.Bar; Place(0, 0, 1920, 1080);
         RefreshInputs(); var items = BarItems(); barSig = BarSignature(items);
-        oDim = Dimming(false, 0, BandTop + 180, 1920, 1080 - BandTop - 180, .5f); oRoot.Add(oDim); oRoot.Add(oLayer);
+        oDim = BottomShade(BandTop + 180); oRoot.Add(oDim); oRoot.Add(oLayer);
         // measure, then centre the capsule
         var labels = new List<(TextLabel t, TextLabel s, int w)>(); int total = 24;
         foreach (var it in items) {
@@ -179,9 +179,12 @@ public sealed partial class SilentGlass
     void CornerClock()
     {
         string ct = CornerClockText(); if (ct.Length == 0) return;
-        var corner = new View { Position2D = new Position2D(1160, 0), Size2D = new Size2D(760, 240), Background = Scrim() };
-        cornerClock = Label(ct, 1420 - 1160, 40, 420, 64, 40, White, "Display"); cornerClock.HorizontalAlignment = HorizontalAlignment.End;
-        corner.Add(cornerClock); oRoot.Add(corner);
+        // a band across the whole top, darkest at the edge (owner: the clock was hard to read over bright scenes)
+        var band = new View { Position2D = new Position2D(0, 0), Size2D = new Size2D(1920, TopShadeH), Background = Gradient(false, 0,
+            (0f, new Color(0, 0, 0, .84f)), (.35f, new Color(0, 0, 0, .55f)), (.7f, new Color(0, 0, 0, .2f)), (1f, Clear)) };
+        cornerClock = Label(ct, 1420, 40, 420, 64, 40, White, "Display"); cornerClock.HorizontalAlignment = HorizontalAlignment.End;
+        cornerClock.Shadow = TextShadow(); band.Add(cornerClock);
+        oRoot.Add(band); band.LowerToBottom();  // under the panels (Controls / Info can reach up into it)
     }
     void UpdateCornerClock() { if (cornerClock == null) return; string t = CornerClockText(); if (t.Length > 0 && cornerClock.Text != t) cornerClock.Text = t; }
     void FocusBar(bool animate)
