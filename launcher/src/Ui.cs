@@ -60,8 +60,10 @@ public sealed partial class SilentGlass
     }
     // the shades behind the bar and the clock: darkest at the screen edge, fading out (no line where they end)
     const int TopShadeH = 260;
-    static View BottomShade(int y) => new() { Position2D = new Position2D(0, y), Size2D = new Size2D(1920, 1080 - y), Background = Gradient(false, 0,
-        (0f, Clear), (.4f, new Color(0, 0, 0, .22f)), (.78f, new Color(0, 0, 0, .6f)), (1f, new Color(0, 0, 0, .86f))) };
+    // pre-rendered (tools/make_shades.py): the TV's gradient visual held each stop flat for ~27 rows, which striped
+    static ImageView Shade(string which, int y, int h) =>
+        new() { ResourceUrl = Res + "shade-" + which + ".png", Position2D = new Position2D(0, y), Size2D = new Size2D(1920, h) };
+    static View BottomShade(int y) => Shade("bottom", y, 1080 - y);
     // a soft dark halo behind white text over the picture
     static PropertyMap TextShadow()
     {

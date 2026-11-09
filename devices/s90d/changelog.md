@@ -9,7 +9,9 @@ records of the 2026-10-25 style benchmarks. Conf keys mentioned in older entries
 - **SilentGlass 1.4.1** (unreleased): darker shades so the clock and the bar read over bright scenes. The clock's
   shade is a band across the whole top (darkest at the edge, fading out over 260 px) instead of a patch in the
   corner, and the digits have a soft shadow; the bar's shade goes to 86 % black at the bottom edge (was 50 %) while
-  the middle of the picture stays about as it was.
+  the middle of the picture stays about as it was. Both shades are pre-rendered images (`tools/make_shades.py`:
+  one alpha level per row, ordered dither) because the TV's gradient visual held each colour stop flat for ~27 rows
+  and the slope changes showed as stripes over the picture.
 - **SilentGlass 1.4.0** (2026-11-09): **shortcuts** replace Watch / Play, and a visual refresh.
   - Up to four, each a name (up to 14 characters), an icon (TV, game controller, desktop, laptop, disc, HDMI) and an
     HDMI input. Hidden ones aren't on the bar. The line under a name is the TV's own name for the input; an unnamed

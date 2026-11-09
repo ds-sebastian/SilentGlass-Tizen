@@ -214,7 +214,7 @@ class CornerClockAndPanels(unittest.TestCase):
         self.assertIn('string CornerClockText() => backdropShown ? "" : Logic.ClockText(prefs.Clock, Shared.Now(DataDir), true);', src)
         self.assertIn('Label(ct, 1420, 40, 420, 64, 40, White, "Display")', src)  # = Backdrop.cs's clock at 1420,40
         cc = body(src, "void CornerClock()")  # a full-width band under the panels, the digits with a shadow
-        self.assertIn("Size2D(1920, TopShadeH)", cc); self.assertIn("band.LowerToBottom();", cc); self.assertIn("cornerClock.Shadow = TextShadow();", cc)
+        self.assertIn('Shade("top", 0, TopShadeH)', cc); self.assertIn("band.LowerToBottom();", cc); self.assertIn("cornerClock.Shadow = TextShadow();", cc)
         self.assertIn('Label("", 1420, 40, 420, 64, 40, White, "Display")', (SRC / "Backdrop.cs").read_text())
         self.assertIn("UpdateCornerClock(); if (overlayShown", src)  # the idle timer ticks it every second
         self.assertIn("cornerClock = null;", body(src, "void ClearOverlay()"))
@@ -227,6 +227,15 @@ class CornerClockAndPanels(unittest.TestCase):
         for row in ('"Contrast"', '"Pixel Shift"', '"Bluetooth"', '"Network"', '"TV Settings"', '"Developer Mode"'):
             self.assertIn(row, om); self.assertNotIn(row, oc)
         self.assertIn('Choice("moon", "Sleep Timer", SleepValue,', oc)  # "None" or the time left, never the TV's "Off"
+
+    def test_shades_are_the_generated_images(self):
+        # the TV's gradient visual striped (flat runs at each stop); the shades are images from tools/make_shades.py
+        out = subprocess.run(["python3", str(ROOT / "tools/make_shades.py")], capture_output=True, text=True, check=True)
+        self.assertIn("shade-top.png", out.stdout)
+        st = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "launcher/assets/shade-top.png", "launcher/assets/shade-bottom.png"],
+                            capture_output=True, text=True).stdout
+        self.assertEqual(st.strip().startswith(" M"), False, "committed shades differ from make_shades.py")
+        self.assertNotIn("Gradient(", body(launcher(), "void CornerClock()"))
 
     def test_every_panel_gets_its_keys(self):
         # 1.4.0 test build: More and Status details opened but the key switch listed panels by name and missed them,

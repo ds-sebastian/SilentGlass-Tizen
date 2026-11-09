@@ -180,8 +180,7 @@ public sealed partial class SilentGlass
     {
         string ct = CornerClockText(); if (ct.Length == 0) return;
         // a band across the whole top, darkest at the edge (owner: the clock was hard to read over bright scenes)
-        var band = new View { Position2D = new Position2D(0, 0), Size2D = new Size2D(1920, TopShadeH), Background = Gradient(false, 0,
-            (0f, new Color(0, 0, 0, .84f)), (.35f, new Color(0, 0, 0, .55f)), (.7f, new Color(0, 0, 0, .2f)), (1f, Clear)) };
+        var band = Shade("top", 0, TopShadeH);
         cornerClock = Label(ct, 1420, 40, 420, 64, 40, White, "Display"); cornerClock.HorizontalAlignment = HorizontalAlignment.End;
         cornerClock.Shadow = TextShadow(); band.Add(cornerClock);
         oRoot.Add(band); band.LowerToBottom();  // under the panels (Controls / Info can reach up into it)
